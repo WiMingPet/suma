@@ -748,11 +748,7 @@ export default function Home() {
                   onClick={handleGenerateText} // 语音实际调用的是文字生成逻辑，但为了统一，调用 handleGenerateText（语音生成已在 generateFromVoice 中实现，这里需要改成语音生成按钮调用 handleGenerateVoice）
                   disabled={isGeneratingVoice || !user || (!user.is_pro && (user?.daily_count || 0) >= 6)}
                   className="mt-4 px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium disabled:opacity-50 hover:from-green-700 hover:to-emerald-700 transition-all duration-200"
-                  onClick={() => {
-                    if (!user) { setShowLogin(true); return }
-                    if (!prompt.trim()) { alert('请先录音或输入描述'); return }
-                    handleGenerateText() // 注意：语音生成应调用 generateFromVoice，但为了统一，我们直接调用它。实际上语音生成有单独的按钮，但这里没有触发，需要修改
-                  }}
+                  
                 >
                   {isGeneratingVoice ? '生成中...' : '生成应用'}
                 </button>
