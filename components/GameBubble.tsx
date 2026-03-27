@@ -477,6 +477,9 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
     style.textContent = styleSheet;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
   }, []);
 
   return (
