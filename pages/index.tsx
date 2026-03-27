@@ -622,7 +622,7 @@ export default function Home() {
                       type="file" 
                       className="hidden" 
                       accept="image/*" 
-                      capture="environment"
+                      
                       onChange={handleImageUpload} 
                     />
                   </label>
