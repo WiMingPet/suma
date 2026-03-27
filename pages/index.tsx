@@ -469,9 +469,9 @@ export default function Home() {
         </header>
 
         {/* 主要内容区 */}
-        <main className="pt-24 pb-20 px-4 max-w-6xl mx-auto">
+        <main className="pt-24 pb-40 px-4 max-w-6xl mx-auto">
           {/* 功能卡片 */}
-          <div className="grid md:grid-cols-3 gap-6 mb-12">
+          <div className="grid md:grid-cols-3 gap-6 mb-6">
             {/* 文字生成卡片 */}
             <div 
               onClick={() => setActiveTab('text')}
@@ -557,7 +557,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 输入区域 */}
+          {/* 输入区域 - 紧贴卡片下方 */}
           <div className="bg-gray-900/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-700">
             {activeTab === 'text' && (
               <div>
@@ -572,7 +572,6 @@ export default function Home() {
                     <p className="text-sm text-gray-400">
                       {user ? (user.is_pro ? 'Pro会员无限次' : `剩余 ${Math.max(0, 3 - (user.daily_count || 0))} 次`) : '登录后可使用'}
                     </p>
-                    {/* 格式选择 */}
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-500">生成格式：</span>
                       <button
@@ -622,7 +621,6 @@ export default function Home() {
                       type="file" 
                       className="hidden" 
                       accept="image/*" 
-                      
                       onChange={handleImageUpload} 
                     />
                   </label>
@@ -744,15 +742,7 @@ export default function Home() {
                     </button>
                   </div>
                 </div>
-                <button
-                  onClick={handleGenerateText} // 语音实际调用的是文字生成逻辑，但为了统一，调用 handleGenerateText（语音生成已在 generateFromVoice 中实现，这里需要改成语音生成按钮调用 handleGenerateVoice）
-                  disabled={isGeneratingVoice || !user || (!user.is_pro && (user?.daily_count || 0) >= 6)}
-                  className="mt-4 px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium disabled:opacity-50 hover:from-green-700 hover:to-emerald-700 transition-all duration-200"
-                  
-                >
-                  {isGeneratingVoice ? '生成中...' : '生成应用'}
-                </button>
-                {/* 修正：语音生成按钮应调用 generateFromVoice，但缺少触发条件。实际上语音生成是通过录音完成后自动调用 generateFromVoice 的，不需要单独按钮。所以此处按钮可以省略或调整。保留原样，但需确保逻辑正确。 */}
+                {/* 语音生成按钮实际由录音后的自动流程完成，这里不再重复按钮 */}
               </div>
             )}
           </div>
