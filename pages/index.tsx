@@ -552,11 +552,6 @@ const startRecording = async () => {
                 onClick={() => { setShowGames(false); setCurrentGame('snakePro') }}
                 className="p-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"
               >
-                
-              <button
-                onClick={() => { setShowGames(false); setCurrentGame('snakePro') }}
-                className="p-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition-transform"
-              >
                 🐍 贪吃蛇美食大战
               </button>
             </div>
