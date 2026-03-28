@@ -42,11 +42,11 @@ export default function Home() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isGeneratingImage, setIsGeneratingImage] = useState(false)
   
-  // 语音识别状态
+  // 语音录制状态
   const [isRecording, setIsRecording] = useState(false)
   const [isGeneratingVoice, setIsGeneratingVoice] = useState(false)
-  const recognitionRef = useRef<any>(null)
-  const [voiceText, setVoiceText] = useState('')
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
   
   // 预览弹窗
   const [previewCode, setPreviewCode] = useState<string | null>(null)
@@ -125,6 +125,7 @@ export default function Home() {
       const data = await res.json()
       if (data.success) {
         setGeneratedCode(data.code)
+        // 保存到本地存储
         const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
         apps.unshift({
           id: Date.now().toString(),
@@ -219,90 +220,72 @@ export default function Home() {
     }
   }
 
-  // 开始语音识别
-  const startVoiceRecognition = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognition) {
-      alert('您的浏览器不支持语音识别，请使用 Chrome 或 Edge')
+  // 开始录音
+  const startRecording = async () => {
+    if (!user) {
+      setShowLogin(true)
       return
     }
-    if (!user) { setShowLogin(true); return }
     if (!user.is_pro && (user.daily_count || 0) >= 6) {
       alert('今日免费次数已用完')
       return
     }
 
-    const recognition = new SpeechRecognition()
-    recognition.lang = 'zh-CN'
-    recognition.interimResults = false
-    recognition.maxAlternatives = 1
-    recognition.continuous = false
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
 
-    recognition.onstart = () => {
-      setIsRecording(true)
-      setVoiceText('')
-    }
-
-    recognition.onresult = (event: any) => {
-      const text = event.results[0][0].transcript
-      setVoiceText(text)
-      setPrompt(text)
-      setIsRecording(false)
-      // 自动生成
-      handleGenerateVoiceApp(text)
-    }
-
-    recognition.onerror = (event: any) => {
-      console.error('语音识别错误:', event.error)
-      let msg = '识别失败'
-      if (event.error === 'no-speech') msg = '未检测到语音'
-      else if (event.error === 'audio-capture') msg = '无法获取麦克风权限'
-      else if (event.error === 'not-allowed') msg = '请允许麦克风权限'
-      alert(msg)
-      setIsRecording(false)
-    }
-
-    recognition.onend = () => {
-      setIsRecording(false)
-    }
-
-    recognitionRef.current = recognition
-    recognition.start()
-  }
-
-  // 停止语音识别
-  const stopVoiceRecognition = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop()
-      setIsRecording(false)
-      if (voiceText.trim()) {
-        handleGenerateVoiceApp(voiceText)
-      } else if (prompt.trim()) {
-        handleGenerateVoiceApp(prompt)
-      } else {
-        alert('未识别到内容')
+      mediaRecorder.ondataavailable = (e) => {
+        audioChunksRef.current.push(e.data)
       }
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        const reader = new FileReader()
+        reader.onload = async (e) => {
+          const base64 = (e.target?.result as string).split(',')[1]
+          await handleVoiceUpload(base64)
+        }
+        reader.readAsDataURL(audioBlob)
+        stream.getTracks().forEach(track => track.stop())
+      }
+
+      mediaRecorder.start()
+      setIsRecording(true)
+    } catch (err) {
+      alert('无法获取麦克风权限')
     }
   }
 
-  // 从语音生成应用
-  const handleGenerateVoiceApp = async (text: string) => {
-    if (!user) { setShowLogin(true); return }
-    if (!text.trim()) return
+  // 停止录音
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop()
+      setIsRecording(false)
+    }
+  }
+
+  // 上传音频到后端识别
+  const handleVoiceUpload = async (audioBase64: string) => {
+    if (!user) return
     setIsGeneratingVoice(true)
     try {
-      const res = await fetch('/api/generate-text', {
+      const res = await fetch('/api/generate-voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, prompt: text })
+        body: JSON.stringify({ userId: user.id, audioBase64 })
       })
       const data = await res.json()
       if (data.success) {
         setGeneratedCode(data.code)
+        setPrompt(data.recognizedText)
+        // 保存到本地存储
         const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
         apps.unshift({
           id: Date.now().toString(),
-          name: text.slice(0, 30) + '...',
+          name: data.recognizedText.slice(0, 30) + '...',
           code: data.code,
           type: 'voice',
           created_at: new Date().toISOString()
@@ -322,10 +305,10 @@ export default function Home() {
         }
         if (data.remaining !== undefined) setRemaining(data.remaining)
       } else {
-        alert(data.error || '生成失败')
+        alert(data.error || '识别失败')
       }
     } catch (err) {
-      alert('生成失败，请稍后重试')
+      alert('语音处理失败')
     } finally {
       setIsGeneratingVoice(false)
     }
@@ -350,8 +333,12 @@ export default function Home() {
         <meta name="description" content="使用 AI 生成 Web 应用" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
+
+      {/* Three.js 背景 */}
       <ThreeBackground />
+
       <div className="min-h-screen relative z-10">
+        {/* 顶部导航 */}
         <header className="fixed top-0 left-0 right-0 z-40 bg-black/30 backdrop-blur-md border-b border-white/10">
           <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
             <button onClick={() => setShowMenu(true)} className="p-2 hover:bg-white/10 rounded-lg transition">
@@ -378,6 +365,7 @@ export default function Home() {
             </div>
           </div>
         </header>
+
         <main className="pt-24 pb-40 px-4 max-w-6xl mx-auto">
           {/* 功能卡片 */}
           <div className="grid md:grid-cols-3 gap-6 mb-6">
@@ -408,7 +396,7 @@ export default function Home() {
           <div className="bg-gray-900/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-700">
             {activeTab === 'text' && (
               <div>
-                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="描述你想要的应用..." className="w-full h-32 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none" />
+                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="描述你想要的应用，例如：帮我做一个计算器..." className="w-full h-32 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none" />
                 <div className="flex items-center justify-between mt-4">
                   <div className="flex items-center gap-3">
                     <p className="text-sm text-gray-400">{user ? (user.is_pro ? 'Pro会员无限次' : `剩余 ${Math.max(0, 3 - (user.daily_count || 0))} 次`) : '登录后可使用'}</p>
@@ -422,6 +410,7 @@ export default function Home() {
                 </div>
               </div>
             )}
+
             {activeTab === 'image' && (
               <div>
                 <div className="flex flex-col items-center gap-4">
@@ -451,21 +440,35 @@ export default function Home() {
                 </div>
               </div>
             )}
+
             {activeTab === 'voice' && (
               <div className="text-center py-8">
                 <div className="flex justify-center gap-4">
                   {!isRecording ? (
-                    <button onClick={startVoiceRecognition} disabled={isGeneratingVoice || !user || (!user.is_pro && (user?.daily_count || 0) >= 6)} className="w-24 h-24 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 hover:scale-105 transition disabled:opacity-50">
-                      <svg className="w-10 h-10 text-white mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                    <button
+                      onClick={startRecording}
+                      disabled={isGeneratingVoice || !user || (!user.is_pro && (user?.daily_count || 0) >= 6)}
+                      className="w-24 h-24 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 hover:scale-105 transition disabled:opacity-50"
+                    >
+                      <svg className="w-10 h-10 text-white mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                      </svg>
                     </button>
                   ) : (
-                    <button onClick={stopVoiceRecognition} className="w-24 h-24 rounded-full bg-red-500 animate-pulse hover:scale-105 transition">
-                      <svg className="w-10 h-10 text-white mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1" fill="white" /></svg>
+                    <button
+                      onClick={stopRecording}
+                      className="w-24 h-24 rounded-full bg-red-500 animate-pulse hover:scale-105 transition"
+                    >
+                      <svg className="w-10 h-10 text-white mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <rect x="6" y="6" width="12" height="12" rx="1" fill="white" />
+                      </svg>
                     </button>
                   )}
                 </div>
-                <p className="mt-4 text-gray-400">{isRecording ? '🎤 录音中... 点击方块停止' : '点击麦克风开始语音输入'}</p>
-                {isGeneratingVoice && <p className="mt-2 text-blue-400">AI 生成中...</p>}
+                <p className="mt-4 text-gray-400">
+                  {isRecording ? '🎤 录音中... 点击停止' : '点击麦克风开始录音'}
+                </p>
+                {isGeneratingVoice && <p className="mt-2 text-blue-400">AI 识别中...</p>}
                 <div className="flex items-center justify-center gap-3 mt-4">
                   <p className="text-sm text-gray-400">{user ? (user.is_pro ? 'Pro会员无限次' : `剩余 ${Math.max(0, 3 - (user.daily_count || 0))} 次`) : '登录后可使用'}</p>
                   <div className="flex items-center gap-2">
@@ -497,6 +500,7 @@ export default function Home() {
             </div>
           )}
         </main>
+
         <footer className="fixed bottom-0 left-0 right-0 bg-black/50 backdrop-blur-md border-t border-white/10 py-3">
           <div className="max-w-6xl mx-auto px-4 flex items-center justify-center">
             <button onClick={() => setShowGames(true)} className="text-sm text-gray-400 hover:text-white transition">轻松时刻 ☕</button>
