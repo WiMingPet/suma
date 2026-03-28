@@ -41,7 +41,7 @@ async function speechToText(audioBase64: string): Promise<string> {
   const params = {
     EngSerViceType: '16k_zh',
     SourceType: 1,
-    VoiceFormat: 'webm',
+    VoiceFormat: 'wav',
     Data: audioData,
     DataLen: audioBuffer.length,
   }

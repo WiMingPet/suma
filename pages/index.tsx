@@ -15,6 +15,7 @@ import SideMenu from '../components/SideMenu'
 import GameSnake from '../components/GameSnake'
 import GameTetris from '../components/GameTetris'
 import GameBubble from '../components/GameBubble'
+import audioBufferToWav from 'audiobuffer-to-wav'
 
 interface User {
   id: string
@@ -221,43 +222,61 @@ export default function Home() {
   }
 
   // 开始录音
-  const startRecording = async () => {
-    if (!user) {
-      setShowLogin(true)
-      return
+const startRecording = async () => {
+  if (!user) {
+    setShowLogin(true)
+    return
+  }
+  if (!user.is_pro && (user.daily_count || 0) >= 6) {
+    alert('今日免费次数已用完')
+    return
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    const mediaRecorder = new MediaRecorder(stream)
+    mediaRecorderRef.current = mediaRecorder
+    audioChunksRef.current = []
+
+    mediaRecorder.ondataavailable = (e) => {
+      audioChunksRef.current.push(e.data)
     }
-    if (!user.is_pro && (user.daily_count || 0) >= 6) {
-      alert('今日免费次数已用完')
-      return
-    }
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = mediaRecorder
-      audioChunksRef.current = []
-
-      mediaRecorder.ondataavailable = (e) => {
-        audioChunksRef.current.push(e.data)
-      }
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+    mediaRecorder.onstop = async () => {
+      const webmBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+      
+      // 将 webm 转为 wav
+      try {
+        const arrayBuffer = await webmBlob.arrayBuffer()
+        const audioContext = new AudioContext()
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+        
+        // 转换为 wav 格式
+        const wavBuffer = audioBufferToWav(audioBuffer)
+        const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' })
+        
         const reader = new FileReader()
         reader.onload = async (e) => {
           const base64 = (e.target?.result as string).split(',')[1]
           await handleVoiceUpload(base64)
         }
-        reader.readAsDataURL(audioBlob)
-        stream.getTracks().forEach(track => track.stop())
+        reader.readAsDataURL(wavBlob)
+        
+        await audioContext.close()
+      } catch (err) {
+        console.error('音频转换失败:', err)
+        alert('音频处理失败，请重试')
       }
-
-      mediaRecorder.start()
-      setIsRecording(true)
-    } catch (err) {
-      alert('无法获取麦克风权限')
+      
+      stream.getTracks().forEach(track => track.stop())
     }
+
+    mediaRecorder.start()
+    setIsRecording(true)
+  } catch (err) {
+    alert('无法获取麦克风权限')
   }
+}
 
   // 停止录音
   const stopRecording = () => {
