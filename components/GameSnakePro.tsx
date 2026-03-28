@@ -255,7 +255,16 @@ export default function GameSnakePro({ onClose }: GameSnakeProProps) {
             <span>⭐ 等级: <span className="text-green-400 font-bold">{level}</span></span>
           </div>
           <div className="bg-gray-900/80 rounded-xl p-3 flex justify-center">
-            <div className="grid grid-cols-20 gap-0.5 bg-gray-800/50 p-1 rounded" style={{ width: GRID_SIZE * (CELL_SIZE+2), height: GRID_SIZE * (CELL_SIZE+2) }}>
+            <div 
+              className="gap-0.5 bg-gray-800/50 p-1 rounded"
+              style={{ 
+                width: GRID_SIZE * (CELL_SIZE + 2), 
+                height: GRID_SIZE * (CELL_SIZE + 2),
+                display: 'grid',
+                gridTemplateColumns: `repeat(${GRID_SIZE}, minmax(0, 1fr))`,
+                gridTemplateRows: `repeat(${GRID_SIZE}, minmax(0, 1fr))`
+              }}
+            >
               {Array.from({ length: GRID_SIZE }).map((_, y) => (
                 Array.from({ length: GRID_SIZE }).map((_, x) => {
                   const isSnake = snake.some(seg => seg[0] === x && seg[1] === y)

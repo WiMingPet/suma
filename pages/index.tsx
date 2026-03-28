@@ -14,6 +14,8 @@ import LoginModal from '../components/LoginModal'
 import SideMenu from '../components/SideMenu'
 import audioBufferToWav from 'audiobuffer-to-wav'
 import GameSnakePro from '../components/GameSnakePro'
+import GameSpaceShooter from '../components/GameSpaceShooter'
+import GameEggParty from '../components/GameEggParty'
 
 interface User {
   id: string
@@ -504,14 +506,17 @@ export default function Home() {
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} onLoginSuccess={handleLoginSuccess} />
       <SideMenu isOpen={showMenu} onClose={() => setShowMenu(false)} user={user} onLogout={handleLogout} />
 
+      {/* 三款游戏 */}
       {currentGame === 'snakePro' && <GameSnakePro onClose={() => setCurrentGame(null)} />}
+      {currentGame === 'spaceShooter' && <GameSpaceShooter onClose={() => setCurrentGame(null)} />}
+      {currentGame === 'eggParty' && <GameEggParty onClose={() => setCurrentGame(null)} />}
 
       {showGames && (
         <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowGames(false)} />
           <div className="relative bg-gradient-to-br from-gray-900 to-gray-800 p-8 rounded-2xl border border-white/10 max-w-md w-full mx-4 shadow-2xl">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-white">轻松时刻</h2>
+              <h2 className="text-2xl font-bold text-white">🎮 轻松时刻</h2>
               <button onClick={() => setShowGames(false)} className="text-gray-400 hover:text-white">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -519,11 +524,37 @@ export default function Home() {
               </button>
             </div>
             <div className="grid grid-cols-1 gap-4">
+              {/* 贪吃蛇游戏 */}
               <button
                 onClick={() => { setShowGames(false); setCurrentGame('snakePro') }}
-                className="p-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"
+                className="group relative overflow-hidden p-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-2xl"
               >
-                🐍 贪吃蛇美食大战
+                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                <span className="text-2xl">🐍</span>
+                <span>贪吃蛇美食大战</span>
+                <span className="text-sm opacity-75">| 闯关升级</span>
+              </button>
+              
+              {/* 太空射击游戏 */}
+              <button
+                onClick={() => { setShowGames(false); setCurrentGame('spaceShooter') }}
+                className="group relative overflow-hidden p-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-2xl"
+              >
+                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                <span className="text-2xl">🚀</span>
+                <span>3D 太空射击</span>
+                <span className="text-sm opacity-75">| 战机射击</span>
+              </button>
+              
+              {/* 蛋仔派对游戏 */}
+              <button
+                onClick={() => { setShowGames(false); setCurrentGame('eggParty') }}
+                className="group relative overflow-hidden p-4 bg-gradient-to-r from-pink-500 to-orange-500 rounded-xl text-white font-bold text-lg hover:scale-105 transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-2xl"
+              >
+                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                <span className="text-2xl">🥚</span>
+                <span>蛋仔派对</span>
+                <span className="text-sm opacity-75">| 3D跳跃收集</span>
               </button>
             </div>
           </div>
