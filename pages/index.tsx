@@ -271,55 +271,84 @@ export default function Home() {
   }
 
   // 开始语音识别（浏览器原生）
-  const startVoiceRecognition = () => {
-    // 检查浏览器支持
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognition) {
-      alert('您的浏览器不支持语音识别，请使用 Chrome 或 Edge')
-      return
-    }
-
-    // 检查次数限制
-    if (!user) {
-      setShowLogin(true)
-      return
-    }
-    if (!user.is_pro && (user.daily_count || 0) >= 6) {
-      alert('今日免费次数已用完')
-      return
-    }
-
-    const recognition = new SpeechRecognition()
-    recognition.lang = 'zh-CN'
-    recognition.interimResults = false
-    recognition.maxAlternatives = 1
-
-    recognition.onstart = () => {
-      setIsRecording(true)
-      setMessage('🎤 请说话...')
-    }
-
-    recognition.onresult = (event: any) => {
-      const text = event.results[0][0].transcript
-      setPrompt(text)
-      setMessage(`✅ 识别结果: ${text}`)
-      setIsRecording(false)
-      // 自动生成应用
-      handleGenerateVoiceApp(text)
-    }
-
-    recognition.onerror = (event: any) => {
-      setMessage(`❌ 识别失败: ${event.error}`)
-      setIsRecording(false)
-    }
-
-    recognition.onend = () => {
-      setIsRecording(false)
-    }
-
-    recognition.start()
-    recognitionRef.current = recognition
+const startVoiceRecognition = () => {
+  // 检查浏览器支持
+  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+  if (!SpeechRecognition) {
+    alert('您的浏览器不支持语音识别，请使用 Chrome 或 Edge')
+    return
   }
+
+  // 检查次数限制
+  if (!user) {
+    setShowLogin(true)
+    return
+  }
+  if (!user.is_pro && (user.daily_count || 0) >= 6) {
+    alert('今日免费次数已用完')
+    return
+  }
+
+  const recognition = new SpeechRecognition()
+  recognition.lang = 'zh-CN'
+  recognition.interimResults = false
+  recognition.maxAlternatives = 1
+  recognition.continuous = false  // 添加：单次识别，说完即停
+
+  // 添加：超时保护
+  let timeoutId: NodeJS.Timeout
+
+  recognition.onstart = () => {
+    setIsRecording(true)
+    setMessage('🎤 请说话...')
+    // 添加：10秒后自动结束
+    timeoutId = setTimeout(() => {
+      if (isRecording) {
+        recognition.stop()
+        setMessage('⏰ 等待超时，请重新尝试')
+        setIsRecording(false)
+      }
+    }, 10000)
+  }
+
+  recognition.onresult = (event: any) => {
+    // 添加：清除超时
+    clearTimeout(timeoutId)
+    const text = event.results[0][0].transcript
+    setPrompt(text)
+    setMessage(`✅ 识别结果: ${text}`)
+    setIsRecording(false)
+    // 自动生成应用
+    handleGenerateVoiceApp(text)
+  }
+
+  recognition.onerror = (event: any) => {
+    // 添加：清除超时
+    clearTimeout(timeoutId)
+    console.error('语音识别错误:', event.error)
+    let errorMsg = '识别失败'
+    if (event.error === 'no-speech') {
+      errorMsg = '未检测到语音，请重新尝试'
+    } else if (event.error === 'audio-capture') {
+      errorMsg = '无法获取麦克风权限'
+    } else if (event.error === 'not-allowed') {
+      errorMsg = '请允许麦克风权限'
+    }
+    setMessage(`❌ ${errorMsg}`)
+    setIsRecording(false)
+  }
+
+  recognition.onend = () => {
+    // 添加：清除超时
+    clearTimeout(timeoutId)
+    if (isRecording) {
+      setIsRecording(false)
+      setMessage('录音已结束')
+    }
+  }
+
+  recognition.start()
+}
 
   // 从语音生成应用
   const handleGenerateVoiceApp = async (voiceText: string) => {
