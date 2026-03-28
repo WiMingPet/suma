@@ -12,9 +12,7 @@ const ThreeBackground = dynamic(() => import('../components/ThreeBackground'), {
 // 组件导入
 import LoginModal from '../components/LoginModal'
 import SideMenu from '../components/SideMenu'
-import GameSnake from '../components/GameSnake'
-import GameTetris from '../components/GameTetris'
-import GameBubble from '../components/GameBubble'
+import Game3DSpace from '../components/Game3DSpace'
 import audioBufferToWav from 'audiobuffer-to-wav'
 
 interface User {
@@ -530,25 +528,32 @@ const startRecording = async () => {
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} onLoginSuccess={handleLoginSuccess} />
       <SideMenu isOpen={showMenu} onClose={() => setShowMenu(false)} user={user} onLogout={handleLogout} />
 
+      {/* 游戏选择弹窗 - 改为 3D 空间入口 */}
       {showGames && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/80" onClick={() => setShowGames(false)} />
-          <div className="relative bg-gray-900 p-8 rounded-2xl border border-gray-700 max-w-md w-full">
+        <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowGames(false)} />
+          <div className="relative bg-gradient-to-br from-gray-900 to-gray-800 p-8 rounded-2xl border border-white/10 max-w-md w-full mx-4 shadow-2xl">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-white">轻松时刻</h2>
-              <button onClick={() => setShowGames(false)} className="text-gray-400 hover:text-white"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+              <h2 className="text-2xl font-bold text-white">3D 空间</h2>
+              <button onClick={() => setShowGames(false)} className="text-gray-400 hover:text-white">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              <button onClick={() => { setShowGames(false); setCurrentGame('snake') }} className="p-4 bg-green-600/20 border border-green-500/30 rounded-xl hover:bg-green-600/30 transition"><div className="text-3xl mb-2">🐍</div><p className="text-white font-medium">贪吃蛇</p></button>
-              <button onClick={() => { setShowGames(false); setCurrentGame('tetris') }} className="p-4 bg-blue-600/20 border border-blue-500/30 rounded-xl hover:bg-blue-600/30 transition"><div className="text-3xl mb-2">🧱</div><p className="text-white font-medium">俄罗斯方块</p></button>
-              <button onClick={() => { setShowGames(false); setCurrentGame('bubble') }} className="p-4 bg-purple-600/20 border border-purple-500/30 rounded-xl hover:bg-purple-600/30 transition"><div className="text-3xl mb-2">🫧</div><p className="text-white font-medium">泡泡消消乐</p></button>
-            </div>
+            <button
+              onClick={() => { setShowGames(false); setCurrentGame('3dspace') }}
+              className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition-transform"
+            >
+              进入 3D 空间
+            </button>
+            <p className="text-gray-500 text-xs text-center mt-4">
+              炫酷的 3D 动态简历，支持鼠标交互
+            </p>
           </div>
         </div>
       )}
-      {currentGame === 'snake' && <GameSnake onClose={() => setCurrentGame(null)} />}
-      {currentGame === 'tetris' && <GameTetris onClose={() => setCurrentGame(null)} />}
-      {currentGame === 'bubble' && <GameBubble onClose={() => setCurrentGame(null)} />}
+      {currentGame === '3dspace' && <Game3DSpace onClose={() => setCurrentGame(null)} />}
       {previewCode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80" onClick={() => setPreviewCode(null)} />
