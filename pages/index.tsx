@@ -273,7 +273,7 @@ export default function Home() {
   // 开始语音识别（浏览器原生）
   const startVoiceRecognition = () => {
     // 检查浏览器支持
-    const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SpeechRecognition) {
       alert('您的浏览器不支持语音识别，请使用 Chrome 或 Edge')
       return
