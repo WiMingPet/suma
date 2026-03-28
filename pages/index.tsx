@@ -15,8 +15,8 @@ import SideMenu from '../components/SideMenu'
 import Game3DSpace from '../components/Game3DSpace'
 import audioBufferToWav from 'audiobuffer-to-wav'
 import GameSnakePro from '../components/GameSnakePro'
-import GameHappyEliminate from '../components/GameHappyEliminate'
-import GameEggParty from '../components/GameEggParty'
+// import GameHappyEliminate from '../components/GameHappyEliminate'
+// import GameEGGParty from '../components/GameEGGParty'
 
 interface User {
   id: string
@@ -533,8 +533,6 @@ const startRecording = async () => {
 
       {/* 游戏组件 */}
       {currentGame === 'snakePro' && <GameSnakePro onClose={() => setCurrentGame(null)} />}
-      {currentGame === 'happyEliminate' && <GameHappyEliminate onClose={() => setCurrentGame(null)} />}
-      {currentGame === 'eggParty' && <GameEggParty onClose={() => setCurrentGame(null)} />}
 
       {/* 游戏选择弹窗 */}
       {showGames && (
@@ -555,20 +553,10 @@ const startRecording = async () => {
                 className="p-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"
               >
                 🐍 贪吃蛇美食大战
-              </button>
               <button
-                onClick={() => { setShowGames(false); setCurrentGame('happyEliminate') }}
-                className="p-4 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"
+                onClick={() => { setShowGames(false); setCurrentGame('snakePro') }}
+                className="p-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition-transform"
               >
-                  🍬 开心消消乐
+                🐍 贪吃蛇美食大战
               </button>
-              <button
-                onClick={() => { setShowGames(false); setCurrentGame('eggParty') }}
-                className="p-4 bg-gradient-to-r from-pink-500 to-purple-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"
-            >
-              🥚 蛋仔派对
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
+            )}
