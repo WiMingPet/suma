@@ -12,11 +12,8 @@ const ThreeBackground = dynamic(() => import('../components/ThreeBackground'), {
 // 组件导入
 import LoginModal from '../components/LoginModal'
 import SideMenu from '../components/SideMenu'
-import Game3DSpace from '../components/Game3DSpace'
 import audioBufferToWav from 'audiobuffer-to-wav'
 import GameSnakePro from '../components/GameSnakePro'
-// import GameHappyEliminate from '../components/GameHappyEliminate'
-// import GameEGGParty from '../components/GameEGGParty'
 
 interface User {
   id: string
@@ -127,7 +124,6 @@ export default function Home() {
       const data = await res.json()
       if (data.success) {
         setGeneratedCode(data.code)
-        // 保存到本地存储
         const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
         apps.unshift({
           id: Date.now().toString(),
@@ -223,61 +219,55 @@ export default function Home() {
   }
 
   // 开始录音
-const startRecording = async () => {
-  if (!user) {
-    setShowLogin(true)
-    return
-  }
-  if (!user.is_pro && (user.daily_count || 0) >= 6) {
-    alert('今日免费次数已用完')
-    return
-  }
-
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    const mediaRecorder = new MediaRecorder(stream)
-    mediaRecorderRef.current = mediaRecorder
-    audioChunksRef.current = []
-
-    mediaRecorder.ondataavailable = (e) => {
-      audioChunksRef.current.push(e.data)
+  const startRecording = async () => {
+    if (!user) {
+      setShowLogin(true)
+      return
+    }
+    if (!user.is_pro && (user.daily_count || 0) >= 6) {
+      alert('今日免费次数已用完')
+      return
     }
 
-    mediaRecorder.onstop = async () => {
-      const webmBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-      
-      // 将 webm 转为 wav
-      try {
-        const arrayBuffer = await webmBlob.arrayBuffer()
-        const audioContext = new AudioContext()
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-        
-        // 转换为 wav 格式
-        const wavBuffer = audioBufferToWav(audioBuffer)
-        const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' })
-        
-        const reader = new FileReader()
-        reader.onload = async (e) => {
-          const base64 = (e.target?.result as string).split(',')[1]
-          await handleVoiceUpload(base64)
-        }
-        reader.readAsDataURL(wavBlob)
-        
-        await audioContext.close()
-      } catch (err) {
-        console.error('音频转换失败:', err)
-        alert('音频处理失败，请重试')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (e) => {
+        audioChunksRef.current.push(e.data)
       }
-      
-      stream.getTracks().forEach(track => track.stop())
-    }
 
-    mediaRecorder.start()
-    setIsRecording(true)
-  } catch (err) {
-    alert('无法获取麦克风权限')
+      mediaRecorder.onstop = async () => {
+        const webmBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        
+        try {
+          const arrayBuffer = await webmBlob.arrayBuffer()
+          const audioContext = new AudioContext()
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+          const wavBuffer = audioBufferToWav(audioBuffer)
+          const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' })
+          const reader = new FileReader()
+          reader.onload = async (e) => {
+            const base64 = (e.target?.result as string).split(',')[1]
+            await handleVoiceUpload(base64)
+          }
+          reader.readAsDataURL(wavBlob)
+          await audioContext.close()
+        } catch (err) {
+          console.error('音频转换失败:', err)
+          alert('音频处理失败，请重试')
+        }
+        stream.getTracks().forEach(track => track.stop())
+      }
+
+      mediaRecorder.start()
+      setIsRecording(true)
+    } catch (err) {
+      alert('无法获取麦克风权限')
+    }
   }
-}
 
   // 停止录音
   const stopRecording = () => {
@@ -301,7 +291,6 @@ const startRecording = async () => {
       if (data.success) {
         setGeneratedCode(data.code)
         setPrompt(data.recognizedText)
-        // 保存到本地存储
         const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
         apps.unshift({
           id: Date.now().toString(),
@@ -354,11 +343,9 @@ const startRecording = async () => {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      {/* Three.js 背景 */}
       <ThreeBackground />
 
       <div className="min-h-screen relative z-10">
-        {/* 顶部导航 */}
         <header className="fixed top-0 left-0 right-0 z-40 bg-black/30 backdrop-blur-md border-b border-white/10">
           <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
             <button onClick={() => setShowMenu(true)} className="p-2 hover:bg-white/10 rounded-lg transition">
@@ -416,7 +403,7 @@ const startRecording = async () => {
           <div className="bg-gray-900/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-700">
             {activeTab === 'text' && (
               <div>
-                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="描述你想要的应用，例如：帮我做一个计算器..." className="w-full h-32 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none" />
+                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="描述你想要的应用..." className="w-full h-32 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none" />
                 <div className="flex items-center justify-between mt-4">
                   <div className="flex items-center gap-3">
                     <p className="text-sm text-gray-400">{user ? (user.is_pro ? 'Pro会员无限次' : `剩余 ${Math.max(0, 3 - (user.daily_count || 0))} 次`) : '登录后可使用'}</p>
@@ -465,29 +452,16 @@ const startRecording = async () => {
               <div className="text-center py-8">
                 <div className="flex justify-center gap-4">
                   {!isRecording ? (
-                    <button
-                      onClick={startRecording}
-                      disabled={isGeneratingVoice || !user || (!user.is_pro && (user?.daily_count || 0) >= 6)}
-                      className="w-24 h-24 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 hover:scale-105 transition disabled:opacity-50"
-                    >
-                      <svg className="w-10 h-10 text-white mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                      </svg>
+                    <button onClick={startRecording} disabled={isGeneratingVoice || !user || (!user.is_pro && (user?.daily_count || 0) >= 6)} className="w-24 h-24 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 hover:scale-105 transition disabled:opacity-50">
+                      <svg className="w-10 h-10 text-white mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
                     </button>
                   ) : (
-                    <button
-                      onClick={stopRecording}
-                      className="w-24 h-24 rounded-full bg-red-500 animate-pulse hover:scale-105 transition"
-                    >
-                      <svg className="w-10 h-10 text-white mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <rect x="6" y="6" width="12" height="12" rx="1" fill="white" />
-                      </svg>
+                    <button onClick={stopRecording} className="w-24 h-24 rounded-full bg-red-500 animate-pulse hover:scale-105 transition">
+                      <svg className="w-10 h-10 text-white mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1" fill="white" /></svg>
                     </button>
                   )}
                 </div>
-                <p className="mt-4 text-gray-400">
-                  {isRecording ? '🎤 录音中... 点击停止' : '点击麦克风开始录音'}
-                </p>
+                <p className="mt-4 text-gray-400">{isRecording ? '🎤 录音中... 点击停止' : '点击麦克风开始录音'}</p>
                 {isGeneratingVoice && <p className="mt-2 text-blue-400">AI 识别中...</p>}
                 <div className="flex items-center justify-center gap-3 mt-4">
                   <p className="text-sm text-gray-400">{user ? (user.is_pro ? 'Pro会员无限次' : `剩余 ${Math.max(0, 3 - (user.daily_count || 0))} 次`) : '登录后可使用'}</p>
@@ -501,7 +475,6 @@ const startRecording = async () => {
             )}
           </div>
 
-          {/* 生成结果预览 */}
           {generatedCode && (
             <div className="mt-8 bg-gray-900/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-700">
               <div className="flex items-center justify-between mb-4">
@@ -531,10 +504,8 @@ const startRecording = async () => {
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} onLoginSuccess={handleLoginSuccess} />
       <SideMenu isOpen={showMenu} onClose={() => setShowMenu(false)} user={user} onLogout={handleLogout} />
 
-      {/* 游戏组件 */}
       {currentGame === 'snakePro' && <GameSnakePro onClose={() => setCurrentGame(null)} />}
 
-      {/* 游戏选择弹窗 */}
       {showGames && (
         <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowGames(false)} />
@@ -558,3 +529,20 @@ const startRecording = async () => {
           </div>
         </div>
       )}
+
+      {previewCode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80" onClick={() => setPreviewCode(null)} />
+          <div className="relative bg-white w-full max-w-4xl h-[80vh] rounded-lg overflow-hidden shadow-2xl">
+            <button onClick={() => setPreviewCode(null)} className="absolute top-4 right-4 z-10 bg-gray-900/80 hover:bg-gray-900 text-white p-2 rounded-full transition">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <iframe srcDoc={previewCode} className="w-full h-full" title="预览" />
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
