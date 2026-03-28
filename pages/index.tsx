@@ -50,13 +50,10 @@ export default function Home() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isGeneratingImage, setIsGeneratingImage] = useState(false)
   
-  // 语音录制状态
+  // 语音录制状态（使用浏览器原生语音识别）
   const [isRecording, setIsRecording] = useState(false)
-  const [recordingTime, setRecordingTime] = useState(0)
   const [isGeneratingVoice, setIsGeneratingVoice] = useState(false)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioChunksRef = useRef<Blob[]>([])
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const recognitionRef = useRef<any>(null)
   
   // 预览弹窗
   const [previewCode, setPreviewCode] = useState<string | null>(null)
@@ -273,76 +270,78 @@ export default function Home() {
     }
   }
 
-  // 开始录音
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = mediaRecorder
-      audioChunksRef.current = []
+  // 开始语音识别（浏览器原生）
+  const startVoiceRecognition = () => {
+    // 检查浏览器支持
+    const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      alert('您的浏览器不支持语音识别，请使用 Chrome 或 Edge')
+      return
+    }
 
-      mediaRecorder.ondataavailable = (e) => {
-        audioChunksRef.current.push(e.data)
-      }
+    // 检查次数限制
+    if (!user) {
+      setShowLogin(true)
+      return
+    }
+    if (!user.is_pro && (user.daily_count || 0) >= 6) {
+      alert('今日免费次数已用完')
+      return
+    }
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        
-        const reader = new FileReader()
-        reader.onload = async (e) => {
-          const base64 = (e.target?.result as string).split(',')[1]
-          await generateFromVoice(base64)
-        }
-        reader.readAsDataURL(audioBlob)
-        
-        stream.getTracks().forEach(track => track.stop())
-      }
+    const recognition = new SpeechRecognition()
+    recognition.lang = 'zh-CN'
+    recognition.interimResults = false
+    recognition.maxAlternatives = 1
 
-      mediaRecorder.start()
+    recognition.onstart = () => {
       setIsRecording(true)
-      setRecordingTime(0)
-
-      timerRef.current = setInterval(() => {
-        setRecordingTime(t => {
-          if (t >= 30) {
-            stopRecording()
-            return t
-          }
-          return t + 1
-        })
-      }, 1000)
-    } catch (err) {
-      alert('无法访问麦克风，请检查权限')
+      setMessage('🎤 请说话...')
     }
-  }
 
-  // 停止录音
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
+    recognition.onresult = (event: any) => {
+      const text = event.results[0][0].transcript
+      setPrompt(text)
+      setMessage(`✅ 识别结果: ${text}`)
       setIsRecording(false)
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-      }
+      // 自动生成应用
+      handleGenerateVoiceApp(text)
     }
+
+    recognition.onerror = (event: any) => {
+      setMessage(`❌ 识别失败: ${event.error}`)
+      setIsRecording(false)
+    }
+
+    recognition.onend = () => {
+      setIsRecording(false)
+    }
+
+    recognition.start()
+    recognitionRef.current = recognition
   }
 
   // 从语音生成应用
-  const generateFromVoice = async (audioBase64: string) => {
+  const handleGenerateVoiceApp = async (voiceText: string) => {
     if (!user) {
       setShowLogin(true)
+      return
+    }
+    
+    if (!voiceText.trim()) {
+      alert('未识别到内容，请重新录音')
       return
     }
 
     setIsGeneratingVoice(true)
 
     try {
-      const res = await fetch('/api/generate-voice', {
+      const res = await fetch('/api/generate-text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           userId: user.id, 
-          audioBase64 
+          prompt: voiceText 
         })
       })
 
@@ -355,7 +354,7 @@ export default function Home() {
         const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
         const newApp = {
           id: Date.now().toString(),
-          name: `语音应用-${Date.now()}`,
+          name: voiceText.slice(0, 30) + '...',
           code: data.code,
           type: 'voice',
           created_at: new Date().toISOString()
@@ -363,7 +362,6 @@ export default function Home() {
         apps.unshift(newApp)
         localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
         
-        // 如果用户选择 PDF，自动打开打印窗口
         if (outputFormat === 'pdf') {
           setTimeout(() => {
             const printWindow = window.open('', '_blank')
@@ -401,6 +399,14 @@ export default function Home() {
     a.download = 'generated-app.html'
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  // 消息提示（简单替代 alert）
+  const setMessage = (msg: string) => {
+    // 可以后续替换为更优雅的 Toast 组件
+    console.log(msg)
+    // 简单 alert，可换成自定义弹窗
+    // alert(msg)
   }
 
   return (
@@ -557,7 +563,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 输入区域 - 紧贴卡片下方 */}
+          {/* 输入区域 */}
           <div className="bg-gray-900/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-700">
             {activeTab === 'text' && (
               <div>
@@ -689,12 +695,12 @@ export default function Home() {
             {activeTab === 'voice' && (
               <div className="text-center py-8">
                 <button
-                  onClick={isRecording ? stopRecording : startRecording}
+                  onClick={startVoiceRecognition}
                   disabled={isGeneratingVoice || !user || (!user.is_pro && (user?.daily_count || 0) >= 6)}
                   className={`w-24 h-24 rounded-full flex items-center justify-center transition ${
                     isRecording 
                       ? 'bg-red-500 animate-pulse' 
-                      : 'bg-gradient-to-r from-green-500 to-emerald-500'
+                      : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:scale-105'
                   } disabled:opacity-50`}
                 >
                   {isRecording ? (
@@ -709,10 +715,10 @@ export default function Home() {
                   )}
                 </button>
                 <p className="mt-4 text-gray-400">
-                  {isRecording ? `录音中... ${recordingTime}/30秒` : '点击录音（最多30秒）'}
+                  {isRecording ? '🎤 录音中，请说话...' : '点击麦克风开始语音输入'}
                 </p>
                 {isGeneratingVoice && (
-                  <p className="mt-2 text-blue-400">AI 识别中...</p>
+                  <p className="mt-2 text-blue-400">AI 生成中...</p>
                 )}
                 <div className="flex items-center justify-center gap-3 mt-4">
                   <p className="text-sm text-gray-400">
@@ -742,7 +748,6 @@ export default function Home() {
                     </button>
                   </div>
                 </div>
-                {/* 语音生成按钮实际由录音后的自动流程完成，这里不再重复按钮 */}
               </div>
             )}
           </div>
