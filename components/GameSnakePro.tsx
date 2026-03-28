@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import * as THREE from 'three'
 
 interface GameSnakeProProps {
   onClose: () => void
@@ -22,10 +21,10 @@ export default function GameSnakePro({ onClose }: GameSnakeProProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
 
-  // 音效播放（简单模拟）
+  // 音效模拟
   const playSound = (type: 'eat' | 'die') => {
+    if (typeof window === 'undefined') return
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
       const osc = ctx.createOscillator()
@@ -49,65 +48,7 @@ export default function GameSnakePro({ onClose }: GameSnakeProProps) {
     } catch (e) {}
   }
 
-  // Three.js 背景
-  useEffect(() => {
-    if (!containerRef.current) return
-    const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x050b1a)
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000)
-    camera.position.set(0, 10, 20)
-    camera.lookAt(0, 0, 0)
-    const renderer = new THREE.WebGLRenderer({ antialias: true })
-    renderer.setSize(window.innerWidth, window.innerHeight)
-    containerRef.current.appendChild(renderer.domElement)
-
-    // 粒子系统
-    const particlesCount = 800
-    const particlesGeo = new THREE.BufferGeometry()
-    const positions = new Float32Array(particlesCount * 3)
-    for (let i = 0; i < particlesCount; i++) {
-      positions[i*3] = (Math.random() - 0.5) * 50
-      positions[i*3+1] = (Math.random() - 0.5) * 30
-      positions[i*3+2] = (Math.random() - 0.5) * 30 - 20
-    }
-    particlesGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    const particlesMat = new THREE.PointsMaterial({ color: 0x88aaff, size: 0.1, transparent: true, blending: THREE.AdditiveBlending })
-    const particles = new THREE.Points(particlesGeo, particlesMat)
-    scene.add(particles)
-
-    // 简单光源
-    const ambientLight = new THREE.AmbientLight(0x404060)
-    scene.add(ambientLight)
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1)
-    dirLight.position.set(1, 2, 1)
-    scene.add(dirLight)
-
-    let time = 0
-    function animate() {
-      requestAnimationFrame(animate)
-      time += 0.01
-      particles.rotation.y = time * 0.1
-      particles.rotation.x = Math.sin(time * 0.2) * 0.1
-      renderer.render(scene, camera)
-    }
-    animate()
-
-    const handleResize = () => {
-      const w = window.innerWidth
-      const h = window.innerHeight
-      camera.aspect = w / h
-      camera.updateProjectionMatrix()
-      renderer.setSize(w, h)
-    }
-    window.addEventListener('resize', handleResize)
-    return () => {
-      window.removeEventListener('resize', handleResize)
-      if (containerRef.current) containerRef.current.removeChild(renderer.domElement)
-      renderer.dispose()
-    }
-  }, [])
-
-  // 游戏逻辑（与原贪吃蛇类似，但增加得分和关卡）
+  // 游戏逻辑
   useEffect(() => {
     if (!isPlaying || gameOver || isPaused) return
     gameLoopRef.current = setInterval(() => {
@@ -120,7 +61,7 @@ export default function GameSnakePro({ onClose }: GameSnakeProProps) {
           case 'LEFT': newHead = [head[0] - 1, head[1]]; break
           default: newHead = [head[0] + 1, head[1]]
         }
-        // 碰撞检测
+        // 边界碰撞
         if (newHead[0] < 0 || newHead[0] >= GRID_SIZE || newHead[1] < 0 || newHead[1] >= GRID_SIZE) {
           setGameOver(true)
           setIsPlaying(false)
@@ -148,12 +89,11 @@ export default function GameSnakePro({ onClose }: GameSnakeProProps) {
             newFood = [Math.floor(Math.random() * GRID_SIZE), Math.floor(Math.random() * GRID_SIZE)]
           } while (newSnake.some(seg => seg[0] === newFood[0] && seg[1] === newFood[1]))
           setFood(newFood)
-          // 升级（每100分升一级）
           if ((score + 10) % 100 === 0) setLevel(l => l + 1)
         }
         return newSnake
       })
-    }, 150 - (level - 1) * 5) // 速度随等级增加
+    }, 150 - (level - 1) * 5)
     return () => { if (gameLoopRef.current) clearInterval(gameLoopRef.current) }
   }, [isPlaying, gameOver, isPaused, direction, food, score, level])
 
@@ -192,8 +132,7 @@ export default function GameSnakePro({ onClose }: GameSnakeProProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
-      <div ref={containerRef} className="absolute inset-0" />
-      <div className="relative bg-gray-900/80 backdrop-blur-sm rounded-2xl p-6 max-w-md w-full mx-4 z-10">
+      <div className="relative bg-gray-900/80 backdrop-blur-sm rounded-2xl p-6 max-w-md w-full mx-4">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-white">贪吃蛇美食大战</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
