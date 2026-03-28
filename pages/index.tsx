@@ -14,6 +14,9 @@ import LoginModal from '../components/LoginModal'
 import SideMenu from '../components/SideMenu'
 import Game3DSpace from '../components/Game3DSpace'
 import audioBufferToWav from 'audiobuffer-to-wav'
+import GameSnakePro from '../components/GameSnakePro'
+import GameHappyEliminate from '../components/GameHappyEliminate'
+import GameEggParty from '../components/GameEggParty'
 
 interface User {
   id: string
@@ -528,41 +531,44 @@ const startRecording = async () => {
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} onLoginSuccess={handleLoginSuccess} />
       <SideMenu isOpen={showMenu} onClose={() => setShowMenu(false)} user={user} onLogout={handleLogout} />
 
-      {/* 游戏选择弹窗 - 改为 3D 空间入口 */}
+      {/* 游戏组件 */}
+      {currentGame === 'snakePro' && <GameSnakePro onClose={() => setCurrentGame(null)} />}
+      {currentGame === 'happyEliminate' && <GameHappyEliminate onClose={() => setCurrentGame(null)} />}
+      {currentGame === 'eggParty' && <GameEggParty onClose={() => setCurrentGame(null)} />}
+
+      {/* 游戏选择弹窗 */}
       {showGames && (
         <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowGames(false)} />
           <div className="relative bg-gradient-to-br from-gray-900 to-gray-800 p-8 rounded-2xl border border-white/10 max-w-md w-full mx-4 shadow-2xl">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-white">3D 空间</h2>
+              <h2 className="text-2xl font-bold text-white">轻松时刻</h2>
               <button onClick={() => setShowGames(false)} className="text-gray-400 hover:text-white">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <button
-              onClick={() => { setShowGames(false); setCurrentGame('3dspace') }}
-              className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition-transform"
+            <div className="grid grid-cols-1 gap-4">
+              <button
+                onClick={() => { setShowGames(false); setCurrentGame('snakePro') }}
+                className="p-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"
+              >
+                🐍 贪吃蛇美食大战
+              </button>
+              <button
+                onClick={() => { setShowGames(false); setCurrentGame('happyEliminate') }}
+                className="p-4 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"
+              >
+                  🍬 开心消消乐
+              </button>
+              <button
+                onClick={() => { setShowGames(false); setCurrentGame('eggParty') }}
+                className="p-4 bg-gradient-to-r from-pink-500 to-purple-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"
             >
-              进入 3D 空间
+              🥚 蛋仔派对
             </button>
-            <p className="text-gray-500 text-xs text-center mt-4">
-              炫酷的 3D 动态简历，支持鼠标交互
-            </p>
           </div>
         </div>
-      )}
-      {currentGame === '3dspace' && <Game3DSpace onClose={() => setCurrentGame(null)} />}
-      {previewCode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80" onClick={() => setPreviewCode(null)} />
-          <div className="relative bg-white w-full max-w-4xl h-[80vh] rounded-lg overflow-hidden shadow-2xl">
-            <button onClick={() => setPreviewCode(null)} className="absolute top-4 right-4 z-10 bg-gray-900/80 hover:bg-gray-900 text-white p-2 rounded-full transition"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
-            <iframe srcDoc={previewCode} className="w-full h-full" title="预览" />
-          </div>
-        </div>
-      )}
-    </>
-  )
-}
+      </div>
+    )}
