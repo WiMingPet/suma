@@ -46,10 +46,16 @@ export default function GameSpaceShooter({ onClose }: GameSpaceShooterProps) {
   const comboTimeRef = useRef(0);
   const enemiesKilledRef = useRef(0);
   
-  // 音效系统 - 使用简单的 web audio，每次创建新节点
+  // 触摸摇杆状态
+  const joystickActiveRef = useRef(false);
+  const joystickXRef = useRef(0);
+  const joystickYRef = useRef(0);
+  const joystickCenterRef = useRef({ x: 0, y: 0 });
+  const shootPressedRef = useRef(false);
+  
+  // 音效系统
   const playSound = (type: 'shoot' | 'explosion' | 'hit') => {
     try {
-      // 每次播放创建新的 AudioContext
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       const ctx = new AudioCtx();
       const osc = ctx.createOscillator();
@@ -75,13 +81,10 @@ export default function GameSpaceShooter({ onClose }: GameSpaceShooterProps) {
         osc.stop(ctx.currentTime + 0.2);
       }
       
-      // 自动关闭上下文
       setTimeout(() => {
         try { ctx.close(); } catch(e) {}
       }, 500);
-    } catch (e) {
-      // 静默失败，不影响游戏
-    }
+    } catch (e) {}
   };
   
   // 创建玩家战机
@@ -222,6 +225,34 @@ export default function GameSpaceShooter({ onClose }: GameSpaceShooterProps) {
     requestAnimationFrame(animateRing);
   };
   
+  // 触摸摇杆事件处理
+  const handleJoystickStart = (e: React.TouchEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    joystickCenterRef.current = { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
+    joystickActiveRef.current = true;
+    handleJoystickMove(e);
+  };
+  
+  const handleJoystickMove = (e: React.TouchEvent) => {
+    if (!joystickActiveRef.current) return;
+    const touch = e.touches[0];
+    let dx = (touch.clientX - joystickCenterRef.current.x) / 40;
+    let dy = (touch.clientY - joystickCenterRef.current.y) / 40;
+    dx = Math.max(-1, Math.min(1, dx));
+    dy = Math.max(-1, Math.min(1, dy));
+    joystickXRef.current = dx * 4;
+    joystickYRef.current = dy * 3;
+  };
+  
+  const handleJoystickEnd = () => {
+    joystickActiveRef.current = false;
+    joystickXRef.current = 0;
+    joystickYRef.current = 0;
+  };
+  
+  const startShooting = () => { shootPressedRef.current = true; };
+  const stopShooting = () => { shootPressedRef.current = false; };
+  
   // 初始化场景
   useEffect(() => {
     if (!containerRef.current) return;
@@ -347,12 +378,20 @@ export default function GameSpaceShooter({ onClose }: GameSpaceShooterProps) {
       }
       
       if (isPlaying && !gameOver && playerRef.current) {
-        // 玩家移动
+        // 玩家移动 - 同时支持键盘和触摸摇杆
         let moveX = 0, moveY = 0;
+        
+        // 键盘控制
         if (keysRef.current.left) moveX -= 1;
         if (keysRef.current.right) moveX += 1;
         if (keysRef.current.up) moveY += 1;
         if (keysRef.current.down) moveY -= 1;
+        
+        // 触摸摇杆控制（如果有输入则覆盖键盘）
+        if (joystickActiveRef.current && (joystickXRef.current !== 0 || joystickYRef.current !== 0)) {
+          moveX = joystickXRef.current;
+          moveY = joystickYRef.current;
+        }
         
         if (moveX !== 0 || moveY !== 0) {
           const len = Math.sqrt(moveX * moveX + moveY * moveY);
@@ -373,8 +412,9 @@ export default function GameSpaceShooter({ onClose }: GameSpaceShooterProps) {
           playerRef.current.rotation.z = playerPosRef.current.x * -0.15;
         }
         
-        // 射击
-        if (keysRef.current.shoot && shootCooldownRef.current <= 0) {
+        // 射击 - 同时支持键盘和触摸按钮
+        const shouldShoot = keysRef.current.shoot || shootPressedRef.current;
+        if (shouldShoot && shootCooldownRef.current <= 0) {
           const bullet = createBullet(playerRef.current.position);
           scene.add(bullet.mesh);
           bulletsRef.current.push(bullet);
@@ -601,9 +641,41 @@ export default function GameSpaceShooter({ onClose }: GameSpaceShooterProps) {
       )}
       
       {isPlaying && !gameOver && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white/60 text-xs whitespace-nowrap bg-black/40 px-3 py-1 rounded-full">
-          🎮 方向键移动 | 空格射击 | 连击加成得分 | 波次递增难度
-        </div>
+        <>
+          {/* 原有的操作提示 */}
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white/60 text-xs whitespace-nowrap bg-black/40 px-3 py-1 rounded-full">
+            🎮 方向键移动 | 空格射击 | 连击加成得分 | 波次递增难度
+          </div>
+          
+          {/* 新增：手机触摸摇杆（左下角） */}
+          <div
+            className="absolute bottom-20 left-8 z-20 w-28 h-28 rounded-full bg-black/50 backdrop-blur-md border-2 border-white/30 touch-none"
+            onTouchStart={handleJoystickStart}
+            onTouchMove={handleJoystickMove}
+            onTouchEnd={handleJoystickEnd}
+          >
+            <div
+              className="absolute w-12 h-12 rounded-full bg-white/40 border-2 border-white"
+              style={{
+                left: `calc(50% + ${joystickXRef.current * 12}px - 24px)`,
+                top: `calc(50% + ${joystickYRef.current * 12}px - 24px)`,
+                transition: joystickActiveRef.current ? 'none' : 'all 0.1s ease'
+              }}
+            />
+          </div>
+          
+          {/* 新增：手机射击按钮（右下角） */}
+          <button
+            onTouchStart={startShooting}
+            onTouchEnd={stopShooting}
+            onMouseDown={startShooting}
+            onMouseUp={stopShooting}
+            onMouseLeave={stopShooting}
+            className="absolute bottom-20 right-8 z-20 w-20 h-20 rounded-full bg-gradient-to-r from-red-600 to-red-700 backdrop-blur-md border-2 border-white shadow-lg active:scale-95 transition flex items-center justify-center"
+          >
+            <span className="text-3xl">🔫</span>
+          </button>
+        </>
       )}
       
       {combo >= 5 && isPlaying && !gameOver && (
