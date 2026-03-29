@@ -389,7 +389,7 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
         
         armSwing += delta * 12;
         const arms = playerRef.current.children.filter(c => 
-          (c.position.x === -0.45 || c.position.x === 0.45) && c.geometry?.type === 'BoxGeometry'
+          (c.position.x === -0.45 || c.position.x === 0.45)
         );
         arms.forEach((arm, i) => {
           arm.rotation.z = Math.sin(armSwing + i) * 0.6;
