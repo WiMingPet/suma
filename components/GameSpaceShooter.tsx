@@ -46,11 +46,11 @@ export default function GameSpaceShooter({ onClose }: GameSpaceShooterProps) {
   const comboTimeRef = useRef(0);
   const enemiesKilledRef = useRef(0);
   
-  // 触摸摇杆状态
-  const joystickActiveRef = useRef(false);
-  const joystickXRef = useRef(0);
-  const joystickYRef = useRef(0);
-  const joystickCenterRef = useRef({ x: 0, y: 0 });
+  // 触摸方向键状态
+  const touchUpRef = useRef(false);
+  const touchDownRef = useRef(false);
+  const touchLeftRef = useRef(false);
+  const touchRightRef = useRef(false);
   const shootPressedRef = useRef(false);
   
   // 音效系统
@@ -225,30 +225,15 @@ export default function GameSpaceShooter({ onClose }: GameSpaceShooterProps) {
     requestAnimationFrame(animateRing);
   };
   
-  // 触摸摇杆事件处理
-  const handleJoystickStart = (e: React.TouchEvent) => {
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    joystickCenterRef.current = { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
-    joystickActiveRef.current = true;
-    handleJoystickMove(e);
-  };
-  
-  const handleJoystickMove = (e: React.TouchEvent) => {
-    if (!joystickActiveRef.current) return;
-    const touch = e.touches[0];
-    let dx = (touch.clientX - joystickCenterRef.current.x) / 40;
-    let dy = (touch.clientY - joystickCenterRef.current.y) / 40;
-    dx = Math.max(-1, Math.min(1, dx));
-    dy = Math.max(-1, Math.min(1, dy));
-    joystickXRef.current = dx * 4;
-    joystickYRef.current = dy * 3;
-  };
-  
-  const handleJoystickEnd = () => {
-    joystickActiveRef.current = false;
-    joystickXRef.current = 0;
-    joystickYRef.current = 0;
-  };
+  // 触摸方向键控制
+  const startUp = () => { touchUpRef.current = true; };
+  const endUp = () => { touchUpRef.current = false; };
+  const startDown = () => { touchDownRef.current = true; };
+  const endDown = () => { touchDownRef.current = false; };
+  const startLeft = () => { touchLeftRef.current = true; };
+  const endLeft = () => { touchLeftRef.current = false; };
+  const startRight = () => { touchRightRef.current = true; };
+  const endRight = () => { touchRightRef.current = false; };
   
   const startShooting = () => { shootPressedRef.current = true; };
   const stopShooting = () => { shootPressedRef.current = false; };
@@ -378,7 +363,7 @@ export default function GameSpaceShooter({ onClose }: GameSpaceShooterProps) {
       }
       
       if (isPlaying && !gameOver && playerRef.current) {
-        // 玩家移动 - 同时支持键盘和触摸摇杆
+        // 玩家移动 - 同时支持键盘和触摸方向键
         let moveX = 0, moveY = 0;
         
         // 键盘控制
@@ -387,11 +372,11 @@ export default function GameSpaceShooter({ onClose }: GameSpaceShooterProps) {
         if (keysRef.current.up) moveY += 1;
         if (keysRef.current.down) moveY -= 1;
         
-        // 触摸摇杆控制（如果有输入则覆盖键盘）
-        if (joystickActiveRef.current && (joystickXRef.current !== 0 || joystickYRef.current !== 0)) {
-          moveX = joystickXRef.current;
-          moveY = joystickYRef.current;
-        }
+        // 触摸方向键控制
+        if (touchLeftRef.current) moveX -= 1;
+        if (touchRightRef.current) moveX += 1;
+        if (touchUpRef.current) moveY += 1;
+        if (touchDownRef.current) moveY -= 1;
         
         if (moveX !== 0 || moveY !== 0) {
           const len = Math.sqrt(moveX * moveX + moveY * moveY);
@@ -412,7 +397,7 @@ export default function GameSpaceShooter({ onClose }: GameSpaceShooterProps) {
           playerRef.current.rotation.z = playerPosRef.current.x * -0.15;
         }
         
-        // 射击 - 同时支持键盘和触摸按钮
+        // 射击
         const shouldShoot = keysRef.current.shoot || shootPressedRef.current;
         if (shouldShoot && shootCooldownRef.current <= 0) {
           const bullet = createBullet(playerRef.current.position);
@@ -591,6 +576,7 @@ export default function GameSpaceShooter({ onClose }: GameSpaceShooterProps) {
     <div className="fixed inset-0 z-50 bg-black">
       <div ref={containerRef} className="absolute inset-0" />
       
+      {/* 退出按钮 */}
       <button
         onClick={onClose}
         className="absolute top-4 right-4 z-20 w-10 h-10 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 text-white text-xl hover:bg-red-600 transition"
@@ -647,24 +633,57 @@ export default function GameSpaceShooter({ onClose }: GameSpaceShooterProps) {
             🎮 方向键移动 | 空格射击 | 连击加成得分 | 波次递增难度
           </div>
           
-          {/* 新增：手机触摸摇杆（左下角） */}
-          <div
-            className="absolute bottom-20 left-8 z-20 w-28 h-28 rounded-full bg-black/50 backdrop-blur-md border-2 border-white/30 touch-none"
-            onTouchStart={handleJoystickStart}
-            onTouchMove={handleJoystickMove}
-            onTouchEnd={handleJoystickEnd}
-          >
-            <div
-              className="absolute w-12 h-12 rounded-full bg-white/40 border-2 border-white"
-              style={{
-                left: `calc(50% + ${joystickXRef.current * 12}px - 24px)`,
-                top: `calc(50% + ${joystickYRef.current * 12}px - 24px)`,
-                transition: joystickActiveRef.current ? 'none' : 'all 0.1s ease'
-              }}
-            />
+          {/* 触摸方向键区域 - 左下角十字键 */}
+          <div className="absolute bottom-20 left-8 z-20 flex flex-col items-center">
+            {/* 上键 */}
+            <button
+              onTouchStart={startUp}
+              onTouchEnd={endUp}
+              onMouseDown={startUp}
+              onMouseUp={endUp}
+              onMouseLeave={endUp}
+              className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md border-2 border-white/30 flex items-center justify-center text-white text-2xl active:scale-95 transition mb-2"
+            >
+              ▲
+            </button>
+            <div className="flex gap-4">
+              {/* 左键 */}
+              <button
+                onTouchStart={startLeft}
+                onTouchEnd={endLeft}
+                onMouseDown={startLeft}
+                onMouseUp={endLeft}
+                onMouseLeave={endLeft}
+                className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md border-2 border-white/30 flex items-center justify-center text-white text-2xl active:scale-95 transition"
+              >
+                ◀
+              </button>
+              {/* 下键 */}
+              <button
+                onTouchStart={startDown}
+                onTouchEnd={endDown}
+                onMouseDown={startDown}
+                onMouseUp={endDown}
+                onMouseLeave={endDown}
+                className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md border-2 border-white/30 flex items-center justify-center text-white text-2xl active:scale-95 transition"
+              >
+                ▼
+              </button>
+              {/* 右键 */}
+              <button
+                onTouchStart={startRight}
+                onTouchEnd={endRight}
+                onMouseDown={startRight}
+                onMouseUp={endRight}
+                onMouseLeave={endRight}
+                className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md border-2 border-white/30 flex items-center justify-center text-white text-2xl active:scale-95 transition"
+              >
+                ▶
+              </button>
+            </div>
           </div>
           
-          {/* 新增：手机射击按钮（右下角） */}
+          {/* 射击按钮（右下角） */}
           <button
             onTouchStart={startShooting}
             onTouchEnd={stopShooting}

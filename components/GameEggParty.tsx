@@ -9,7 +9,7 @@ interface GameEggPartyProps {
 }
 
 interface Obstacle {
-  mesh: THREE.Group;  // 修改：Mesh -> Group
+  mesh: THREE.Group;
   type: string;
   active: boolean;
   x: number;
@@ -17,7 +17,7 @@ interface Obstacle {
 }
 
 interface Coin {
-  mesh: THREE.Group;  // 修改：Mesh -> Group
+  mesh: THREE.Group;
   active: boolean;
   x: number;
   z: number;
@@ -53,6 +53,8 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
   
   // 触摸控制
   const touchStartXRef = useRef(0);
+  const leftButtonPressedRef = useRef(false);
+  const rightButtonPressedRef = useRef(false);
   
   // 音效系统
   const playSound = (type: 'jump' | 'collect' | 'crash' | 'boost') => {
@@ -151,7 +153,7 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
     return group;
   };
   
-  // 创建障碍物 - 返回 Group
+  // 创建障碍物
   const createObstacle = (type: string, x: number, z: number) => {
     let mesh: THREE.Group;
     
@@ -179,7 +181,7 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
     return { mesh, type, active: true, x, z };
   };
   
-  // 创建金币 - 返回 Group
+  // 创建金币
   const createCoin = (x: number, z: number) => {
     const coinGroup = new THREE.Group();
     const coinMat = new THREE.MeshStandardMaterial({ color: 0xffcc44, metalness: 0.9, emissive: 0xffaa33 });
@@ -328,7 +330,7 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
       coinsRef.current.push({ mesh: coin, active: true, x, z });
     }
     
-    // 触摸控制
+    // 触摸滑动控制
     const handleTouchStart = (e: TouchEvent) => {
       touchStartXRef.current = e.touches[0].clientX;
     };
@@ -384,7 +386,17 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
         speedRef.current = Math.min(12, newSpeed);
         setSpeed(Math.floor(speedRef.current * 12));
         
-        playerXRef.current += (targetXRef.current - playerXRef.current) * 0.2;
+        // 玩家移动 - 同时支持键盘、滑动、触摸按钮
+        let moveTarget = 0;
+        if (targetXRef.current !== 0) {
+          moveTarget = targetXRef.current;
+        } else if (leftButtonPressedRef.current) {
+          moveTarget = -1;
+        } else if (rightButtonPressedRef.current) {
+          moveTarget = 1;
+        }
+        
+        playerXRef.current += (moveTarget - playerXRef.current) * 0.2;
         playerRef.current.position.x = Math.max(-1.3, Math.min(1.3, playerXRef.current));
         
         armSwing += delta * 12;
@@ -409,7 +421,6 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
           ob.z += scrollSpeed;
           ob.mesh.position.z = ob.z;
           
-          // 碰撞检测 - 玩家在 z = 3
           if (playerRef.current && ob.active && invincibleTimerRef.current <= 0 &&
               Math.abs(playerRef.current.position.x - ob.x) < 0.65 && 
               Math.abs(ob.z - playerRef.current.position.z) < 0.8 && 
@@ -430,14 +441,12 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
             scene.add(flash);
             setTimeout(() => scene.remove(flash), 150);
             
-            // 重置到最远的底部
             ob.z = -35 - Math.random() * 20;
             ob.x = [-1.2, 0, 1.2][Math.floor(Math.random() * 3)];
             ob.mesh.position.x = ob.x;
             ob.mesh.position.z = ob.z;
           }
           
-          // 超出屏幕顶部后重置到最远的底部
           if (ob.z > 5) {
             ob.z = -35 - Math.random() * 20;
             ob.x = [-1.2, 0, 1.2][Math.floor(Math.random() * 3)];
@@ -452,7 +461,6 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
           coin.mesh.position.z = coin.z;
           coin.mesh.rotation.y += 0.1;
           
-          // 收集检测 - 玩家在 z = 3
           if (playerRef.current && coin.active && 
               Math.abs(playerRef.current.position.x - coin.x) < 0.65 && 
               Math.abs(coin.z - playerRef.current.position.z) < 0.7 && 
@@ -466,7 +474,6 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
             playSound('collect');
             
             setTimeout(() => {
-              // 重置到最远的底部
               coin.z = -32 - Math.random() * 22;
               coin.x = [-1.2, 0, 1.2][Math.floor(Math.random() * 3)];
               coin.mesh.position.x = coin.x;
@@ -476,7 +483,6 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
             }, 200);
           }
           
-          // 超出屏幕顶部后重置到最远的底部
           if (coin.z > 5 && coin.active) {
             coin.z = -32 - Math.random() * 22;
             coin.x = [-1.2, 0, 1.2][Math.floor(Math.random() * 3)];
@@ -488,7 +494,6 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
         setDistance(d => d + Math.floor(speedRef.current * delta * 12));
       }
       
-      // 相机跟随
       if (playerRef.current && cameraRef.current) {
         const targetX = playerRef.current.position.x * 0.3;
         cameraRef.current.position.x += (targetX - cameraRef.current.position.x) * 0.1;
@@ -570,6 +575,7 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
     <div className="fixed inset-0 z-50 bg-black">
       <div ref={containerRef} className="absolute inset-0" />
       
+      {/* 退出按钮 */}
       <button
         onClick={onClose}
         className="absolute top-4 right-4 z-20 w-10 h-10 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 text-white text-xl hover:bg-red-600 transition"
@@ -624,9 +630,36 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
       )}
       
       {isPlaying && !gameOver && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white/60 text-xs whitespace-nowrap bg-black/40 px-3 py-1 rounded-full">
-          🎮 左右滑动/方向键移动 | 收集金币 | 躲避障碍物
-        </div>
+        <>
+          {/* 原有的操作提示 */}
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white/60 text-xs whitespace-nowrap bg-black/40 px-3 py-1 rounded-full">
+            🎮 左右滑动/方向键移动 | 收集金币 | 躲避障碍物
+          </div>
+          
+          {/* 左箭头触摸按钮 */}
+          <button
+            onTouchStart={() => { leftButtonPressedRef.current = true; }}
+            onTouchEnd={() => { leftButtonPressedRef.current = false; }}
+            onMouseDown={() => { leftButtonPressedRef.current = true; }}
+            onMouseUp={() => { leftButtonPressedRef.current = false; }}
+            onMouseLeave={() => { leftButtonPressedRef.current = false; }}
+            className="absolute bottom-20 left-8 z-20 w-16 h-16 rounded-full bg-black/50 backdrop-blur-md border-2 border-white/30 flex items-center justify-center text-white text-3xl active:scale-95 transition"
+          >
+            ◀
+          </button>
+          
+          {/* 右箭头触摸按钮 */}
+          <button
+            onTouchStart={() => { rightButtonPressedRef.current = true; }}
+            onTouchEnd={() => { rightButtonPressedRef.current = false; }}
+            onMouseDown={() => { rightButtonPressedRef.current = true; }}
+            onMouseUp={() => { rightButtonPressedRef.current = false; }}
+            onMouseLeave={() => { rightButtonPressedRef.current = false; }}
+            className="absolute bottom-20 right-8 z-20 w-16 h-16 rounded-full bg-black/50 backdrop-blur-md border-2 border-white/30 flex items-center justify-center text-white text-3xl active:scale-95 transition"
+          >
+            ▶
+          </button>
+        </>
       )}
       
       {combo >= 3 && isPlaying && !gameOver && (
