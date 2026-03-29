@@ -1,4 +1,5 @@
 // components/GameEggParty.tsx
+// 版本 v2.0 - 2024年3月29日更新
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
