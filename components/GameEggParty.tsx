@@ -1,1068 +1,638 @@
-'use client'
+// components/GameRunner.tsx
+'use client';
 
-import { useEffect, useRef, useState } from 'react'
-import * as THREE from 'three'
+import { useEffect, useRef, useState } from 'react';
+import * as THREE from 'three';
 
-interface GameEggPartyProps {
-  onClose: () => void
+interface GameRunnerProps {
+  onClose: () => void;
 }
 
-interface Player {
-  id: string
-  mesh: THREE.Group
-  type: 'player' | 'ai'
-  skin: string
-  health: number
-  score: number
-  velocity: { x: number; z: number }
-  lastAttack: number
-  isStunned: boolean
-  stunEndTime: number
-  name: string
-  hitFlash: number
+interface Obstacle {
+  mesh: THREE.Mesh;
+  type: string;
+  active: boolean;
+  x: number;
+  z: number;
 }
 
-interface PowerUp {
-  mesh: THREE.Mesh
-  type: 'bomb' | 'freeze' | 'speed' | 'heal'
-  collected: boolean
+interface Coin {
+  mesh: THREE.Mesh;
+  active: boolean;
+  x: number;
+  z: number;
 }
 
-interface Shockwave {
-  mesh: THREE.Mesh
-  life: number
-  maxLife: number
-  scale: number
-}
-
-// 蛋仔皮肤配置
-const EGG_SKINS = [
-  { id: 'yellow', name: '小黄蛋', color: 0xffcc88, accent: 0xffaa66, hat: 0xff8888, icon: '🥚' },
-  { id: 'pink', name: '粉粉蛋', color: 0xffaacc, accent: 0xff88aa, hat: 0xffaacc, icon: '🌸' },
-  { id: 'blue', name: '蓝蓝蛋', color: 0x88aaff, accent: 0x6688dd, hat: 0x88aaff, icon: '💙' },
-  { id: 'green', name: '绿绿蛋', color: 0x88dd88, accent: 0x66aa66, hat: 0x88dd88, icon: '💚' },
-  { id: 'purple', name: '紫紫蛋', color: 0xcc88ff, accent: 0xaa66dd, hat: 0xcc88ff, icon: '💜' },
-  { id: 'orange', name: '橙橙蛋', color: 0xffaa66, accent: 0xdd8844, hat: 0xffaa66, icon: '🧡' },
-]
-
-// AI 名字
-const AI_NAMES = ['蛋小黄', '蛋小粉', '蛋小蓝', '蛋小绿', '蛋小紫', '蛋小橙', '捣蛋鬼', '暴走蛋', '萌蛋蛋', '铁蛋蛋']
-
-export default function GameEggParty({ onClose }: GameEggPartyProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const sceneRef = useRef<THREE.Scene | null>(null)
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
-  const playersRef = useRef<Player[]>([])
-  const powerUpsRef = useRef<PowerUp[]>([])
-  const shockwavesRef = useRef<Shockwave[]>([])
-  const floatingOrbsRef = useRef<THREE.Mesh[]>([])
+export default function GameRunner({ onClose }: GameRunnerProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [score, setScore] = useState(0);
+  const [distance, setDistance] = useState(0);
+  const [health, setHealth] = useState(3);
+  const [gameOver, setGameOver] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [speed, setSpeed] = useState(0);
+  const [combo, setCombo] = useState(0);
   
-  const [gameMode, setGameMode] = useState<'select' | 'battle'>('select')
-  const [selectedSkin, setSelectedSkin] = useState(0)
-  const [playerName, setPlayerName] = useState('蛋仔玩家')
-  const [aiCount, setAiCount] = useState(3)
-  const [gameStatus, setGameStatus] = useState<'waiting' | 'playing' | 'gameover'>('waiting')
-  const [winner, setWinner] = useState<string | null>(null)
-  const [playerHealth, setPlayerHealth] = useState(100)
-  const [playerScore, setPlayerScore] = useState(0)
-  const [survivalTime, setSurvivalTime] = useState(0)
-  const [screenShake, setScreenShake] = useState(0)
-  const [combo, setCombo] = useState(0)
-  const [comboTimer, setComboTimer] = useState(0)
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const playerRef = useRef<THREE.Group | null>(null);
+  const obstaclesRef = useRef<Obstacle[]>([]);
+  const coinsRef = useRef<Coin[]>([]);
+  const groundTilesRef = useRef<THREE.Mesh[]>([]);
+  const animationRef = useRef<number>();
   
-  const keysRef = useRef({ left: false, right: false, up: false, down: false, attack: false })
-  const animationRef = useRef<number>()
-  const timeRef = useRef<number>(0)
-  const attackCooldownRef = useRef(0)
-  const cameraShakeRef = useRef({ x: 0, z: 0, intensity: 0 })
-
-  // 增强音效
-  const playSound = (type: 'attack' | 'hit' | 'collect' | 'gameover' | 'start' | 'combo' | 'victory') => {
+  // 游戏状态
+  const playerXRef = useRef(0);
+  const targetXRef = useRef(0);
+  const speedRef = useRef(0);
+  const comboRef = useRef(0);
+  const comboTimeRef = useRef(0);
+  const scrollOffsetRef = useRef(0);
+  const invincibleTimerRef = useRef(0);
+  
+  // 触摸控制
+  const touchStartXRef = useRef(0);
+  
+  // 音效系统
+  const playSound = (type: 'jump' | 'collect' | 'crash' | 'boost') => {
     try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      gain.gain.value = 0.2;
       
-      if (type === 'attack') {
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
-        osc.connect(gain)
-        gain.connect(ctx.destination)
-        osc.frequency.value = 500
-        gain.gain.value = 0.25
-        osc.start()
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.15)
-        osc.stop(ctx.currentTime + 0.15)
-        setTimeout(() => ctx.close(), 200)
-      } else if (type === 'hit') {
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
-        const noise = ctx.createBufferSource()
-        osc.connect(gain)
-        gain.connect(ctx.destination)
-        osc.frequency.value = 180
-        gain.gain.value = 0.3
-        osc.start()
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.25)
-        osc.stop(ctx.currentTime + 0.25)
-        setTimeout(() => ctx.close(), 300)
+      if (type === 'jump') {
+        osc.frequency.value = 800;
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.15);
+        osc.stop(ctx.currentTime + 0.15);
       } else if (type === 'collect') {
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
-        osc.connect(gain)
-        gain.connect(ctx.destination)
-        osc.frequency.value = 900
-        gain.gain.value = 0.2
-        osc.start()
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12)
-        osc.stop(ctx.currentTime + 0.12)
-        setTimeout(() => ctx.close(), 150)
-      } else if (type === 'combo') {
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
-        osc.connect(gain)
-        gain.connect(ctx.destination)
-        osc.frequency.value = 1200
-        gain.gain.value = 0.35
-        osc.start()
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.2)
-        osc.stop(ctx.currentTime + 0.2)
-        setTimeout(() => ctx.close(), 250)
-      } else if (type === 'victory') {
-        const osc1 = ctx.createOscillator()
-        const osc2 = ctx.createOscillator()
-        const gain = ctx.createGain()
-        osc1.connect(gain)
-        osc2.connect(gain)
-        gain.connect(ctx.destination)
-        osc1.frequency.value = 800
-        osc2.frequency.value = 1200
-        gain.gain.value = 0.4
-        osc1.start()
-        osc2.start()
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.8)
-        osc1.stop(ctx.currentTime + 0.8)
-        osc2.stop(ctx.currentTime + 0.8)
-        setTimeout(() => ctx.close(), 900)
+        osc.frequency.value = 1200;
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.1);
+        osc.stop(ctx.currentTime + 0.1);
+      } else if (type === 'crash') {
+        osc.frequency.value = 200;
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+        osc.stop(ctx.currentTime + 0.4);
       } else {
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
-        osc.connect(gain)
-        gain.connect(ctx.destination)
-        osc.frequency.value = 600
-        gain.gain.value = 0.2
-        osc.start()
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3)
-        osc.stop(ctx.currentTime + 0.3)
-        setTimeout(() => ctx.close(), 400)
+        osc.frequency.value = 600;
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.25);
+        osc.stop(ctx.currentTime + 0.25);
       }
+      
+      setTimeout(() => {
+        try { ctx.close(); } catch(e) {}
+      }, 500);
     } catch (e) {}
-  }
-
-  // 屏幕震动
-  const shakeScreen = (intensity: number, duration: number) => {
-    setScreenShake(intensity)
-    cameraShakeRef.current = { x: 0, z: 0, intensity: intensity }
-    setTimeout(() => {
-      if (cameraShakeRef.current.intensity === intensity) {
-        setScreenShake(0)
-        cameraShakeRef.current.intensity = 0
-      }
-    }, duration)
-  }
-
-  // 增强粒子特效
-  const createParticles = (position: THREE.Vector3, color: number, count: number = 20, size: number = 0.08, spread: number = 0.6) => {
-    if (!sceneRef.current) return
-    
-    for (let i = 0; i < count; i++) {
-      const geometry = new THREE.SphereGeometry(size, 6, 6)
-      const material = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.5 })
-      const particle = new THREE.Mesh(geometry, material)
-      particle.position.copy(position)
-      sceneRef.current.add(particle)
-      
-      const velocity = new THREE.Vector3(
-        (Math.random() - 0.5) * spread,
-        Math.random() * spread,
-        (Math.random() - 0.5) * spread
-      )
-      
-      let life = 0
-      const animateParticle = () => {
-        particle.position.x += velocity.x
-        particle.position.y += velocity.y
-        particle.position.z += velocity.z
-        particle.scale.multiplyScalar(0.95)
-        life++
-        if (life < 40) {
-          requestAnimationFrame(animateParticle)
-        } else {
-          sceneRef.current?.remove(particle)
-        }
-      }
-      requestAnimationFrame(animateParticle)
-    }
-  }
-
-  // 创建冲击波
-  const createShockwave = (position: THREE.Vector3, color: number) => {
-    if (!sceneRef.current) return
-    
-    const ringGeo = new THREE.TorusGeometry(0.5, 0.08, 32, 64)
-    const ringMat = new THREE.MeshStandardMaterial({ color: color, emissive: color, transparent: true, opacity: 0.8 })
-    const ring = new THREE.Mesh(ringGeo, ringMat)
-    ring.position.copy(position)
-    ring.position.y = 0.1
-    sceneRef.current.add(ring)
-    
-    shockwavesRef.current.push({
-      mesh: ring,
-      life: 0,
-      maxLife: 30,
-      scale: 1
-    })
-  }
-
-  // 创建胜利光环
-  const createVictoryAura = (position: THREE.Vector3) => {
-    if (!sceneRef.current) return
-    
-    const particles: THREE.Mesh[] = []
-    for (let i = 0; i < 60; i++) {
-      const geometry = new THREE.SphereGeometry(0.1, 6, 6)
-      const material = new THREE.MeshStandardMaterial({ color: 0xffaa44, emissive: 0xff6600, emissiveIntensity: 0.8 })
-      const particle = new THREE.Mesh(geometry, material)
-      const angle = (i / 60) * Math.PI * 2
-      const radius = 1.5
-      particle.position.set(position.x + Math.cos(angle) * radius, position.y + 0.5, position.z + Math.sin(angle) * radius)
-      sceneRef.current.add(particle)
-      particles.push(particle)
-    }
-    
-    let angle = 0
-    const animateAura = () => {
-      angle += 0.05
-      particles.forEach((p, i) => {
-        const rad = (i / particles.length) * Math.PI * 2 + angle
-        const radius = 1.5 + Math.sin(angle * 2) * 0.2
-        p.position.x = position.x + Math.cos(rad) * radius
-        p.position.z = position.z + Math.sin(rad) * radius
-        p.position.y = position.y + 0.5 + Math.sin(angle * 3) * 0.2
-        p.scale.setScalar(0.8 + Math.sin(angle * 5 + i) * 0.3)
-      })
-      if (angle < Math.PI * 4) {
-        requestAnimationFrame(animateAura)
-      } else {
-        particles.forEach(p => sceneRef.current?.remove(p))
-      }
-    }
-    animateAura()
-  }
-
-  // 创建蛋仔角色（增强版）
-  const createEggCharacter = (skinColor: number, accentColor: number, hatColor: number) => {
-    const group = new THREE.Group()
-    
-    // 身体
-    const bodyGeo = new THREE.SphereGeometry(0.55, 48, 48)
-    const bodyMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.2, metalness: 0.1 })
-    const body = new THREE.Mesh(bodyGeo, bodyMat)
-    body.scale.set(1, 1.15, 0.9)
-    body.castShadow = true
-    group.add(body)
-    
-    // 大眼睛（带高光）
-    const eyeWhiteGeo = new THREE.SphereGeometry(0.18, 48, 48)
-    const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.1 })
-    const leftEye = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat)
-    leftEye.position.set(-0.3, 0.35, 0.68)
-    group.add(leftEye)
-    const rightEye = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat)
-    rightEye.position.set(0.3, 0.35, 0.68)
-    group.add(rightEye)
-    
-    // 瞳孔（会随移动方向转动）
-    const eyeBlackGeo = new THREE.SphereGeometry(0.12, 32, 32)
-    const eyeBlackMat = new THREE.MeshStandardMaterial({ color: 0x000000 })
-    const leftPupil = new THREE.Mesh(eyeBlackGeo, eyeBlackMat)
-    leftPupil.position.set(-0.3, 0.33, 0.85)
-    group.add(leftPupil)
-    const rightPupil = new THREE.Mesh(eyeBlackGeo, eyeBlackMat)
-    rightPupil.position.set(0.3, 0.33, 0.85)
-    group.add(rightPupil)
-    
-    // 高光
-    const highlightGeo = new THREE.SphereGeometry(0.06, 24, 24)
-    const highlightMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
-    const leftHighlight = new THREE.Mesh(highlightGeo, highlightMat)
-    leftHighlight.position.set(-0.34, 0.42, 0.9)
-    group.add(leftHighlight)
-    const rightHighlight = new THREE.Mesh(highlightGeo, highlightMat)
-    rightHighlight.position.set(0.26, 0.42, 0.9)
-    group.add(rightHighlight)
-    
-    // 腮红
-    const blushGeo = new THREE.SphereGeometry(0.09, 24, 24)
-    const blushMat = new THREE.MeshStandardMaterial({ color: 0xffaaaa, emissive: 0xff8888, emissiveIntensity: 0.2 })
-    const leftBlush = new THREE.Mesh(blushGeo, blushMat)
-    leftBlush.position.set(-0.48, 0.12, 0.72)
-    group.add(leftBlush)
-    const rightBlush = new THREE.Mesh(blushGeo, blushMat)
-    rightBlush.position.set(0.48, 0.12, 0.72)
-    group.add(rightBlush)
-    
-    // 嘴巴
-    const mouthGeo = new THREE.TorusGeometry(0.13, 0.05, 24, 48, Math.PI)
-    const mouthMat = new THREE.MeshStandardMaterial({ color: 0xcc8866 })
-    const mouth = new THREE.Mesh(mouthGeo, mouthMat)
-    mouth.rotation.x = 0.15
-    mouth.rotation.z = 0.1
-    mouth.position.set(0, 0.02, 0.78)
-    group.add(mouth)
-    
-    // 帽子
-    const hatGeo = new THREE.ConeGeometry(0.48, 0.38, 12)
-    const hatMat = new THREE.MeshStandardMaterial({ color: hatColor, metalness: 0.3 })
-    const hat = new THREE.Mesh(hatGeo, hatMat)
-    hat.position.y = 0.73
-    group.add(hat)
-    
-    const hatBallGeo = new THREE.SphereGeometry(0.12, 16, 16)
-    const hatBallMat = new THREE.MeshStandardMaterial({ color: accentColor, emissive: accentColor, emissiveIntensity: 0.3 })
-    const hatBall = new THREE.Mesh(hatBallGeo, hatBallMat)
-    hatBall.position.set(0, 0.92, 0)
-    group.add(hatBall)
-    
-    group.castShadow = true
-    group.receiveShadow = true
-    return group
-  }
-
-  // 初始化战斗场景（增强版）
-  const initBattleScene = () => {
-    if (!sceneRef.current) return
-    
-    const scene = sceneRef.current
-    
-    // 竞技场地面（带网格纹理）
-    const arenaSize = 16
-    const gridHelper = new THREE.GridHelper(arenaSize, 20, 0x88aaff, 0x4466aa)
-    gridHelper.position.y = -0.85
-    gridHelper.material.transparent = true
-    gridHelper.material.opacity = 0.5
-    scene.add(gridHelper)
-    
-    const groundMat = new THREE.MeshStandardMaterial({ color: 0x5c9e5e, roughness: 0.7, metalness: 0.1 })
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(arenaSize, arenaSize), groundMat)
-    ground.rotation.x = -Math.PI / 2
-    ground.position.y = -0.9
-    ground.receiveShadow = true
-    scene.add(ground)
-    
-    // 装饰性光柱（四个角落）
-    const pillarMat = new THREE.MeshStandardMaterial({ color: 0xddaa77, emissive: 0x442200 })
-    const corners = [[-7, -7], [-7, 7], [7, -7], [7, 7]]
-    corners.forEach(([x, z]) => {
-      const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 1.8, 8), pillarMat)
-      pillar.position.set(x, -0.2, z)
-      pillar.castShadow = true
-      scene.add(pillar)
-      
-      const topLight = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), new THREE.MeshStandardMaterial({ color: 0xffaa66, emissive: 0xff4400, emissiveIntensity: 0.5 }))
-      topLight.position.set(x, 0.7, z)
-      scene.add(topLight)
-      floatingOrbsRef.current.push(topLight)
-    })
-    
-    // 漂浮粒子（氛围）
-    const ambientParticles = new THREE.BufferGeometry()
-    const particleCount = 400
-    const positions = new Float32Array(particleCount * 3)
-    for (let i = 0; i < particleCount; i++) {
-      positions[i*3] = (Math.random() - 0.5) * 18
-      positions[i*3+1] = Math.random() * 3
-      positions[i*3+2] = (Math.random() - 0.5) * 18
-    }
-    ambientParticles.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    const particleMat = new THREE.PointsMaterial({ color: 0x88aaff, size: 0.05, transparent: true, opacity: 0.4 })
-    const particles = new THREE.Points(ambientParticles, particleMat)
-    scene.add(particles)
-    
-    // 动态灯光
-    const ambientLight = new THREE.AmbientLight(0x88aaff, 0.6)
-    scene.add(ambientLight)
-    
-    const mainLight = new THREE.DirectionalLight(0xfff5e6, 1.2)
-    mainLight.position.set(5, 8, 4)
-    mainLight.castShadow = true
-    mainLight.shadow.mapSize.width = 1024
-    mainLight.shadow.mapSize.height = 1024
-    scene.add(mainLight)
-    
-    const fillLight = new THREE.PointLight(0xffaa66, 0.5)
-    fillLight.position.set(0, 3, 0)
-    scene.add(fillLight)
-    
-    const backLight = new THREE.PointLight(0x6688ff, 0.4)
-    backLight.position.set(0, 2, -5)
-    scene.add(backLight)
-    
-    const colorLight = new THREE.PointLight(0xff66aa, 0.3)
-    colorLight.position.set(3, 2, 3)
-    scene.add(colorLight)
-    
-    return { particles, mainLight, fillLight, colorLight }
-  }
-
-  // 开始游戏
-  const startBattle = () => {
-    if (!sceneRef.current || !cameraRef.current) return
-    
-    setGameStatus('playing')
-    setWinner(null)
-    setPlayerHealth(100)
-    setPlayerScore(0)
-    setSurvivalTime(0)
-    setCombo(0)
-    setComboTimer(0)
-    timeRef.current = 0
-    
-    // 清除现有玩家和道具
-    playersRef.current.forEach(p => sceneRef.current?.remove(p.mesh))
-    powerUpsRef.current.forEach(p => sceneRef.current?.remove(p.mesh))
-    shockwavesRef.current.forEach(s => sceneRef.current?.remove(s.mesh))
-    playersRef.current = []
-    powerUpsRef.current = []
-    shockwavesRef.current = []
-    
-    const skin = EGG_SKINS[selectedSkin]
-    
-    // 创建玩家
-    const playerMesh = createEggCharacter(skin.color, skin.accent, skin.hat)
-    playerMesh.position.set(0, 0, 0)
-    sceneRef.current.add(playerMesh)
-    
-    playersRef.current.push({
-      id: 'player',
-      mesh: playerMesh,
-      type: 'player',
-      skin: skin.id,
-      health: 100,
-      score: 0,
-      velocity: { x: 0, z: 0 },
-      lastAttack: 0,
-      isStunned: false,
-      stunEndTime: 0,
-      name: playerName,
-      hitFlash: 0
-    })
-    
-    // 创建 AI 对手
-    const positions = [[-3.5, -3.5], [3.5, -3.5], [-3.5, 3.5], [3.5, 3.5], [-5, 0], [5, 0], [0, -5], [0, 5]]
-    for (let i = 0; i < Math.min(aiCount, 8); i++) {
-      const aiSkin = EGG_SKINS[Math.floor(Math.random() * EGG_SKINS.length)]
-      const aiMesh = createEggCharacter(aiSkin.color, aiSkin.accent, aiSkin.hat)
-      const pos = positions[i % positions.length]
-      aiMesh.position.set(pos[0], 0, pos[1])
-      sceneRef.current.add(aiMesh)
-      
-      playersRef.current.push({
-        id: `ai_${i}`,
-        mesh: aiMesh,
-        type: 'ai',
-        skin: aiSkin.id,
-        health: 100,
-        score: 0,
-        velocity: { x: 0, z: 0 },
-        lastAttack: 0,
-        isStunned: false,
-        stunEndTime: 0,
-        name: AI_NAMES[i % AI_NAMES.length],
-        hitFlash: 0
-      })
-    }
-    
-    // 创建道具
-    const powerUpTypes: ('bomb' | 'freeze' | 'speed' | 'heal')[] = ['bomb', 'freeze', 'speed', 'heal']
-    for (let i = 0; i < 15; i++) {
-      const type = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)]
-      let color, shape
-      
-      if (type === 'bomb') {
-        color = 0xff4444
-        shape = new THREE.SphereGeometry(0.24, 16, 16)
-      } else if (type === 'freeze') {
-        color = 0x44aaff
-        shape = new THREE.IcosahedronGeometry(0.24, 0)
-      } else if (type === 'speed') {
-        color = 0x44ff44
-        shape = new THREE.CylinderGeometry(0.22, 0.27, 0.45, 8)
-      } else {
-        color = 0xffaa44
-        shape = new THREE.ConeGeometry(0.27, 0.45, 8)
-      }
-      
-      const powerMat = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.5 })
-      const powerUp = new THREE.Mesh(shape, powerMat)
-      powerUp.position.set(
-        (Math.random() - 0.5) * 12,
-        0.25,
-        (Math.random() - 0.5) * 12
-      )
-      powerUp.castShadow = true
-      sceneRef.current.add(powerUp)
-      
-      powerUpsRef.current.push({
-        mesh: powerUp,
-        type: type,
-        collected: false
-      })
-    }
-    
-    playSound('start')
-  }
-
-  // AI 决策
-  const aiMove = (ai: Player, delta: number, players: Player[]) => {
-    const player = players.find(p => p.id === 'player')
-    if (!player || ai.isStunned) return false
-    
-    const dx = player.mesh.position.x - ai.mesh.position.x
-    const dz = player.mesh.position.z - ai.mesh.position.z
-    const dist = Math.sqrt(dx * dx + dz * dz)
-    
-    // 移动向玩家
-    if (dist > 1.5) {
-      const moveX = dx / dist * 4
-      const moveZ = dz / dist * 4
-      ai.velocity.x += moveX * delta
-      ai.velocity.z += moveZ * delta
-    } else if (dist < 1.2) {
-      // 远离玩家（避免重叠）
-      ai.velocity.x -= dx * 2 * delta
-      ai.velocity.z -= dz * 2 * delta
-    }
-    
-    // 攻击
-    if (dist < 1.6 && Date.now() - ai.lastAttack > 1300) {
-      ai.lastAttack = Date.now()
-      return true
-    }
-    
-    return false
-  }
-
-  // 更新游戏逻辑
-  useEffect(() => {
-    if (!sceneRef.current || !cameraRef.current || gameStatus !== 'playing') return
-    
-    let lastTime = performance.now()
-    let comboDecayTimer = 0
-    
-    const updateGame = () => {
-      animationRef.current = requestAnimationFrame(updateGame)
-      const now = performance.now()
-      const delta = Math.min(0.033, (now - lastTime) / 1000)
-      lastTime = now
-      
-      // 更新时间
-      timeRef.current += delta
-      setSurvivalTime(Math.floor(timeRef.current))
-      
-      // Combo 衰减
-      if (comboTimer > 0) {
-        comboDecayTimer += delta
-        if (comboDecayTimer > 1) {
-          comboDecayTimer = 0
-          setCombo(c => Math.max(0, c - 1))
-        }
-      }
-      
-      const player = playersRef.current.find(p => p.id === 'player')
-      if (!player) return
-      
-      // 更新晕眩状态
-      if (player.isStunned && Date.now() > player.stunEndTime) {
-        player.isStunned = false
-      }
-      
-      // 更新击中闪烁
-      if (player.hitFlash > 0) {
-        player.hitFlash -= delta * 10
-        const intensity = Math.min(1, player.hitFlash / 10)
-        player.mesh.children.forEach(child => {
-          if (child instanceof THREE.Mesh && child.material) {
-            const origColor = child.userData.origColor
-            if (origColor && child.material.color) {
-              child.material.color.setHex(0xff8888)
-            }
-          }
-        })
-        if (player.hitFlash <= 0) {
-          player.mesh.children.forEach(child => {
-            if (child instanceof THREE.Mesh && child.userData.origColor && child.material.color) {
-              child.material.color.setHex(child.userData.origColor)
-            }
-          })
-        }
-      }
-      
-      // 玩家移动
-      if (!player.isStunned) {
-        let moveX = 0, moveZ = 0
-        if (keysRef.current.left) moveX = -1
-        if (keysRef.current.right) moveX = 1
-        if (keysRef.current.up) moveZ = -1
-        if (keysRef.current.down) moveZ = 1
-        
-        if (moveX !== 0 || moveZ !== 0) {
-          const len = Math.sqrt(moveX * moveX + moveZ * moveZ)
-          moveX /= len
-          moveZ /= len
-          player.velocity.x += moveX * 6 * delta
-          player.velocity.z += moveZ * 6 * delta
-        }
-        
-        // 攻击
-        if (keysRef.current.attack && Date.now() - player.lastAttack > 700 && attackCooldownRef.current === 0) {
-          player.lastAttack = Date.now()
-          attackCooldownRef.current = 25
-          playSound('attack')
-          createShockwave(player.mesh.position, 0xffaa44)
-          shakeScreen(0.15, 100)
-          
-          let hitCount = 0
-          playersRef.current.forEach(target => {
-            if (target.id !== 'player') {
-              const dx = target.mesh.position.x - player.mesh.position.x
-              const dz = target.mesh.position.z - player.mesh.position.z
-              const dist = Math.sqrt(dx * dx + dz * dz)
-              if (dist < 1.6) {
-                hitCount++
-                const damage = 15 + Math.floor(combo * 2)
-                target.health = Math.max(0, target.health - damage)
-                target.hitFlash = 10
-                createParticles(target.mesh.position, 0xff6666, 25, 0.1, 0.8)
-                playSound('hit')
-                
-                // 击退
-                const angle = Math.atan2(dz, dx)
-                target.velocity.x += Math.cos(angle) * 2.5
-                target.velocity.z += Math.sin(angle) * 2.5
-                
-                if (target.health <= 0) {
-                  sceneRef.current?.remove(target.mesh)
-                  playersRef.current = playersRef.current.filter(p => p.id !== target.id)
-                  const newCombo = combo + 1
-                  setCombo(newCombo)
-                  setComboTimer(3)
-                  setPlayerScore(s => s + 10 + combo * 2)
-                  createParticles(target.mesh.position, 0xffaa44, 40, 0.12, 1)
-                  if (newCombo >= 3) playSound('combo')
-                }
-              }
-            }
-          })
-          
-          if (hitCount > 0) shakeScreen(0.2 + hitCount * 0.05, 120)
-        }
-      }
-      
-      // 更新所有玩家移动
-      playersRef.current.forEach(p => {
-        // 摩擦力
-        p.velocity.x *= 0.94
-        p.velocity.z *= 0.94
-        
-        let newX = p.mesh.position.x + p.velocity.x * delta
-        let newZ = p.mesh.position.z + p.velocity.z * delta
-        
-        // 边界限制
-        newX = Math.max(-6.2, Math.min(6.2, newX))
-        newZ = Math.max(-6.2, Math.min(6.2, newZ))
-        
-        p.mesh.position.x = newX
-        p.mesh.position.z = newZ
-        
-        // 弹跳动画
-        const bounce = Math.sin(Date.now() * 0.018) * 0.025
-        p.mesh.position.y = bounce
-        
-        // 血量显示（头顶光环）
-        const existingRing = p.mesh.children.find(c => c.userData?.isHealthRing)
-        if (existingRing) p.mesh.remove(existingRing)
-        
-        const ringGeo = new THREE.TorusGeometry(0.58, 0.06, 16, 32)
-        const ringMat = new THREE.MeshStandardMaterial({ 
-          color: p.health > 70 ? 0x44ff44 : p.health > 35 ? 0xffaa44 : 0xff4444,
-          emissive: p.health > 70 ? 0x226622 : p.health > 35 ? 0x442200 : 0x441111,
-          emissiveIntensity: 0.4
-        })
-        const ring = new THREE.Mesh(ringGeo, ringMat)
-        ring.position.y = 0.95
-        ring.userData = { isHealthRing: true }
-        p.mesh.add(ring)
-      })
-      
-      // AI 决策
-      playersRef.current.forEach(p => {
-        if (p.type === 'ai' && !p.isStunned) {
-          const attacked = aiMove(p, delta, playersRef.current)
-          if (attacked && playersRef.current.find(t => t.id === 'player')) {
-            const playerTarget = playersRef.current.find(t => t.id === 'player')!
-            const dx = playerTarget.mesh.position.x - p.mesh.position.x
-            const dz = playerTarget.mesh.position.z - p.mesh.position.z
-            const dist = Math.sqrt(dx * dx + dz * dz)
-            if (dist < 1.6) {
-              const damage = 12
-              playerTarget.health = Math.max(0, playerTarget.health - damage)
-              playerTarget.hitFlash = 10
-              setPlayerHealth(playerTarget.health)
-              createParticles(playerTarget.mesh.position, 0xff6666, 20, 0.1, 0.7)
-              playSound('hit')
-              shakeScreen(0.12, 80)
-              
-              if (playerTarget.health <= 0) {
-                setGameStatus('gameover')
-                setWinner(p.name)
-                playSound('gameover')
-              }
-              
-              // 击退
-              const angle = Math.atan2(dz, dx)
-              playerTarget.velocity.x += Math.cos(angle) * 1.8
-              playerTarget.velocity.z += Math.sin(angle) * 1.8
-            }
-          }
-        }
-      })
-      
-      // 道具收集
-      powerUpsRef.current.forEach(power => {
-        if (!power.collected && player) {
-          const dist = player.mesh.position.distanceTo(power.mesh.position)
-          if (dist < 0.9) {
-            power.collected = true
-            sceneRef.current?.remove(power.mesh)
-            playSound('collect')
-            createParticles(power.mesh.position, 0xffaa44, 30, 0.1, 0.6)
-            createShockwave(power.mesh.position, 0xffaa44)
-            
-            if (power.type === 'heal') {
-              player.health = Math.min(100, player.health + 25)
-              setPlayerHealth(player.health)
-              createParticles(player.mesh.position, 0x44ff44, 25, 0.1, 0.5)
-            } else if (power.type === 'speed') {
-              player.velocity.x *= 2.2
-              player.velocity.z *= 2.2
-              createParticles(player.mesh.position, 0x44ff44, 20, 0.08, 0.4)
-            } else if (power.type === 'freeze') {
-              playersRef.current.forEach(p => {
-                if (p.id !== 'player') {
-                  p.isStunned = true
-                  p.stunEndTime = Date.now() + 1800
-                  createParticles(p.mesh.position, 0x44aaff, 30, 0.1, 0.6)
-                  createShockwave(p.mesh.position, 0x44aaff)
-                }
-              })
-            } else if (power.type === 'bomb') {
-              playersRef.current.forEach(p => {
-                const distToBomb = p.mesh.position.distanceTo(power.mesh.position)
-                if (distToBomb < 2.8) {
-                  p.health = Math.max(0, p.health - 28)
-                  createParticles(p.mesh.position, 0xff4444, 35, 0.12, 0.9)
-                  createShockwave(p.mesh.position, 0xff4444)
-                  if (p.id === 'player') setPlayerHealth(p.health)
-                  if (p.health <= 0 && p.id !== 'player') {
-                    sceneRef.current?.remove(p.mesh)
-                    playersRef.current = playersRef.current.filter(p2 => p2.id !== p.id)
-                    setPlayerScore(s => s + 10)
-                  }
-                }
-              })
-              shakeScreen(0.25, 150)
-            }
-            setPlayerScore(s => s + 8)
-          }
-        }
-      })
-      
-      // 更新冲击波
-      shockwavesRef.current.forEach((wave, idx) => {
-        wave.life++
-        const progress = wave.life / wave.maxLife
-        const scale = 1 + progress * 3
-        wave.mesh.scale.set(scale, scale, scale)
-        const mat = wave.mesh.material as THREE.MeshStandardMaterial
-        mat.opacity = 1 - progress
-        if (wave.life >= wave.maxLife) {
-          sceneRef.current?.remove(wave.mesh)
-          shockwavesRef.current.splice(idx, 1)
-        }
-      })
-      
-      // 屏幕震动
-      if (screenShake > 0 && cameraRef.current) {
-        const shakeX = (Math.random() - 0.5) * screenShake * 0.2
-        const shakeZ = (Math.random() - 0.5) * screenShake * 0.1
-        cameraRef.current.position.x = player.mesh.position.x + shakeX
-        cameraRef.current.position.z = player.mesh.position.z + 6 + shakeZ
-      } else {
-        cameraRef.current.position.x += (player.mesh.position.x - cameraRef.current.position.x) * 0.08
-        cameraRef.current.position.z = player.mesh.position.z + 6.2
-      }
-      
-      cameraRef.current.lookAt(player.mesh.position)
-      
-      // 道具动画
-      powerUpsRef.current.forEach(power => {
-        if (!power.collected) {
-          power.mesh.rotation.y += 0.04
-          power.mesh.rotation.x = Math.sin(Date.now() * 0.008) * 0.2
-          power.mesh.position.y = 0.25 + Math.sin(Date.now() * 0.007) * 0.08
-        }
-      })
-      
-      // 漂浮光球动画
-      floatingOrbsRef.current.forEach((orb, i) => {
-        orb.position.y = 0.6 + Math.sin(Date.now() * 0.003 + i) * 0.15
-      })
-      
-      // 攻击冷却
-      if (attackCooldownRef.current > 0) attackCooldownRef.current--
-      
-      rendererRef.current?.render(sceneRef.current!, cameraRef.current!)
-      
-      // 检查胜利
-      if (playersRef.current.filter(p => p.type === 'ai').length === 0 && gameStatus === 'playing') {
-        setGameStatus('gameover')
-        setWinner(playerName)
-        playSound('victory')
-        createVictoryAura(player.mesh.position)
-        createParticles(player.mesh.position, 0xffaa44, 80, 0.15, 1.2)
-        shakeScreen(0.3, 200)
-      }
-    }
-    
-    updateGame()
-    
-    return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current)
-    }
-  }, [gameStatus])
+  };
   
-  // 键盘控制
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (gameStatus !== 'playing') return
+  // 创建跑者角色
+  const createRunner = () => {
+    const group = new THREE.Group();
+    
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x44aaff, metalness: 0.7, emissive: 0x1166aa });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.9, 0.5), bodyMat);
+    body.position.y = 0.45;
+    body.castShadow = true;
+    group.add(body);
+    
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xffccaa });
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.4, 32, 32), headMat);
+    head.position.y = 0.95;
+    head.castShadow = true;
+    group.add(head);
+    
+    const helmetMat = new THREE.MeshStandardMaterial({ color: 0x88ccff, metalness: 0.9, emissive: 0x2266aa });
+    const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.42, 32, 32), helmetMat);
+    helmet.position.y = 0.95;
+    helmet.scale.set(1, 0.85, 1);
+    group.add(helmet);
+    
+    const eyeMat = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00aaff });
+    const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.1, 24, 24), eyeMat);
+    leftEye.position.set(-0.18, 1.05, 0.45);
+    group.add(leftEye);
+    const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.1, 24, 24), eyeMat);
+    rightEye.position.set(0.18, 1.05, 0.45);
+    group.add(rightEye);
+    
+    const armMat = new THREE.MeshStandardMaterial({ color: 0x44aaff });
+    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.6, 0.25), armMat);
+    leftArm.position.set(-0.45, 0.7, 0);
+    leftArm.castShadow = true;
+    group.add(leftArm);
+    const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.6, 0.25), armMat);
+    rightArm.position.set(0.45, 0.7, 0);
+    rightArm.castShadow = true;
+    group.add(rightArm);
+    
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x44aaff });
+    const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.55, 0.3), legMat);
+    leftLeg.position.set(-0.22, 0.22, 0);
+    leftLeg.castShadow = true;
+    group.add(leftLeg);
+    const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.55, 0.3), legMat);
+    rightLeg.position.set(0.22, 0.22, 0);
+    rightLeg.castShadow = true;
+    group.add(rightLeg);
+    
+    const glowMat = new THREE.MeshStandardMaterial({ color: 0x44aaff, emissive: 0x2288ff, transparent: true, opacity: 0.5 });
+    const glowRing = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.05, 16, 32), glowMat);
+    glowRing.position.y = 0.6;
+    group.add(glowRing);
+    
+    return group;
+  };
+  
+  // 创建障碍物
+  const createObstacle = (type: string, x: number, z: number) => {
+    let mesh: THREE.Mesh;
+    
+    if (type === 'block') {
+      mesh = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), new THREE.MeshStandardMaterial({ color: 0xcc6644, roughness: 0.5 }));
+      mesh.position.set(x, 0.35, z);
+    } else {
+      const group = new THREE.Group();
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.6), new THREE.MeshStandardMaterial({ color: 0x886644 }));
+      base.position.y = 0.1;
+      group.add(base);
+      for (let i = -0.2; i <= 0.2; i += 0.2) {
+        const spike = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.35, 6), new THREE.MeshStandardMaterial({ color: 0xcc8866 }));
+        spike.position.set(i, 0.35, 0);
+        group.add(spike);
+      }
+      mesh = group as any;
+      mesh.position.set(x, 0, z);
+    }
+    
+    mesh.castShadow = true;
+    return { mesh, type, active: true, x, z };
+  };
+  
+  // 创建金币
+  const createCoin = (x: number, z: number) => {
+    const coinGroup = new THREE.Group();
+    const coinMat = new THREE.MeshStandardMaterial({ color: 0xffcc44, metalness: 0.9, emissive: 0xffaa33 });
+    const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.08, 24), coinMat);
+    coin.rotation.x = Math.PI / 2;
+    coin.castShadow = true;
+    coinGroup.add(coin);
+    
+    const glowMat = new THREE.MeshStandardMaterial({ color: 0xffaa44, emissive: 0xffaa44, transparent: true, opacity: 0.4 });
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 16), glowMat);
+    coinGroup.add(glow);
+    
+    coinGroup.position.set(x, 0.2, z);
+    return coinGroup;
+  };
+  
+  // 创建赛道
+  const createTrack = () => {
+    if (!sceneRef.current) return;
+    
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x2a2a3a, roughness: 0.7 });
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(20, 200), groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.2;
+    ground.receiveShadow = true;
+    sceneRef.current.add(ground);
+    
+    const trackMat = new THREE.MeshStandardMaterial({ color: 0x4a4a6a, roughness: 0.4 });
+    const track = new THREE.Mesh(new THREE.PlaneGeometry(4, 200), trackMat);
+    track.rotation.x = -Math.PI / 2;
+    track.position.y = -0.15;
+    track.receiveShadow = true;
+    sceneRef.current.add(track);
+    
+    const lineMat = new THREE.MeshStandardMaterial({ color: 0xffdd88 });
+    for (let z = -40; z <= 40; z += 2) {
+      const leftLine = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.05, 0.3), lineMat);
+      leftLine.position.set(-1.8, -0.1, z);
+      sceneRef.current.add(leftLine);
+      groundTilesRef.current.push(leftLine);
       
-      switch(e.key) {
-        case 'ArrowLeft': case 'a': keysRef.current.left = true; break
-        case 'ArrowRight': case 'd': keysRef.current.right = true; break
-        case 'ArrowUp': case 'w': keysRef.current.up = true; break
-        case 'ArrowDown': case 's': keysRef.current.down = true; break
-        case 'j': case 'J': case ' ':
-          e.preventDefault()
-          keysRef.current.attack = true
-          break
-      }
+      const rightLine = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.05, 0.3), lineMat);
+      rightLine.position.set(1.8, -0.1, z);
+      sceneRef.current.add(rightLine);
+      groundTilesRef.current.push(rightLine);
+      
+      const centerLine = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.4), lineMat);
+      centerLine.position.set(0, -0.1, z);
+      sceneRef.current.add(centerLine);
+      groundTilesRef.current.push(centerLine);
     }
-    
-    const handleKeyUp = (e: KeyboardEvent) => {
-      switch(e.key) {
-        case 'ArrowLeft': case 'a': keysRef.current.left = false; break
-        case 'ArrowRight': case 'd': keysRef.current.right = false; break
-        case 'ArrowUp': case 'w': keysRef.current.up = false; break
-        case 'ArrowDown': case 's': keysRef.current.down = false; break
-        case 'j': case 'J': case ' ':
-          keysRef.current.attack = false
-          break
-      }
-    }
-    
-    window.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('keyup', handleKeyUp)
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-      window.removeEventListener('keyup', handleKeyUp)
-    }
-  }, [gameStatus])
-
+  };
+  
   // 初始化场景
   useEffect(() => {
-    if (!containerRef.current) return
+    if (!containerRef.current) return;
     
-    const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x0a0a2a)
-    scene.fog = new THREE.FogExp2(0x0a0a2a, 0.02)
-    sceneRef.current = scene
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a1030);
+    scene.fog = new THREE.FogExp2(0x0a1030, 0.01);
+    sceneRef.current = scene;
     
-    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000)
-    camera.position.set(0, 6, 14)
-    cameraRef.current = camera
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 2.2, 6);
+    camera.lookAt(0, 0, 0);
+    cameraRef.current = camera;
     
-    const renderer = new THREE.WebGLRenderer({ antialias: true })
-    renderer.setSize(window.innerWidth, window.innerHeight)
-    renderer.shadowMap.enabled = true
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap
-    containerRef.current.appendChild(renderer.domElement)
-    rendererRef.current = renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    containerRef.current.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
     
-    initBattleScene()
+    // 星空
+    const starCount = 2000;
+    const starGeo = new THREE.BufferGeometry();
+    const starPos = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount; i++) {
+      starPos[i*3] = (Math.random() - 0.5) * 200;
+      starPos[i*3+1] = (Math.random() - 0.5) * 100;
+      starPos[i*3+2] = (Math.random() - 0.5) * 100 - 50;
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.08 }));
+    scene.add(stars);
+    
+    createTrack();
+    
+    // 玩家在屏幕顶部 (z = 3)
+    const player = createRunner();
+    player.position.set(0, 0, 3);
+    player.castShadow = true;
+    scene.add(player);
+    playerRef.current = player;
+    
+    // 装饰树木
+    const treeMat = new THREE.MeshStandardMaterial({ color: 0x4caf50 });
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B5A2B });
+    for (let z = -30; z <= 30; z += 3) {
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.7, 6), trunkMat);
+      trunk.position.set(-2.8, 0.3, z);
+      trunk.castShadow = true;
+      scene.add(trunk);
+      const foliage = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.6, 8), treeMat);
+      foliage.position.set(-2.8, 0.75, z);
+      foliage.castShadow = true;
+      scene.add(foliage);
+      
+      const trunkR = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.7, 6), trunkMat);
+      trunkR.position.set(2.8, 0.3, z);
+      trunkR.castShadow = true;
+      scene.add(trunkR);
+      const foliageR = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.6, 8), treeMat);
+      foliageR.position.set(2.8, 0.75, z);
+      foliageR.castShadow = true;
+      scene.add(foliageR);
+    }
+    
+    // 灯光
+    const ambientLight = new THREE.AmbientLight(0x446688, 0.6);
+    scene.add(ambientLight);
+    const dirLight = new THREE.DirectionalLight(0xfff5e6, 1);
+    dirLight.position.set(5, 8, 3);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
+    const fillLight = new THREE.PointLight(0xffaa66, 0.5);
+    fillLight.position.set(0, 2, 2);
+    scene.add(fillLight);
+    
+    // 【拉到最远】障碍物从最远的屏幕底部出现 (z = -30 ~ -50)
+    for (let i = 0; i < 15; i++) {
+      const x = [-1.2, 0, 1.2][Math.floor(Math.random() * 3)];
+      const z = -30 - Math.random() * 20;
+      const type = Math.random() > 0.6 ? 'block' : 'spike';
+      const { mesh, type: t, active, x: px, z: pz } = createObstacle(type, x, z);
+      scene.add(mesh);
+      obstaclesRef.current.push({ mesh, type: t, active, x: px, z: pz });
+    }
+    
+    // 【拉到最远】金币从最远的屏幕底部出现 (z = -28 ~ -48)
+    for (let i = 0; i < 25; i++) {
+      const x = [-1.2, 0, 1.2][Math.floor(Math.random() * 3)];
+      const z = -28 - Math.random() * 20;
+      const coin = createCoin(x, z);
+      scene.add(coin);
+      coinsRef.current.push({ mesh: coin, active: true, x, z });
+    }
+    
+    // 触摸控制
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartXRef.current = e.touches[0].clientX;
+    };
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isPlaying || gameOver) return;
+      const delta = (e.touches[0].clientX - touchStartXRef.current) / 60;
+      targetXRef.current = Math.max(-1.2, Math.min(1.2, delta));
+      touchStartXRef.current = e.touches[0].clientX;
+    };
+    const handleTouchEnd = () => {
+      targetXRef.current = 0;
+    };
+    containerRef.current.addEventListener('touchstart', handleTouchStart);
+    containerRef.current.addEventListener('touchmove', handleTouchMove);
+    containerRef.current.addEventListener('touchend', handleTouchEnd);
+    
+    // 键盘控制
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isPlaying || gameOver) return;
+      if (e.key === 'ArrowLeft') targetXRef.current = -1;
+      if (e.key === 'ArrowRight') targetXRef.current = 1;
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') targetXRef.current = 0;
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    // 动画循环
+    let lastTime = performance.now();
+    let armSwing = 0;
+    
+    const animate = () => {
+      animationRef.current = requestAnimationFrame(animate);
+      const now = performance.now();
+      let delta = Math.min(0.033, (now - lastTime) / 1000);
+      lastTime = now;
+      
+      if (invincibleTimerRef.current > 0) {
+        invincibleTimerRef.current -= delta;
+      }
+      
+      if (comboTimeRef.current > 0) {
+        comboTimeRef.current -= delta;
+        if (comboTimeRef.current <= 0) {
+          comboRef.current = 0;
+          setCombo(0);
+        }
+      }
+      
+      if (isPlaying && !gameOver && playerRef.current) {
+        const newSpeed = 5 + Math.floor(distance / 500);
+        speedRef.current = Math.min(12, newSpeed);
+        setSpeed(Math.floor(speedRef.current * 12));
+        
+        playerXRef.current += (targetXRef.current - playerXRef.current) * 0.2;
+        playerRef.current.position.x = Math.max(-1.3, Math.min(1.3, playerXRef.current));
+        
+        armSwing += delta * 12;
+        const arms = playerRef.current.children.filter(c => 
+          (c.position.x === -0.45 || c.position.x === 0.45) && c.geometry?.type === 'BoxGeometry'
+        );
+        arms.forEach((arm, i) => {
+          arm.rotation.z = Math.sin(armSwing + i) * 0.6;
+        });
+        
+        const scrollSpeed = speedRef.current * 2.5 * delta;
+        scrollOffsetRef.current += scrollSpeed;
+        
+        groundTilesRef.current.forEach((tile, idx) => {
+          let z = -40 + (idx * 2) + scrollOffsetRef.current;
+          z = ((z % 80) + 80) % 80 - 40;
+          tile.position.z = z;
+        });
+        
+        // 障碍物向上移动
+        obstaclesRef.current.forEach(ob => {
+          ob.z += scrollSpeed;
+          ob.mesh.position.z = ob.z;
+          
+          // 碰撞检测 - 玩家在 z = 3
+          if (playerRef.current && ob.active && invincibleTimerRef.current <= 0 &&
+              Math.abs(playerRef.current.position.x - ob.x) < 0.65 && 
+              Math.abs(ob.z - playerRef.current.position.z) < 0.8 && 
+              ob.z > 2.2 && ob.z < 3.8) {
+            setHealth(h => {
+              const newHealth = h - 1;
+              if (newHealth <= 0) setGameOver(true);
+              return newHealth;
+            });
+            setCombo(0);
+            comboRef.current = 0;
+            invincibleTimerRef.current = 1.2;
+            playSound('crash');
+            
+            const flashMat = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, transparent: true });
+            const flash = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), flashMat);
+            flash.position.copy(playerRef.current!.position);
+            scene.add(flash);
+            setTimeout(() => scene.remove(flash), 150);
+            
+            // 【拉到最远】重置到最远的底部
+            ob.z = -35 - Math.random() * 20;
+            ob.x = [-1.2, 0, 1.2][Math.floor(Math.random() * 3)];
+            ob.mesh.position.x = ob.x;
+            ob.mesh.position.z = ob.z;
+          }
+          
+          // 超出屏幕顶部后重置到最远的底部
+          if (ob.z > 5) {
+            ob.z = -35 - Math.random() * 20;
+            ob.x = [-1.2, 0, 1.2][Math.floor(Math.random() * 3)];
+            ob.mesh.position.x = ob.x;
+            ob.mesh.position.z = ob.z;
+          }
+        });
+        
+        // 金币向上移动
+        coinsRef.current.forEach(coin => {
+          coin.z += scrollSpeed;
+          coin.mesh.position.z = coin.z;
+          coin.mesh.rotation.y += 0.1;
+          
+          // 收集检测 - 玩家在 z = 3
+          if (playerRef.current && coin.active && 
+              Math.abs(playerRef.current.position.x - coin.x) < 0.65 && 
+              Math.abs(coin.z - playerRef.current.position.z) < 0.7 && 
+              coin.z > 2.2 && coin.z < 3.8) {
+            coin.active = false;
+            coin.mesh.visible = false;
+            setScore(s => s + 10);
+            setCombo(c => c + 1);
+            comboRef.current++;
+            comboTimeRef.current = 1.5;
+            playSound('collect');
+            
+            setTimeout(() => {
+              // 【拉到最远】重置到最远的底部
+              coin.z = -32 - Math.random() * 22;
+              coin.x = [-1.2, 0, 1.2][Math.floor(Math.random() * 3)];
+              coin.mesh.position.x = coin.x;
+              coin.mesh.position.z = coin.z;
+              coin.active = true;
+              coin.mesh.visible = true;
+            }, 200);
+          }
+          
+          // 超出屏幕顶部后重置到最远的底部
+          if (coin.z > 5 && coin.active) {
+            coin.z = -32 - Math.random() * 22;
+            coin.x = [-1.2, 0, 1.2][Math.floor(Math.random() * 3)];
+            coin.mesh.position.x = coin.x;
+            coin.mesh.position.z = coin.z;
+          }
+        });
+        
+        setDistance(d => d + Math.floor(speedRef.current * delta * 12));
+      }
+      
+      // 相机跟随
+      if (playerRef.current && cameraRef.current) {
+        const targetX = playerRef.current.position.x * 0.3;
+        cameraRef.current.position.x += (targetX - cameraRef.current.position.x) * 0.1;
+        cameraRef.current.lookAt(playerRef.current.position.x, 0.8, 2);
+      }
+      
+      stars.rotation.y += 0.001;
+      renderer.render(scene, camera);
+    };
+    
+    animate();
     
     const handleResize = () => {
       if (cameraRef.current && rendererRef.current) {
-        cameraRef.current.aspect = window.innerWidth / window.innerHeight
-        cameraRef.current.updateProjectionMatrix()
-        rendererRef.current.setSize(window.innerWidth, window.innerHeight)
+        cameraRef.current.aspect = window.innerWidth / window.innerHeight;
+        cameraRef.current.updateProjectionMatrix();
+        rendererRef.current.setSize(window.innerWidth, window.innerHeight);
       }
-    }
-    window.addEventListener('resize', handleResize)
-    
-    renderer.render(scene, camera)
+    };
+    window.addEventListener('resize', handleResize);
     
     return () => {
-      window.removeEventListener('resize', handleResize)
-      if (containerRef.current && rendererRef.current) {
-        containerRef.current.removeChild(rendererRef.current.domElement)
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      if (containerRef.current) {
+        containerRef.current.removeEventListener('touchstart', handleTouchStart);
+        containerRef.current.removeEventListener('touchmove', handleTouchMove);
+        containerRef.current.removeEventListener('touchend', handleTouchEnd);
       }
-      rendererRef.current?.dispose()
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      if (containerRef.current && rendererRef.current?.domElement) {
+        containerRef.current.removeChild(rendererRef.current.domElement);
+      }
+      rendererRef.current?.dispose();
+    };
+  }, [isPlaying, gameOver]);
+  
+  const startGame = () => {
+    setScore(0);
+    setDistance(0);
+    setHealth(3);
+    setCombo(0);
+    setGameOver(false);
+    setIsPlaying(true);
+    playerXRef.current = 0;
+    targetXRef.current = 0;
+    comboRef.current = 0;
+    comboTimeRef.current = 0;
+    invincibleTimerRef.current = 0;
+    if (playerRef.current) {
+      playerRef.current.position.set(0, 0, 3);
+      playerRef.current.rotation.set(0, 0, 0);
     }
-  }, [])
-
+    obstaclesRef.current.forEach(ob => {
+      ob.z = -30 - Math.random() * 20;
+      ob.x = [-1.2, 0, 1.2][Math.floor(Math.random() * 3)];
+      ob.mesh.position.x = ob.x;
+      ob.mesh.position.z = ob.z;
+      ob.active = true;
+    });
+    coinsRef.current.forEach(coin => {
+      coin.z = -28 - Math.random() * 20;
+      coin.x = [-1.2, 0, 1.2][Math.floor(Math.random() * 3)];
+      coin.mesh.position.x = coin.x;
+      coin.mesh.position.z = coin.z;
+      coin.active = true;
+      coin.mesh.visible = true;
+    });
+    playSound('boost');
+  };
+  
+  const getHearts = () => {
+    const safeHealth = Math.max(0, Math.min(3, health));
+    return '❤️'.repeat(safeHealth);
+  };
+  
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-50 bg-black">
       <div ref={containerRef} className="absolute inset-0" />
       
-      {/* UI 控制面板 */}
-      <div className="absolute top-4 left-4 z-10 bg-black/60 backdrop-blur-md rounded-xl p-4 pointer-events-auto border border-white/20 shadow-2xl min-w-[280px]">
-        <div className="flex items-center justify-between gap-4 mb-3">
-          <h2 className="text-xl font-bold text-white">🥚 蛋仔派对 · 疯狂乱斗</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl leading-none">✕</button>
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 z-20 w-10 h-10 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 text-white text-xl hover:bg-red-600 transition"
+      >
+        ✕
+      </button>
+      
+      <div className="absolute top-4 left-4 z-10 bg-black/60 backdrop-blur-md rounded-xl px-4 py-2 pointer-events-auto border border-white/20">
+        <div className="flex gap-4 text-white">
+          <div className="text-center">
+            <div className="text-xs text-gray-400">💰 金币</div>
+            <div className="text-2xl font-bold text-yellow-400">{score}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-gray-400">🏃 距离</div>
+            <div className="text-2xl font-bold text-green-400">{distance}m</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-gray-400">❤️ 生命</div>
+            <div className="text-2xl font-bold text-red-400">{getHearts()}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-gray-400">⚡ 速度</div>
+            <div className="text-2xl font-bold text-blue-400">{speed}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-gray-400">🔥 连击</div>
+            <div className="text-2xl font-bold text-orange-400">x{combo}</div>
+          </div>
         </div>
-        
-        {gameMode === 'select' ? (
-          <>
-            <div className="mb-4">
-              <p className="text-white text-sm mb-2">🎨 选择你的蛋仔</p>
-              <div className="grid grid-cols-3 gap-2">
-                {EGG_SKINS.map((skin, idx) => (
-                  <button
-                    key={skin.id}
-                    onClick={() => setSelectedSkin(idx)}
-                    className={`p-2 rounded-lg transition ${selectedSkin === idx ? 'bg-yellow-500/50 ring-2 ring-yellow-400' : 'bg-white/10 hover:bg-white/20'}`}
-                  >
-                    <div className="text-2xl">{skin.icon}</div>
-                    <div className="text-xs text-white">{skin.name}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-            
-            <div className="mb-4">
-              <p className="text-white text-sm mb-2">📝 你的名字</p>
-              <input
-                type="text"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                className="w-full px-3 py-2 bg-white/20 rounded-lg text-white border border-white/30 focus:outline-none"
-                maxLength={12}
-              />
-            </div>
-            
-            <div className="mb-4">
-              <p className="text-white text-sm mb-2">🤖 AI对手数量: {aiCount}</p>
-              <input
-                type="range"
-                min="1"
-                max="8"
-                value={aiCount}
-                onChange={(e) => setAiCount(parseInt(e.target.value))}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-gray-400 mt-1">
-                <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
-              </div>
-            </div>
-            
-            <button
-              onClick={() => {
-                setGameMode('battle')
-                startBattle()
-              }}
-              className="w-full py-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition"
-            >
-              ⚔️ 开始乱斗
-            </button>
-            
-            <p className="text-gray-400 text-xs text-center mt-3">WASD移动 | J/空格攻击 | 连击加成</p>
-          </>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 gap-3 text-white mb-3">
-              <div>
-                <p className="text-xs text-gray-400">❤️ 血量</p>
-                <div className="w-full h-2 bg-gray-700 rounded-full mt-1">
-                  <div className="h-full bg-gradient-to-r from-red-500 to-red-400 rounded-full transition-all" style={{ width: `${playerHealth}%` }} />
-                </div>
-                <p className="text-sm mt-1">{playerHealth}%</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400">💰 积分</p>
-                <p className="text-xl font-bold text-yellow-400">{playerScore}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400">⏱️ 存活时间</p>
-                <p className="text-lg font-bold text-green-400">{Math.floor(survivalTime)}s</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400">🔥 连击</p>
-                <p className="text-lg font-bold text-orange-400">x{combo}</p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-xs text-gray-400">🥚 剩余对手</p>
-                <p className="text-xl font-bold text-purple-400">{playersRef.current.filter(p => p.id !== 'player').length}</p>
-              </div>
-            </div>
-            
-            {gameStatus === 'playing' && (
-              <div className="text-center text-white text-xs bg-gradient-to-r from-purple-500/30 to-pink-500/30 rounded-lg py-2 mb-2">
-                ⚡ 连击加成伤害 | 击败AI获得积分
-              </div>
-            )}
-            
-            {gameStatus === 'gameover' && (
-              <div className="text-center">
-                <p className="text-yellow-400 text-xl mb-2 animate-pulse">
-                  {winner === playerName ? '🏆 蛋仔冠军! 🏆' : '💀 被击败了...'}
-                </p>
-                <p className="text-white mb-2">获胜者: {winner}</p>
-                <p className="text-white mb-1">🔥 最大连击: x{combo}</p>
-                <p className="text-white mb-3">💰 总积分: {playerScore}</p>
-                <button
-                  onClick={() => {
-                    setGameMode('select')
-                    setGameStatus('waiting')
-                  }}
-                  className="w-full py-2 bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg text-white font-bold hover:scale-105 transition"
-                >
-                  🔄 返回选择
-                </button>
-              </div>
-            )}
-          </>
-        )}
       </div>
       
-      {/* Combo 特效提示 */}
-      {combo >= 3 && gameStatus === 'playing' && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none animate-ping">
-          <div className="text-4xl font-bold text-orange-400 drop-shadow-lg animate-bounce">
+      {!isPlaying && !gameOver && (
+        <button
+          onClick={startGame}
+          className="absolute bottom-24 left-1/2 transform -translate-x-1/2 z-10 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-full w-24 h-24 flex items-center justify-center shadow-lg active:scale-95 transition border-2 border-white/50"
+        >
+          <span className="text-4xl">🏃</span>
+        </button>
+      )}
+      
+      {gameOver && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 bg-black/85 backdrop-blur-md rounded-2xl p-6 text-center min-w-[260px] border border-white/20">
+          <p className="text-red-500 text-3xl mb-3">💀 游戏结束</p>
+          <p className="text-white text-lg mb-1">💰 获得金币: <span className="text-yellow-400 font-bold">{score}</span></p>
+          <p className="text-white text-sm mb-1">🏃 奔跑距离: <span className="text-green-400 font-bold">{distance}m</span></p>
+          <p className="text-white text-sm mb-3">🔥 最高连击: <span className="text-orange-400 font-bold">x{combo}</span></p>
+          <button onClick={startGame} className="mt-2 bg-gradient-to-r from-green-600 to-emerald-600 px-8 py-2 rounded-full text-white font-bold hover:scale-105 transition">
+            重新奔跑
+          </button>
+        </div>
+      )}
+      
+      {isPlaying && !gameOver && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white/60 text-xs whitespace-nowrap bg-black/40 px-3 py-1 rounded-full">
+          🎮 左右滑动/方向键移动 | 收集金币 | 躲避障碍物
+        </div>
+      )}
+      
+      {combo >= 3 && isPlaying && !gameOver && (
+        <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 pointer-events-none animate-pulse">
+          <div className="text-4xl font-bold text-orange-400 drop-shadow-lg tracking-wider">
             {combo} COMBO!
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }
