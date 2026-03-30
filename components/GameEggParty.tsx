@@ -27,11 +27,14 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [score, setScore] = useState(0);
   const [distance, setDistance] = useState(0);
-  const [health, setHealth] = useState(3);
   const [gameOver, setGameOver] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(0);
   const [combo, setCombo] = useState(0);
+  
+  // 使用 ref 存储生命值，避免闭包问题
+  const healthRef = useRef(3);
+  const [health, setHealth] = useState(3);
   
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -45,7 +48,7 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
   // 游戏状态
   const playerXRef = useRef(0);
   const targetXRef = useRef(0);
-  const speedRef = useRef(0);
+  const speedRef = useRef(5); // 修复：初始速度改为5
   const comboRef = useRef(0);
   const comboTimeRef = useRef(0);
   const scrollOffsetRef = useRef(0);
@@ -382,11 +385,12 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
       }
       
       if (isPlaying && !gameOver && playerRef.current) {
+        // 速度随距离增加，但最高不超过12
         const newSpeed = 5 + Math.floor(distance / 500);
         speedRef.current = Math.min(12, newSpeed);
         setSpeed(Math.floor(speedRef.current * 12));
         
-        // 玩家移动 - 同时支持键盘、滑动、触摸按钮
+        // 玩家移动
         let moveTarget = 0;
         if (targetXRef.current !== 0) {
           moveTarget = targetXRef.current;
@@ -421,19 +425,28 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
           ob.z += scrollSpeed;
           ob.mesh.position.z = ob.z;
           
+          // 碰撞检测 - 只有无敌时间外且距离足够近才触发
           if (playerRef.current && ob.active && invincibleTimerRef.current <= 0 &&
               Math.abs(playerRef.current.position.x - ob.x) < 0.65 && 
-              Math.abs(ob.z - playerRef.current.position.z) < 0.8 && 
-              ob.z > 2.2 && ob.z < 3.8) {
-            setHealth(h => {
-              const newHealth = h - 1;
-              if (newHealth <= 0) setGameOver(true);
-              return newHealth;
-            });
+              Math.abs(ob.z - playerRef.current.position.z) < 0.7 && 
+              ob.z > 2.3 && ob.z < 3.7) {
+            
+            // 使用 ref 更新生命值
+            const newHealth = healthRef.current - 1;
+            healthRef.current = newHealth;
+            setHealth(newHealth);
+            
+            if (newHealth <= 0) {
+              setGameOver(true);
+              setIsPlaying(false);
+              playSound('crash');
+            } else {
+              playSound('crash');
+            }
+            
             setCombo(0);
             comboRef.current = 0;
             invincibleTimerRef.current = 1.2;
-            playSound('crash');
             
             const flashMat = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, transparent: true });
             const flash = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), flashMat);
@@ -441,12 +454,14 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
             scene.add(flash);
             setTimeout(() => scene.remove(flash), 150);
             
+            // 重置障碍物到远处
             ob.z = -35 - Math.random() * 20;
             ob.x = [-1.2, 0, 1.2][Math.floor(Math.random() * 3)];
             ob.mesh.position.x = ob.x;
             ob.mesh.position.z = ob.z;
           }
           
+          // 超出屏幕顶部后重置到最远的底部
           if (ob.z > 5) {
             ob.z = -35 - Math.random() * 20;
             ob.x = [-1.2, 0, 1.2][Math.floor(Math.random() * 3)];
@@ -461,10 +476,11 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
           coin.mesh.position.z = coin.z;
           coin.mesh.rotation.y += 0.1;
           
+          // 收集检测
           if (playerRef.current && coin.active && 
               Math.abs(playerRef.current.position.x - coin.x) < 0.65 && 
               Math.abs(coin.z - playerRef.current.position.z) < 0.7 && 
-              coin.z > 2.2 && coin.z < 3.8) {
+              coin.z > 2.3 && coin.z < 3.7) {
             coin.active = false;
             coin.mesh.visible = false;
             setScore(s => s + 10);
@@ -535,6 +551,7 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
   const startGame = () => {
     setScore(0);
     setDistance(0);
+    healthRef.current = 3;
     setHealth(3);
     setCombo(0);
     setGameOver(false);
@@ -544,6 +561,7 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
     comboRef.current = 0;
     comboTimeRef.current = 0;
     invincibleTimerRef.current = 0;
+    speedRef.current = 5; // 修复：重置速度
     if (playerRef.current) {
       playerRef.current.position.set(0, 0, 3);
       playerRef.current.rotation.set(0, 0, 0);
@@ -567,7 +585,7 @@ export default function GameEggParty({ onClose }: GameEggPartyProps) {
   };
   
   const getHearts = () => {
-    const safeHealth = Math.max(0, Math.min(3, health));
+    const safeHealth = Math.max(0, Math.min(3, healthRef.current));
     return '❤️'.repeat(safeHealth);
   };
   
