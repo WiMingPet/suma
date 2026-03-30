@@ -23,6 +23,9 @@ export default function GameSnakePro({ onClose }: GameSnakeProProps) {
   const [isPaused, setIsPaused] = useState(false)
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  
+  // 触摸方向键状态
+  const [touchDirection, setTouchDirection] = useState<string | null>(null)
 
   // 音效播放
   const playSound = (type: 'eat' | 'die' | 'start') => {
@@ -157,7 +160,9 @@ export default function GameSnakePro({ onClose }: GameSnakeProProps) {
       setSnake(prev => {
         const head = prev[0]
         let newHead: [number, number]
-        switch (direction) {
+        // 优先使用触摸方向，否则使用键盘方向
+        const currentDir = touchDirection || direction
+        switch (currentDir) {
           case 'UP': newHead = [head[0], head[1] - 1]; break
           case 'DOWN': newHead = [head[0], head[1] + 1]; break
           case 'LEFT': newHead = [head[0] - 1, head[1]]; break
@@ -202,7 +207,7 @@ export default function GameSnakePro({ onClose }: GameSnakeProProps) {
     }, Math.max(80, 150 - (level - 1) * 8))
     
     return () => { if (gameLoopRef.current) clearInterval(gameLoopRef.current) }
-  }, [isPlaying, gameOver, isPaused, direction, food, score, level])
+  }, [isPlaying, gameOver, isPaused, direction, touchDirection, food, score, level])
 
   // 键盘控制
   useEffect(() => {
@@ -214,6 +219,8 @@ export default function GameSnakePro({ onClose }: GameSnakeProProps) {
         const opposite = { UP: 'DOWN', DOWN: 'UP', LEFT: 'RIGHT', RIGHT: 'LEFT' }
         if (opposite[newDir as keyof typeof opposite] !== direction) {
           setDirection(newDir)
+          // 清除触摸方向，让键盘方向生效
+          setTouchDirection(null)
         }
       }
     }
@@ -221,9 +228,20 @@ export default function GameSnakePro({ onClose }: GameSnakeProProps) {
     return () => window.removeEventListener('keydown', handleKey)
   }, [isPlaying, gameOver, isPaused, direction])
 
+  // 触摸方向键处理
+  const handleTouchDirection = (dir: string) => {
+    if (!isPlaying || gameOver || isPaused) return
+    const opposite = { UP: 'DOWN', DOWN: 'UP', LEFT: 'RIGHT', RIGHT: 'LEFT' }
+    // 不能反向
+    if (opposite[dir as keyof typeof opposite] !== direction && opposite[dir as keyof typeof opposite] !== touchDirection) {
+      setTouchDirection(dir)
+    }
+  }
+
   const startGame = () => {
     setSnake(INIT_SNAKE)
     setDirection(INIT_DIR)
+    setTouchDirection(null)
     setFood([15, 10])
     setScore(0)
     setLevel(1)
@@ -297,6 +315,60 @@ export default function GameSnakePro({ onClose }: GameSnakeProProps) {
             )}
           </div>
           <p className="text-gray-400 text-xs text-center mt-4">键盘方向键控制 | 每100分升1级 | 速度递增</p>
+          
+          {/* 手机触摸方向键 */}
+          {isPlaying && !gameOver && (
+            <div className="absolute -bottom-24 left-0 right-0 flex justify-center gap-4 mt-4 pb-4">
+              <div className="flex flex-col items-center gap-2">
+                {/* 上键 */}
+                <button
+                  onTouchStart={() => handleTouchDirection('UP')}
+                  onTouchEnd={() => setTouchDirection(null)}
+                  onMouseDown={() => handleTouchDirection('UP')}
+                  onMouseUp={() => setTouchDirection(null)}
+                  onMouseLeave={() => setTouchDirection(null)}
+                  className="w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border-2 border-white/30 flex items-center justify-center text-white text-2xl active:scale-95 transition"
+                >
+                  ▲
+                </button>
+                <div className="flex gap-4">
+                  {/* 左键 */}
+                  <button
+                    onTouchStart={() => handleTouchDirection('LEFT')}
+                    onTouchEnd={() => setTouchDirection(null)}
+                    onMouseDown={() => handleTouchDirection('LEFT')}
+                    onMouseUp={() => setTouchDirection(null)}
+                    onMouseLeave={() => setTouchDirection(null)}
+                    className="w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border-2 border-white/30 flex items-center justify-center text-white text-2xl active:scale-95 transition"
+                  >
+                    ◀
+                  </button>
+                  {/* 下键 */}
+                  <button
+                    onTouchStart={() => handleTouchDirection('DOWN')}
+                    onTouchEnd={() => setTouchDirection(null)}
+                    onMouseDown={() => handleTouchDirection('DOWN')}
+                    onMouseUp={() => setTouchDirection(null)}
+                    onMouseLeave={() => setTouchDirection(null)}
+                    className="w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border-2 border-white/30 flex items-center justify-center text-white text-2xl active:scale-95 transition"
+                  >
+                    ▼
+                  </button>
+                  {/* 右键 */}
+                  <button
+                    onTouchStart={() => handleTouchDirection('RIGHT')}
+                    onTouchEnd={() => setTouchDirection(null)}
+                    onMouseDown={() => handleTouchDirection('RIGHT')}
+                    onMouseUp={() => setTouchDirection(null)}
+                    onMouseLeave={() => setTouchDirection(null)}
+                    className="w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border-2 border-white/30 flex items-center justify-center text-white text-2xl active:scale-95 transition"
+                  >
+                    ▶
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
