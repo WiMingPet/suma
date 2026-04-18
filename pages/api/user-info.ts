@@ -26,8 +26,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   res.status(200).json({
     success: true,
     user: {
+      id: user.phone,
       phone: user.phone,
-      isPro: user.isPro,
+      is_pro: user.isPro,
+      daily_count: 3,
       proExpiresAt: user.proExpiresAt,
       createdAt: user.createdAt,
     },
