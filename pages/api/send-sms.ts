@@ -1,37 +1,60 @@
-// pages/api/send-sms.ts - 发送短信验证码
-import type { NextApiRequest, NextApiResponse } from 'next'
-import { sendSmsCode, storeCode } from '../../lib/tencent-sms'
+// pages/api/send-sms.ts
+import type { NextApiRequest, NextApiResponse } from 'next';
+import Dysmsapi, { SendSmsRequest } from '@alicloud/dysmsapi20170525';
+import * as OpenApi from '@alicloud/openapi-client';
+import { codeStore } from '../../lib/store';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  console.log('========== 收到发送验证码请求 ==========')
-
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { phone } = req.body
-  console.log('手机号:', phone)
-
+  const { phone } = req.body;
   if (!phone || !/^1[3-9]\d{9}$/.test(phone)) {
-    console.log('手机号无效')
-    return res.status(400).json({ error: '请输入有效的手机号' })
+    return res.status(400).json({ error: '手机号格式错误' });
+  }
+
+  // 频率限制：同一手机号60秒内只能发送一次
+  const lastSent = codeStore.get(`${phone}_last`);
+  if (lastSent && lastSent.expires > Date.now() - 60000) {
+    return res.status(429).json({ error: '发送太频繁，请稍后再试' });
+  }
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expires = Date.now() + 5 * 60 * 1000;
+
+  // 存储验证码
+  codeStore.set(phone, { code, expires });
+  codeStore.set(`${phone}_last`, { code, expires: Date.now() + 60000 });
+
+  // 本地开发环境不发送真实短信
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[DEV] 验证码 ${code} 发送给 ${phone}`);
+    return res.status(200).json({ success: true, devCode: code });
   }
 
   try {
-    console.log('调用 sendSmsCode...')
-    const result = await sendSmsCode(phone)
-    console.log('sendSmsCode 返回结果:', result)
+    const config = new OpenApi.Config({
+      accessKeyId: process.env.ALIYUN_ACCESS_KEY_ID,
+      accessKeySecret: process.env.ALIYUN_ACCESS_KEY_SECRET,
+    });
+    config.endpoint = 'dysmsapi.aliyuncs.com';
+    const client = new Dysmsapi(config);
 
-    if (result.success && result.code) {
-      storeCode(phone, result.code)
-      console.log('验证码已存储')
-      return res.status(200).json({ success: true })
+    const sendReq = new SendSmsRequest({
+      phoneNumbers: phone,
+      signName: process.env.ALIYUN_SMS_SIGN_NAME,
+      templateCode: process.env.ALIYUN_SMS_TEMPLATE_CODE,
+      templateParam: JSON.stringify({ code }),
+    });
+    const response = await client.sendSms(sendReq);
+    if (response.body.code === 'OK') {
+      res.status(200).json({ success: true });
+    } else {
+      throw new Error(response.body.message);
     }
-
-    console.log('发送失败:', result.error)
-    return res.status(500).json({ error: result.error || '发送失败' })
   } catch (error) {
-    console.error('捕获到错误:', error)
-    return res.status(500).json({ error: '服务器内部错误' })
+    console.error(error);
+    res.status(500).json({ error: '发送失败，请稍后重试' });
   }
 }

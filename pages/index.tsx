@@ -12,16 +12,23 @@ const ThreeBackground = dynamic(() => import('../components/ThreeBackground'), {
 // 组件导入
 import LoginModal from '../components/LoginModal'
 import SideMenu from '../components/SideMenu'
-import audioBufferToWav from 'audiobuffer-to-wav'
-import GameSnakePro from '../components/GameSnakePro'
-import GameSpaceShooter from '../components/GameSpaceShooter'
-import GameEggParty from '../components/GameEggParty'
+import GameSnake from '../components/GameSnake'
+import GameTetris from '../components/GameTetris'
+import GameBubble from '../components/GameBubble'
 
 interface User {
   id: string
   phone: string
   is_pro: boolean
   daily_count: number
+}
+
+interface SavedApp {
+  id: string
+  name: string
+  code: string
+  type: string
+  created_at: string
 }
 
 export default function Home() {
@@ -45,29 +52,46 @@ export default function Home() {
   
   // 语音录制状态
   const [isRecording, setIsRecording] = useState(false)
+  const [recordingTime, setRecordingTime] = useState(0)
   const [isGeneratingVoice, setIsGeneratingVoice] = useState(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
   
   // 预览弹窗
   const [previewCode, setPreviewCode] = useState<string | null>(null)
   
   // 当前激活的功能标签
   const [activeTab, setActiveTab] = useState<'text' | 'image' | 'voice'>('text')
-  
-  // 生成格式（HTML 或 PDF）
-  const [outputFormat, setOutputFormat] = useState<'html' | 'pdf'>('html')
 
-  // 初始化用户状态
+  // 使用 JWT token 验证用户
   useEffect(() => {
-    const savedUser = localStorage.getItem('suma_user')
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser))
-      } catch (e) {
-        console.error('解析用户失败', e)
-        localStorage.removeItem('suma_user')
-      }
+    const token = localStorage.getItem('token')
+    if (token) {
+      fetch('/api/user-info', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            // 转换为旧版 User 格式
+            const user: User = {
+              id: data.user.phone,
+              phone: data.user.phone,
+              is_pro: data.user.isPro || false,
+              daily_count: 3
+            }
+            setUser(user)
+            localStorage.setItem('suma_user', JSON.stringify(user))
+          } else {
+            localStorage.removeItem('token')
+            localStorage.removeItem('suma_user')
+          }
+        })
+        .catch(() => {
+          localStorage.removeItem('token')
+          localStorage.removeItem('suma_user')
+        })
     }
   }, [])
 
@@ -80,6 +104,7 @@ export default function Home() {
 
   const checkLimit = async () => {
     if (!user) return
+    
     try {
       const res = await fetch('/api/check-limit', {
         method: 'POST',
@@ -89,6 +114,7 @@ export default function Home() {
       const data = await res.json()
       setRemaining(data.remaining)
     } catch (err) {
+      // 使用本地存储的计数
       const localCount = localStorage.getItem(`suma_daily_count_${user.id}`)
       if (localCount) {
         setRemaining(Math.max(0, 3 - parseInt(localCount)))
@@ -101,31 +127,41 @@ export default function Home() {
   }
 
   const handleLogout = () => {
+    localStorage.removeItem('token')
     localStorage.removeItem('suma_user')
     setUser(null)
     setShowMenu(false)
   }
-
   // 文字生成应用
   const handleGenerateText = async () => {
     if (!user) {
       setShowLogin(true)
       return
     }
+    
     if (!prompt.trim()) {
       alert('请输入应用描述')
       return
     }
+
     setIsGenerating(true)
+
     try {
       const res = await fetch('/api/generate-text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, prompt })
+        body: JSON.stringify({ 
+          userId: user.id, 
+          prompt 
+        })
       })
+
       const data = await res.json()
+
       if (data.success) {
         setGeneratedCode(data.code)
+        
+        // 保存到本地存储
         const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
         apps.unshift({
           id: Date.now().toString(),
@@ -135,19 +171,10 @@ export default function Home() {
           created_at: new Date().toISOString()
         })
         localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
-        if (outputFormat === 'pdf') {
-          setTimeout(() => {
-            const printWindow = window.open('', '_blank')
-            if (printWindow) {
-              printWindow.document.write(data.code)
-              printWindow.document.close()
-              printWindow.print()
-            } else {
-              alert('请允许弹出窗口，以便打印PDF')
-            }
-          }, 100)
+        
+        if (data.remaining !== undefined) {
+          setRemaining(data.remaining)
         }
-        if (data.remaining !== undefined) setRemaining(data.remaining)
       } else {
         alert(data.error || '生成失败')
       }
@@ -164,28 +191,49 @@ export default function Home() {
     if (file) {
       setImageFile(file)
       const reader = new FileReader()
-      reader.onload = (e) => setImagePreview(e.target?.result as string)
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string)
+      }
       reader.readAsDataURL(file)
     }
   }
 
   // 图片生成应用
   const handleGenerateImage = async () => {
-    if (!user) { setShowLogin(true); return }
-    if (!imageFile) { alert('请上传图片'); return }
+    if (!user) {
+      setShowLogin(true)
+      return
+    }
+    
+    if (!imageFile) {
+      alert('请上传图片')
+      return
+    }
+
     setIsGeneratingImage(true)
+
     try {
+      // 将图片转换为 base64
       const reader = new FileReader()
       reader.onload = async (e) => {
         const base64 = (e.target?.result as string).split(',')[1]
+        
         const res = await fetch('/api/generate-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: user.id, imageBase64: base64, prompt })
+          body: JSON.stringify({ 
+            userId: user.id, 
+            imageBase64: base64,
+            prompt: prompt
+          })
         })
+
         const data = await res.json()
+
         if (data.success) {
           setGeneratedCode(data.code)
+          
+          // 保存到本地存储
           const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
           apps.unshift({
             id: Date.now().toString(),
@@ -195,19 +243,10 @@ export default function Home() {
             created_at: new Date().toISOString()
           })
           localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
-          if (outputFormat === 'pdf') {
-            setTimeout(() => {
-              const printWindow = window.open('', '_blank')
-              if (printWindow) {
-                printWindow.document.write(data.code)
-                printWindow.document.close()
-                printWindow.print()
-              } else {
-                alert('请允许弹出窗口，以便打印PDF')
-              }
-            }, 100)
+          
+          if (data.remaining !== undefined) {
+            setRemaining(data.remaining)
           }
-          if (data.remaining !== undefined) setRemaining(data.remaining)
         } else {
           alert(data.error || '生成失败')
         }
@@ -222,15 +261,6 @@ export default function Home() {
 
   // 开始录音
   const startRecording = async () => {
-    if (!user) {
-      setShowLogin(true)
-      return
-    }
-    if (!user.is_pro && (user.daily_count || 0) >= 6) {
-      alert('今日免费次数已用完')
-      return
-    }
-
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mediaRecorder = new MediaRecorder(stream)
@@ -242,32 +272,35 @@ export default function Home() {
       }
 
       mediaRecorder.onstop = async () => {
-        const webmBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
         
-        try {
-          const arrayBuffer = await webmBlob.arrayBuffer()
-          const audioContext = new AudioContext()
-          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-          const wavBuffer = audioBufferToWav(audioBuffer)
-          const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' })
-          const reader = new FileReader()
-          reader.onload = async (e) => {
-            const base64 = (e.target?.result as string).split(',')[1]
-            await handleVoiceUpload(base64)
-          }
-          reader.readAsDataURL(wavBlob)
-          await audioContext.close()
-        } catch (err) {
-          console.error('音频转换失败:', err)
-          alert('音频处理失败，请重试')
+        // 转换为 base64
+        const reader = new FileReader()
+        reader.onload = async (e) => {
+          const base64 = (e.target?.result as string).split(',')[1]
+          await generateFromVoice(base64)
         }
+        reader.readAsDataURL(audioBlob)
+        
+        // 停止所有轨道
         stream.getTracks().forEach(track => track.stop())
       }
 
       mediaRecorder.start()
       setIsRecording(true)
+      setRecordingTime(0)
+
+      timerRef.current = setInterval(() => {
+        setRecordingTime(t => {
+          if (t >= 30) {
+            stopRecording()
+            return t
+          }
+          return t + 1
+        })
+      }, 1000)
     } catch (err) {
-      alert('无法获取麦克风权限')
+      alert('无法访问麦克风，请检查权限')
     }
   }
 
@@ -276,50 +309,55 @@ export default function Home() {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop()
       setIsRecording(false)
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+      }
     }
   }
 
-  // 上传音频到后端识别
-  const handleVoiceUpload = async (audioBase64: string) => {
-    if (!user) return
+  // 从语音生成应用
+  const generateFromVoice = async (audioBase64: string) => {
+    if (!user) {
+      setShowLogin(true)
+      return
+    }
+
     setIsGeneratingVoice(true)
+
     try {
       const res = await fetch('/api/generate-voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, audioBase64 })
+        body: JSON.stringify({ 
+          userId: user.id, 
+          audioBase64 
+        })
       })
+
       const data = await res.json()
+
       if (data.success) {
         setGeneratedCode(data.code)
-        setPrompt(data.recognizedText)
+        
+        // 保存到本地存储
         const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
         apps.unshift({
           id: Date.now().toString(),
-          name: data.recognizedText.slice(0, 30) + '...',
+          name: `语音应用-${Date.now()}`,
           code: data.code,
           type: 'voice',
           created_at: new Date().toISOString()
         })
         localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
-        if (outputFormat === 'pdf') {
-          setTimeout(() => {
-            const printWindow = window.open('', '_blank')
-            if (printWindow) {
-              printWindow.document.write(data.code)
-              printWindow.document.close()
-              printWindow.print()
-            } else {
-              alert('请允许弹出窗口，以便打印PDF')
-            }
-          }, 100)
+        
+        if (data.remaining !== undefined) {
+          setRemaining(data.remaining)
         }
-        if (data.remaining !== undefined) setRemaining(data.remaining)
       } else {
-        alert(data.error || '识别失败')
+        alert(data.error || '生成失败')
       }
     } catch (err) {
-      alert('语音处理失败')
+      alert('生成失败，请稍后重试')
     } finally {
       setIsGeneratingVoice(false)
     }
@@ -328,6 +366,7 @@ export default function Home() {
   // 下载代码
   const handleDownload = () => {
     if (!generatedCode) return
+    
     const blob = new Blob([generatedCode], { type: 'text/html' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -345,56 +384,113 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
+      {/* Three.js 背景 */}
       <ThreeBackground />
 
+      {/* 主内容 */}
       <div className="min-h-screen relative z-10">
+        {/* 顶部导航 */}
         <header className="fixed top-0 left-0 right-0 z-40 bg-black/30 backdrop-blur-md border-b border-white/10">
           <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-            <button onClick={() => setShowMenu(true)} className="p-2 hover:bg-white/10 rounded-lg transition">
+            <button
+              onClick={() => setShowMenu(true)}
+              className="p-2 hover:bg-white/10 rounded-lg transition"
+            >
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <h1 className="text-xl font-bold text-white"><span className="text-blue-400">速</span>码</h1>
+
+            <h1 className="text-xl font-bold text-white">
+              <span className="text-blue-400">速</span>码
+            </h1>
+
             <div>
-              {user ? (
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-sm text-white">{user.phone.slice(0,3)}****{user.phone.slice(-4)}</p>
-                    <p className="text-xs text-gray-400">{user.is_pro ? 'Pro会员·无限次' : `今日剩余 ${3 - (user.daily_count || 0)} 次`}</p>
-                  </div>
-                  {!user.is_pro && (
-                    <button onClick={() => alert('Pro会员升级功能开发中，请支付19元/月')} className="px-3 py-1 bg-yellow-500 text-black rounded-lg text-sm font-medium hover:bg-yellow-400 transition">升级Pro</button>
-                  )}
-                  <button onClick={() => setShowLogin(true)} className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full text-white font-bold">{user.phone.slice(-2)}</button>
-                </div>
-              ) : (
-                <button onClick={() => setShowLogin(true)} className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium">登录</button>
+            {user && (
+  <div className="flex items-center gap-3">
+    <div className="text-right">
+      <p className="text-sm text-white">{user.phone.slice(0, 3)}****{user.phone.slice(-4)}</p>
+      <p className="text-xs text-gray-400">
+        {user.is_pro ? 'Pro会员·无限次' : `今日剩余 ${6 - (user.daily_count || 0)} 次`}
+      </p>
+    </div>
+    {!user.is_pro && (
+      <button
+        onClick={() => alert('Pro会员升级功能开发中，请支付19元/月')}
+        className="px-3 py-1 bg-yellow-500 text-black rounded-lg text-sm font-medium hover:bg-yellow-400 transition"
+      >
+        升级Pro
+      </button>
+    )}
+    <button
+      onClick={() => setShowLogin(true)}
+      className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full text-white font-bold"
+    >
+      {user.phone.slice(-2)}
+    </button>
+  </div>
+)}
+                <button
+                  onClick={() => setShowLogin(true)}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium"
+                >
+                  登录
+                </button>
               )}
             </div>
           </div>
         </header>
 
-        <main className="pt-24 pb-40 px-4 max-w-6xl mx-auto">
+        {/* 主要内容区 */}
+        <main className="pt-24 pb-20 px-4 max-w-6xl mx-auto">
           {/* 功能卡片 */}
-          <div className="grid md:grid-cols-3 gap-6 mb-6">
-            <div onClick={() => setActiveTab('text')} className={`group relative overflow-hidden rounded-2xl p-6 cursor-pointer transition-all duration-300 hover:scale-105 ${activeTab === 'text' ? 'bg-gradient-to-br from-blue-600 to-cyan-600 ring-2 ring-blue-400' : 'bg-gray-900/50 border border-gray-700 hover:border-gray-600'}`}>
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110 ${activeTab === 'text' ? 'bg-white/20' : 'bg-gradient-to-r from-blue-500 to-cyan-500'}`}>
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+          <div className="grid md:grid-cols-3 gap-6 mb-12">
+            <div 
+              onClick={() => setActiveTab('text')}
+              className={`p-6 rounded-2xl border transition cursor-pointer ${
+                activeTab === 'text' 
+                  ? 'bg-blue-600/20 border-blue-500' 
+                  : 'bg-gray-900/50 border-gray-700 hover:border-gray-600'
+              }`}
+            >
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
               </div>
               <h3 className="text-lg font-bold text-white mb-2">文字生成</h3>
               <p className="text-sm text-gray-400">用文字描述你想要的应用，AI 自动生成完整代码</p>
             </div>
-            <div onClick={() => setActiveTab('image')} className={`group relative overflow-hidden rounded-2xl p-6 cursor-pointer transition-all duration-300 hover:scale-105 ${activeTab === 'image' ? 'bg-gradient-to-br from-purple-600 to-pink-600 ring-2 ring-purple-400' : 'bg-gray-900/50 border border-gray-700 hover:border-gray-600'}`}>
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110 ${activeTab === 'image' ? 'bg-white/20' : 'bg-gradient-to-r from-purple-500 to-pink-500'}`}>
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+
+            <div 
+              onClick={() => setActiveTab('image')}
+              className={`p-6 rounded-2xl border transition cursor-pointer ${
+                activeTab === 'image' 
+                  ? 'bg-purple-600/20 border-purple-500' 
+                  : 'bg-gray-900/50 border-gray-700 hover:border-gray-600'
+              }`}
+            >
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
               </div>
               <h3 className="text-lg font-bold text-white mb-2">图片识别</h3>
               <p className="text-sm text-gray-400">上传图片，AI 识别内容并生成对应应用</p>
             </div>
-            <div onClick={() => setActiveTab('voice')} className={`group relative overflow-hidden rounded-2xl p-6 cursor-pointer transition-all duration-300 hover:scale-105 ${activeTab === 'voice' ? 'bg-gradient-to-br from-green-600 to-emerald-600 ring-2 ring-green-400' : 'bg-gray-900/50 border border-gray-700 hover:border-gray-600'}`}>
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110 ${activeTab === 'voice' ? 'bg-white/20' : 'bg-gradient-to-r from-green-500 to-emerald-500'}`}>
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+
+            <div 
+              onClick={() => setActiveTab('voice')}
+              className={`p-6 rounded-2xl border transition cursor-pointer ${
+                activeTab === 'voice' 
+                  ? 'bg-green-600/20 border-green-500' 
+                  : 'bg-gray-900/50 border-gray-700 hover:border-gray-600'
+              }`}
+            >
+              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
               </div>
               <h3 className="text-lg font-bold text-white mb-2">语音对话</h3>
               <p className="text-sm text-gray-400">说出你的需求，AI 语音识别并生成应用</p>
@@ -405,17 +501,23 @@ export default function Home() {
           <div className="bg-gray-900/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-700">
             {activeTab === 'text' && (
               <div>
-                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="描述你想要的应用..." className="w-full h-32 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none" />
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="描述你想要的应用，例如：帮我做一个计算器，要支持加减乘除运算，有漂亮的渐变背景..."
+                  className="w-full h-32 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none"
+                />
                 <div className="flex items-center justify-between mt-4">
-                  <div className="flex items-center gap-3">
-                    <p className="text-sm text-gray-400">{user ? (user.is_pro ? 'Pro会员无限次' : `剩余 ${Math.max(0, 3 - (user.daily_count || 0))} 次`) : '登录后可使用'}</p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500">生成格式：</span>
-                      <button onClick={() => setOutputFormat('html')} className={`px-2 py-1 text-xs rounded transition ${outputFormat === 'html' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>HTML</button>
-                      <button onClick={() => setOutputFormat('pdf')} className={`px-2 py-1 text-xs rounded transition ${outputFormat === 'pdf' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>PDF（打印保存）</button>
-                    </div>
-                  </div>
-                  <button onClick={handleGenerateText} disabled={isGenerating || !user || (!user.is_pro && (user?.daily_count || 0) >= 6)} className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium disabled:opacity-50 hover:from-blue-700 hover:to-purple-700 transition-all duration-200">{isGenerating ? '生成中...' : '生成应用'}</button>
+                  <p className="text-sm text-gray-400">
+                    {user ? (user.is_pro ? 'Pro会员无限次' : `剩余 ${Math.max(0, 3 - (user.daily_count || 0))} 次`) : '登录后可使用'}
+                  </p>
+                  <button
+                    onClick={handleGenerateText}
+                    disabled={isGenerating || !user || (!user.is_pro && (user?.daily_count || 0) >= 3)}
+                    className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium disabled:opacity-50"
+                  >
+                    {isGenerating ? '生成中...' : '生成应用'}
+                  </button>
                 </div>
               </div>
             )}
@@ -425,152 +527,200 @@ export default function Home() {
                 <div className="flex flex-col items-center gap-4">
                   <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-blue-500 transition">
                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <svg className="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                      <svg className="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
                       <p className="text-sm text-gray-400">点击上传图片或拖拽</p>
                     </div>
                     <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
                   </label>
+                  
                   {imagePreview && (
                     <div className="relative">
                       <img src={imagePreview} alt="预览" className="max-h-40 rounded-lg" />
-                      <button onClick={() => { setImagePreview(null); setImageFile(null) }} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                      <button
+                        onClick={() => { setImagePreview(null); setImageFile(null) }}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </div>
                   )}
-                  <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="补充描述（可选）" className="w-full h-20 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none" />
-                  <div className="flex items-center gap-3">
-                    <p className="text-sm text-gray-400">{user ? (user.is_pro ? 'Pro会员无限次' : `剩余 ${Math.max(0, 3 - (user.daily_count || 0))} 次`) : '登录后可使用'}</p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500">生成格式：</span>
-                      <button onClick={() => setOutputFormat('html')} className={`px-2 py-1 text-xs rounded transition ${outputFormat === 'html' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>HTML</button>
-                      <button onClick={() => setOutputFormat('pdf')} className={`px-2 py-1 text-xs rounded transition ${outputFormat === 'pdf' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>PDF（打印保存）</button>
-                    </div>
-                  </div>
-                  <button onClick={handleGenerateImage} disabled={isGeneratingImage || !user || !imageFile || (!user.is_pro && (user?.daily_count || 0) >= 6)} className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium disabled:opacity-50 hover:from-purple-700 hover:to-pink-700 transition-all duration-200">{isGeneratingImage ? '生成中...' : '生成应用'}</button>
+
+                  <textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="补充描述（可选）"
+                    className="w-full h-20 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none"
+                  />
+
+                  <button
+                    onClick={handleGenerateImage}
+                    disabled={isGeneratingImage || !user || !imageFile || (!user.is_pro && (user?.daily_count || 0) >= 3)}
+                    className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium disabled:opacity-50"
+                  >
+                    {isGeneratingImage ? '生成中...' : '生成应用'}
+                  </button>
                 </div>
               </div>
             )}
 
             {activeTab === 'voice' && (
               <div className="text-center py-8">
-                <div className="flex justify-center gap-4">
-                  {!isRecording ? (
-                    <button onClick={startRecording} disabled={isGeneratingVoice || !user || (!user.is_pro && (user?.daily_count || 0) >= 6)} className="w-24 h-24 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 hover:scale-105 transition disabled:opacity-50">
-                      <svg className="w-10 h-10 text-white mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-                    </button>
+                <button
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={isGeneratingVoice || !user || (!user.is_pro && (user?.daily_count || 0) >= 3)}
+                  className={`w-24 h-24 rounded-full flex items-center justify-center transition ${
+                    isRecording 
+                      ? 'bg-red-500 animate-pulse' 
+                      : 'bg-gradient-to-r from-green-500 to-emerald-500'
+                  } disabled:opacity-50`}
+                >
+                  {isRecording ? (
+                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                    </svg>
                   ) : (
-                    <button onClick={stopRecording} className="w-24 h-24 rounded-full bg-red-500 animate-pulse hover:scale-105 transition">
-                      <svg className="w-10 h-10 text-white mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1" fill="white" /></svg>
-                    </button>
+                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
                   )}
-                </div>
-                <p className="mt-4 text-gray-400">{isRecording ? '🎤 录音中... 点击停止' : '点击麦克风开始录音'}</p>
-                {isGeneratingVoice && <p className="mt-2 text-blue-400">AI 识别中...</p>}
-                <div className="flex items-center justify-center gap-3 mt-4">
-                  <p className="text-sm text-gray-400">{user ? (user.is_pro ? 'Pro会员无限次' : `剩余 ${Math.max(0, 3 - (user.daily_count || 0))} 次`) : '登录后可使用'}</p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">生成格式：</span>
-                    <button onClick={() => setOutputFormat('html')} className={`px-2 py-1 text-xs rounded transition ${outputFormat === 'html' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>HTML</button>
-                    <button onClick={() => setOutputFormat('pdf')} className={`px-2 py-1 text-xs rounded transition ${outputFormat === 'pdf' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>PDF（打印保存）</button>
-                  </div>
-                </div>
+                </button>
+                <p className="mt-4 text-gray-400">
+                  {isRecording ? `录音中... ${recordingTime}/30秒` : '点击录音（最多30秒）'}
+                </p>
+                {isGeneratingVoice && (
+                  <p className="mt-2 text-blue-400">AI 识别中...</p>
+                )}
               </div>
             )}
           </div>
 
+          {/* 生成结果预览 */}
           {generatedCode && (
             <div className="mt-8 bg-gray-900/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-700">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-white">生成结果</h3>
                 <div className="flex gap-2">
-                  <button onClick={() => setPreviewCode(generatedCode)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition">预览</button>
-                  <button onClick={handleDownload} className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm hover:bg-gray-600 transition">下载 HTML</button>
-                  {outputFormat === 'pdf' && (
-                    <button onClick={() => { const printWindow = window.open('', '_blank'); if (printWindow) { printWindow.document.write(generatedCode); printWindow.document.close(); printWindow.print() } else { alert('请允许弹出窗口') } }} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition">打印/另存为PDF</button>
-                  )}
+                  <button
+                    onClick={() => setPreviewCode(generatedCode)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm"
+                  >
+                    预览
+                  </button>
+                  <button
+                    onClick={handleDownload}
+                    className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm"
+                  >
+                    下载 HTML
+                  </button>
                 </div>
               </div>
               <div className="h-64 bg-gray-800 rounded-lg overflow-hidden">
-                <iframe srcDoc={generatedCode} className="w-full h-full" title="预览" />
+                <iframe
+                  srcDoc={generatedCode}
+                  className="w-full h-full"
+                  title="预览"
+                />
               </div>
             </div>
           )}
         </main>
 
+        {/* 底部 */}
         <footer className="fixed bottom-0 left-0 right-0 bg-black/50 backdrop-blur-md border-t border-white/10 py-3">
           <div className="max-w-6xl mx-auto px-4 flex items-center justify-center">
-            <button onClick={() => setShowGames(true)} className="text-sm text-gray-400 hover:text-white transition">轻松时刻 ☕</button>
+            <button
+              onClick={() => setShowGames(true)}
+              className="text-sm text-gray-400 hover:text-white transition"
+            >
+              轻松时刻 ☕
+            </button>
           </div>
         </footer>
       </div>
 
-      <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} onLoginSuccess={handleLoginSuccess} />
-      <SideMenu isOpen={showMenu} onClose={() => setShowMenu(false)} user={user} onLogout={handleLogout} />
+      {/* 登录弹窗 */}
+      <LoginModal
+        isOpen={showLogin}
+        onClose={() => setShowLogin(false)}
+        onLoginSuccess={handleLoginSuccess}
+      />
 
-      {/* 三款游戏 */}
-      {currentGame === 'snakePro' && <GameSnakePro onClose={() => setCurrentGame(null)} />}
-      {currentGame === 'spaceShooter' && <GameSpaceShooter onClose={() => setCurrentGame(null)} />}
-      {currentGame === 'eggParty' && <GameEggParty onClose={() => setCurrentGame(null)} />}
+      {/* 侧滑菜单 */}
+      <SideMenu
+        isOpen={showMenu}
+        onClose={() => setShowMenu(false)}
+        user={user}
+        onLogout={handleLogout}
+      />
 
+      {/* 游戏选择弹窗 */}
       {showGames && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowGames(false)} />
-          <div className="relative bg-gradient-to-br from-gray-900 to-gray-800 p-8 rounded-2xl border border-white/10 max-w-md w-full mx-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/80" onClick={() => setShowGames(false)} />
+          <div className="relative bg-gray-900 p-8 rounded-2xl border border-gray-700 max-w-md w-full">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-white">🎮 轻松时刻</h2>
+              <h2 className="text-2xl font-bold text-white">轻松时刻</h2>
               <button onClick={() => setShowGames(false)} className="text-gray-400 hover:text-white">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <div className="grid grid-cols-1 gap-4">
-              {/* 贪吃蛇游戏 */}
+            <div className="grid grid-cols-3 gap-4">
               <button
-                onClick={() => { setShowGames(false); setCurrentGame('snakePro') }}
-                className="group relative overflow-hidden p-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-2xl"
+                onClick={() => { setShowGames(false); setCurrentGame('snake') }}
+                className="p-4 bg-green-600/20 border border-green-500/30 rounded-xl hover:bg-green-600/30 transition"
               >
-                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                <span className="text-2xl">🐍</span>
-                <span>贪吃蛇美食大战</span>
-                <span className="text-sm opacity-75">| 闯关升级</span>
+                <div className="text-3xl mb-2">🐍</div>
+                <p className="text-white font-medium">贪吃蛇</p>
               </button>
-              
-              {/* 太空射击游戏 */}
               <button
-                onClick={() => { setShowGames(false); setCurrentGame('spaceShooter') }}
-                className="group relative overflow-hidden p-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl text-white font-bold text-lg hover:scale-105 transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-2xl"
+                onClick={() => { setShowGames(false); setCurrentGame('tetris') }}
+                className="p-4 bg-blue-600/20 border border-blue-500/30 rounded-xl hover:bg-blue-600/30 transition"
               >
-                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                <span className="text-2xl">🚀</span>
-                <span>3D 太空射击</span>
-                <span className="text-sm opacity-75">| 战机射击</span>
+                <div className="text-3xl mb-2">🧱</div>
+                <p className="text-white font-medium">俄罗斯方块</p>
               </button>
-              
-              {/* 蛋仔派对游戏 */}
               <button
-                onClick={() => { setShowGames(false); setCurrentGame('eggParty') }}
-                className="group relative overflow-hidden p-4 bg-gradient-to-r from-pink-500 to-orange-500 rounded-xl text-white font-bold text-lg hover:scale-105 transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-2xl"
+                onClick={() => { setShowGames(false); setCurrentGame('bubble') }}
+                className="p-4 bg-purple-600/20 border border-purple-500/30 rounded-xl hover:bg-purple-600/30 transition"
               >
-                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                <span className="text-2xl">🥚</span>
-                <span>蛋仔派对</span>
-                <span className="text-sm opacity-75">| 3D跳跃收集</span>
+                <div className="text-3xl mb-2">🫧</div>
+                <p className="text-white font-medium">泡泡消消乐</p>
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* 游戏组件 */}
+      {currentGame === 'snake' && <GameSnake onClose={() => setCurrentGame(null)} />}
+      {currentGame === 'tetris' && <GameTetris onClose={() => setCurrentGame(null)} />}
+      {currentGame === 'bubble' && <GameBubble onClose={() => setCurrentGame(null)} />}
+
+      {/* 预览弹窗 */}
       {previewCode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80" onClick={() => setPreviewCode(null)} />
-          <div className="relative bg-white w-full max-w-4xl h-[80vh] rounded-lg overflow-hidden shadow-2xl">
-            <button onClick={() => setPreviewCode(null)} className="absolute top-4 right-4 z-10 bg-gray-900/80 hover:bg-gray-900 text-white p-2 rounded-full transition">
+          <div className="relative bg-white w-full max-w-4xl h-[80vh] rounded-lg overflow-hidden">
+            <button
+              onClick={() => setPreviewCode(null)}
+              className="absolute top-4 right-4 z-10 bg-gray-900 text-white p-2 rounded-full"
+            >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            <iframe srcDoc={previewCode} className="w-full h-full" title="预览" />
+            <iframe
+              srcDoc={previewCode}
+              className="w-full h-full"
+              title="预览"
+            />
           </div>
         </div>
       )}

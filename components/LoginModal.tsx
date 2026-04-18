@@ -51,6 +51,10 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       if (data.success) {
         setCountdown(60)
         setError('')
+        // 开发环境显示验证码（方便测试）
+        if (data.devCode) {
+          console.log(`[DEV] 验证码: ${data.devCode}`)
+        }
       } else {
         setError(data.error || '发送失败')
       }
@@ -71,7 +75,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const res = await fetch('/api/verify-sms', {
+      // 调用新的登录 API（支持 JWT token）
+      const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, code })
@@ -80,8 +85,21 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       const data = await res.json()
 
       if (data.success) {
-        localStorage.setItem('suma_user', JSON.stringify(data.user))
-        onLoginSuccess(data.user)
+        // 存储 JWT token（新版）
+        localStorage.setItem('token', data.token)
+        
+        // 转换为旧版 User 格式，保持兼容性
+        const user: User = {
+          id: data.user.phone,  // 使用手机号作为 id
+          phone: data.user.phone,
+          is_pro: data.user.isPro || false,
+          daily_count: 3  // 默认每日次数
+        }
+        
+        // 同时存储旧格式，兼容已有功能
+        localStorage.setItem('suma_user', JSON.stringify(user))
+        
+        onLoginSuccess(user)
         onClose()
       } else {
         setError(data.error || '登录失败')
