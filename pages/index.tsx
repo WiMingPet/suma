@@ -436,7 +436,6 @@ export default function Home() {
                 >
                   登录
                 </button>
-              )}
             </div>
           </div>
         </header>
