@@ -64,34 +64,19 @@ export default function Home() {
   // 当前激活的功能标签
   const [activeTab, setActiveTab] = useState<'text' | 'image' | 'voice'>('text')
 
-  // 使用 JWT token 验证用户
+  // 生成格式（HTML 或 PDF）
+  const [outputFormat, setOutputFormat] = useState<'html' | 'pdf'>('html')
+
+  // 初始化用户状态
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      fetch('/api/user-info', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            // 转换为旧版 User 格式
-            const user: User = {
-              id: data.user.phone,
-              phone: data.user.phone,
-              is_pro: data.user.isPro || false,
-              daily_count: 3
-            }
-            setUser(user)
-            localStorage.setItem('suma_user', JSON.stringify(user))
-          } else {
-            localStorage.removeItem('token')
-            localStorage.removeItem('suma_user')
-          }
-        })
-        .catch(() => {
-          localStorage.removeItem('token')
-          localStorage.removeItem('suma_user')
-        })
+    const savedUser = localStorage.getItem('suma_user')
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser))
+      } catch (e) {
+        console.error('解析用户失败', e)
+        localStorage.removeItem('suma_user')
+      }
     }
   }, [])
 
@@ -123,11 +108,11 @@ export default function Home() {
   }
 
   const handleLoginSuccess = (userData: User) => {
+    console.log('登录成功:', userData)  // 加这行调试
     setUser(userData)
+    localStorage.setItem('suma_user', JSON.stringify(userData))  // 添加这行
   }
-
   const handleLogout = () => {
-    localStorage.removeItem('token')
     localStorage.removeItem('suma_user')
     setUser(null)
     setShowMenu(false)
