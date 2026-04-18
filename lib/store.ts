@@ -35,12 +35,14 @@ export const orderStore = new Map<string, Order>();
 // 清理过期数据（每小时执行一次）
 setInterval(() => {
   const now = Date.now();
-  for (const [phone, data] of codeStore) {
+  // 清理过期的验证码
+  codeStore.forEach((data, phone) => {
     if (data.expires < now) codeStore.delete(phone);
-  }
-  for (const [token, session] of userStore) {
+  });
+  // 清理过期的会员状态
+  userStore.forEach((session) => {
     if (session.proExpiresAt && session.proExpiresAt < now) {
       session.isPro = false;
     }
-  }
+  });
 }, 60 * 60 * 1000);
