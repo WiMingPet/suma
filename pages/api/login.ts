@@ -44,8 +44,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     success: true,
     token,
     user: {
+      id: user.phone,
       phone: user.phone,
-      isPro: user.isPro,
+      is_pro: user.isPro,
+      daily_count: 3,
     },
   });
 }
