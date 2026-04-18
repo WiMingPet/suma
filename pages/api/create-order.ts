@@ -1,8 +1,6 @@
 // pages/api/create-order.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
-import AlipaySdk from 'alipay-sdk';
-import AlipayFormData from 'alipay-sdk/lib/form';
 import { orderStore, userStore } from '../../lib/store';
 
 const plans = {
@@ -52,7 +50,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const isMobile = /mobile|android|iphone|ipad|phone/i.test(userAgent);
 
   if (process.env.NODE_ENV === 'development') {
-    // 开发环境模拟支付
     return res.status(200).json({
       success: true,
       orderId,
@@ -62,7 +59,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 
-  // 生产环境调用支付宝
+  // 动态导入 alipay-sdk
+  const AlipaySdkModule = await import('alipay-sdk');
+  const AlipaySdk = AlipaySdkModule.default;
+
   const alipaySdk = new AlipaySdk({
     appId: process.env.ALIPAY_APP_ID!,
     privateKey: process.env.ALIPAY_PRIVATE_KEY!,
@@ -78,6 +78,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     product_code: isMobile ? 'QUICK_WAP_WAY' : 'FAST_INSTANT_TRADE_PAY',
   };
 
+  // 使用 AlipayFormData 构建表单
+  const AlipayFormData = (await import('alipay-sdk/lib/form')).default;
   const formData = new AlipayFormData();
   formData.setMethod('get');
   formData.addField('returnUrl', `${process.env.NEXT_PUBLIC_SITE_URL}/payment-success`);
