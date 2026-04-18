@@ -92,8 +92,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         const user: User = {
           id: data.user.phone,  // 使用手机号作为 id
           phone: data.user.phone,
-          is_pro: data.user.isPro || false,
-          daily_count: 3  // 默认每日次数
+          is_pro: data.user.is_pro || false,
+          daily_count: data.user.daily_count || 3
         }
         
         // 同时存储旧格式，兼容已有功能
