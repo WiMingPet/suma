@@ -40,10 +40,14 @@ export default function Home() {
   const [currentGame, setCurrentGame] = useState<string | null>(null)
   
   // 生成功能状态
-  const [prompt, setPrompt] = useState('')
   const [generatedCode, setGeneratedCode] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
-  
+
+  // 各个Tab独立的输入状态
+  const [textPrompt, setTextPrompt] = useState('')      // 文字生成输入
+  const [imagePrompt, setImagePrompt] = useState('')    // 图片识别补充描述
+  const [voicePrompt, setVoicePrompt] = useState('')    // 语音对话（实际上语音不需要，但保留一致性）
+
   // 图片上传状态
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -161,7 +165,7 @@ export default function Home() {
     return
   }
     
-    if (!prompt.trim()) {
+    if (!textPrompt.trim()) {
       alert('请输入应用描述')
       return
     }
@@ -174,7 +178,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           userId: user.id, 
-          prompt 
+          prompt: textPrompt 
         })
       })
 
@@ -193,7 +197,7 @@ export default function Home() {
         const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
         apps.unshift({
           id: Date.now().toString(),
-          name: prompt.slice(0, 30) + '...',
+          name: textPrompt.slice(0, 30) + '...',
           code: data.code,
           type: 'text',
           created_at: new Date().toISOString()
@@ -254,7 +258,7 @@ export default function Home() {
           body: JSON.stringify({ 
             userId: user.id, 
             imageBase64: base64,
-            prompt: prompt
+            prompt: imagePrompt
           })
         })
 
@@ -543,8 +547,8 @@ export default function Home() {
             {activeTab === 'text' && (
               <div>
                 <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
+                  value={textPrompt}
+                  onChange={(e) => setTextPrompt(e.target.value)}
                   placeholder="描述你想要的应用，例如：帮我做一个计算器，要支持加减乘除运算，有漂亮的渐变背景..."
                   className="w-full h-32 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none"
                 />
@@ -597,8 +601,8 @@ export default function Home() {
                   )}
 
                   <textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
+                    value={imagePrompt}
+                    onChange={(e) => setImagePrompt(e.target.value)}
                     placeholder="补充描述（可选）"
                     className="w-full h-20 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none"
                   />
