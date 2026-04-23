@@ -27,6 +27,13 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const [code, setCode] = useState('')
   const [password, setPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
+
+  // 注册表单字段（添加这些）
+  const [registerPhone, setRegisterPhone] = useState('')
+  const [registerPassword, setRegisterPassword] = useState('')
+  const [registerConfirmPassword, setRegisterConfirmPassword] = useState('')
+  const [registerCode, setRegisterCode] = useState('')
+  const [registerCountdown, setRegisterCountdown] = useState(0)
   
   // UI 状态
   const [countdown, setCountdown] = useState(0)
@@ -41,6 +48,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       return () => clearTimeout(timer)
     }
   }, [countdown])
+
+  // 注册倒计时
+  useEffect(() => {
+    if (registerCountdown > 0) {
+      const timer = setTimeout(() => setRegisterCountdown(registerCountdown - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [registerCountdown])
 
   // 重置表单
   const resetForm = () => {
@@ -84,6 +99,41 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         setError('')
         if (data.devCode) {
           console.log(`[DEV] 验证码: ${data.devCode}`)
+          alert(`开发环境验证码: ${data.devCode}`)
+        }
+      } else {
+        setError(data.error || '发送失败')
+      }
+    } catch (err) {
+      setError('网络错误，请稍后重试')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  // ========== 发送注册验证码 ==========
+  const handleRegisterSendCode = async () => {
+    if (!/^1[3-9]\d{9}$/.test(registerPhone)) {
+      setError('请输入有效的手机号')
+      return
+    }
+
+    setSending(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: registerPhone })
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        setRegisterCountdown(60)
+        setError('')
+        if (data.devCode) {
           alert(`开发环境验证码: ${data.devCode}`)
         }
       } else {
@@ -241,8 +291,71 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     }
   }
 
-  if (!isOpen) return null
+  // ========== 注册新账号 ==========
+  const handleRegister = async () => {
+    // 验证手机号
+    if (!/^1[3-9]\d{9}$/.test(registerPhone)) {
+      setError('请输入正确的手机号')
+      return
+    }
+    
+    // 验证密码
+    if (!registerPassword || registerPassword.length < 6) {
+      setError('密码长度不能少于6位')
+      return
+    }
+    
+    // 验证确认密码
+    if (registerPassword !== registerConfirmPassword) {
+      setError('两次输入的密码不一致')
+      return
+    }
+    
+    // 验证验证码
+    if (!registerCode) {
+      setError('请输入验证码')
+      return
+    }
 
+    setLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: registerPhone,
+          password: registerPassword,
+          code: registerCode
+        })
+      })
+      
+      const data = await res.json()
+      
+      if (data.success) {
+        alert('注册成功！请使用密码登录')
+        // 切换到密码登录Tab，并自动填充手机号
+        setLoginMode('password')
+        setPhone(registerPhone)
+        setPassword('')
+        setRegisterPhone('')
+        setRegisterPassword('')
+        setRegisterConfirmPassword('')
+        setRegisterCode('')
+        setError('')
+      } else {
+        setError(data.error || '注册失败')
+      }
+    } catch (err) {
+      setError('注册失败，请稍后重试')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!isOpen) return null
+  
   // ========== 忘记密码界面 ==========
   if (isForgotMode) {
     return (
@@ -317,6 +430,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             <div>
               <input 
                 type="tel" 
+                value={registerPhone}
+                onChange={(e) => setRegisterPhone(e.target.value)}
                 placeholder="手机号" 
                 className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" 
               />
@@ -326,6 +441,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             <div>
               <input 
                 type="password" 
+                value={registerPassword}
+                onChange={(e) => setRegisterPassword(e.target.value)}
                 placeholder="密码（至少6位）" 
                 className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" 
               />
@@ -335,6 +452,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             <div>
               <input 
                 type="password" 
+                value={registerConfirmPassword}
+                onChange={(e) => setRegisterConfirmPassword(e.target.value)}
                 placeholder="确认密码" 
                 className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" 
               />
@@ -344,23 +463,29 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             <div className="flex gap-3">
               <input 
                 type="text" 
+                value={registerCode}
+                onChange={(e) => setRegisterCode(e.target.value)}
                 placeholder="验证码" 
                 className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" 
               />
               <button 
-                className="px-5 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium whitespace-nowrap"
-                onClick={() => alert('获取验证码功能开发中')}
+                onClick={handleRegisterSendCode}
+                disabled={registerCountdown > 0 || sending}
+                className="px-5 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium disabled:opacity-50 whitespace-nowrap"
               >
-                获取验证码
+                {registerCountdown > 0 ? `${registerCountdown}s` : sending ? '发送中' : '获取验证码'}
               </button>
             </div>
 
+            {error && <p className="text-red-500 text-sm">{error}</p>}
+
             {/* 注册按钮 */}
             <button 
-              onClick={() => alert('注册功能开发中，暂不可用')}
-              className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+              onClick={handleRegister}
+              disabled={loading}
+              className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold disabled:opacity-50 transition-all duration-200"
             >
-              立即注册
+              {loading ? '注册中...' : '立即注册'}
             </button>
 
             {/* 返回登录 */}
