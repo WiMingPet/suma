@@ -454,7 +454,9 @@ export default function Home() {
                 登录
               </button>
             )}
-            </div>
+          </div>
+        </div>
+      </header>
 
         {/* 主要内容区 */}
         <main className="pt-24 pb-20 px-4 max-w-6xl mx-auto">
