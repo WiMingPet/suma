@@ -15,7 +15,7 @@ interface LoginModalProps {
   onLoginSuccess: (user: User) => void
 }
 
-type LoginMode = 'code' | 'password' | 'register'
+type LoginMode = 'code' | 'password' | 'register'// ← 这一行没问题
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps) {
   // UI 状态
