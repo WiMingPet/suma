@@ -9,7 +9,7 @@ export interface UserRecord {
   phone: string;
   passwordHash?: string;
   isPro: boolean;
-  dailyCount: number;
+  dailyCount: number;      // 已使用次数，初始为 0
   lastLoginDate: number;
   createdAt: number;
 }
@@ -39,14 +39,14 @@ export function getUser(phone: string): UserRecord | undefined {
   return userStore.get(phone);
 }
 
-// 获取或创建用户
+// 获取或创建用户（新用户 dailyCount = 0）
 export function getOrCreateUser(phone: string): UserRecord {
   let user = userStore.get(phone);
   if (!user) {
     user = {
       phone,
       isPro: false,
-      dailyCount: 0,
+      dailyCount: 0,           // ✅ 已使用次数为 0
       lastLoginDate: Date.now(),
       createdAt: Date.now(),
     };
@@ -62,7 +62,7 @@ export function createOrUpdateUser(phone: string, data: Partial<UserRecord>): Us
     user = {
       phone,
       isPro: false,
-      dailyCount: 0,
+      dailyCount: 0,           // ✅ 已使用次数为 0
       lastLoginDate: Date.now(),
       createdAt: Date.now(),
     };
@@ -77,7 +77,7 @@ export function resetDailyCountIfNeeded(user: UserRecord): void {
   const today = new Date().setHours(0, 0, 0, 0);
   const lastLoginDay = new Date(user.lastLoginDate).setHours(0, 0, 0, 0);
   if (lastLoginDay !== today) {
-    user.dailyCount = 0;
+    user.dailyCount = 0;       // ✅ 重置为 0
     user.lastLoginDate = Date.now();
     userStore.set(user.phone, user);
   }
@@ -90,5 +90,4 @@ setInterval(() => {
   codeStore.forEach((data, phone) => {
     if (data.expires < now) codeStore.delete(phone);
   });
-  // 注意：用户数据不过期，保留
 }, 60 * 60 * 1000);

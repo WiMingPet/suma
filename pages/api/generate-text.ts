@@ -1,13 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-
-declare global {
-  var _localUsers: Record<string, any>
-}
-
-if (!global._localUsers) {
-  global._localUsers = {}
-}
-const localUsers = global._localUsers
+import { getUser } from '../../lib/store'
 
 // 免费用户每日最大次数
 const MAX_FREE = 3
@@ -28,16 +20,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (!userId) {
-    return res.status(400).json({ error: '用户不存在' })
+    return res.status(400).json({ error: '用户ID不能为空' })
   }
 
-  const user = localUsers[userId]
+  // 使用新的存储获取用户
+  const user = getUser(userId)
   if (!user) {
     return res.status(404).json({ error: '用户不存在' })
   }
 
   // 检查次数
-  if (!user.is_pro && (user.daily_count || 0) >= MAX_FREE) {
+  if (!user.isPro && (user.dailyCount || 0) >= MAX_FREE) {
     return res.status(403).json({ error: `今日免费次数已用完（上限${MAX_FREE}次），请升级Pro会员` })
   }
 
@@ -70,7 +63,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         ],
         temperature: 0.7,
-        max_tokens: 8192  // 增加到 8192，支持更长内容
+        max_tokens: 8192
       })
     })
 
@@ -99,12 +92,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // 更新使用次数（仅当生成成功时）
   if (generatedCode) {
-    user.daily_count = (user.daily_count || 0) + 1
+    user.dailyCount = (user.dailyCount || 0) + 1
+    // 更新存储中的用户
+    const { userStore } = await import('../../lib/store')
+    userStore.set(userId, user)
   }
+
+  const remaining = user.isPro ? -1 : Math.max(0, MAX_FREE - (user.dailyCount || 0))
 
   return res.status(200).json({
     success: true,
     code: generatedCode,
-    remaining: user.is_pro ? -1 : (MAX_FREE - (user.daily_count || 0))
+    remaining: remaining
   })
 }
