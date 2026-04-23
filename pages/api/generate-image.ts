@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { getUser } from '../../lib/store'
+import { getOrCreateUser } from '../../lib/store'  // 改成 getOrCreateUser
 
 const MAX_FREE = 3
 
@@ -23,13 +23,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: '用户ID不能为空' })
   }
 
-  // 使用新的存储获取用户
-  const user = getUser(userId)
-  if (!user) {
-    return res.status(404).json({ error: '用户不存在' })
-  }
+  // 使用 getOrCreateUser，自动创建用户（如果不存在）
+  const user = getOrCreateUser(userId)
 
-  if (!user.isPro && (user.dailyCount || 0) >= MAX_FREE) {
+  // 检查次数
+  const remainingCount = Math.max(0, MAX_FREE - (user.dailyCount || 0))
+  if (!user.isPro && remainingCount <= 0) {
     return res.status(403).json({ error: `今日免费次数已用完（上限${MAX_FREE}次），请升级Pro会员` })
   }
 

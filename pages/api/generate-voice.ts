@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import * as tencentcloud from 'tencentcloud-sdk-nodejs'
-import { getUser } from '../../lib/store'
+import { getOrCreateUser  } from '../../lib/store'
 
 const MAX_FREE = 3
 
@@ -92,9 +92,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!audioBase64) return res.status(400).json({ error: '请录音' })
   if (!userId) return res.status(400).json({ error: '用户ID不能为空' })
 
-  // 使用新的存储获取用户
-  const user = getUser(userId)
-  if (!user) return res.status(404).json({ error: '用户不存在' })
+  // 使用 getOrCreateUser，自动创建用户（如果不存在）
+  const user = getOrCreateUser(userId)
 
   if (!user.isPro && (user.dailyCount || 0) >= MAX_FREE) {
     return res.status(403).json({ error: `今日免费次数已用完（上限${MAX_FREE}次），请升级Pro会员` })
