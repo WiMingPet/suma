@@ -1,7 +1,7 @@
 // pages/api/user-info.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
-import { getUser, resetDailyCountIfNeeded } from '../../lib/store';
+import { getOrCreateUser, resetDailyCountIfNeeded } from '../../lib/store';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const authHeader = req.headers.authorization;
@@ -18,12 +18,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: '登录已过期' });
   }
 
-  const user = getUser(phone);
-  if (!user) {
-    return res.status(404).json({ error: '用户不存在' });
-  }
-
-  // 重置每日次数（如果跨天）
+  // 获取或创建用户
+  const user = getOrCreateUser(phone);
   resetDailyCountIfNeeded(user);
 
   res.status(200).json({

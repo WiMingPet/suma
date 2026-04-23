@@ -1,44 +1,36 @@
-import type { NextApiRequest, NextApiResponse } from 'next'
+// pages/api/check-limit.ts
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { getUser } from '../../lib/store';
 
-declare global {
-  var _localUsers: Record<string, any>
-}
-
-if (!global._localUsers) {
-  global._localUsers = {}
-}
-const localUsers = global._localUsers
-
-const MAX_FREE = 3
+const MAX_FREE = 3;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { userId } = req.body
+  const { userId } = req.body;
 
   if (!userId) {
-    return res.status(400).json({ error: '用户ID不能为空' })
+    return res.status(400).json({ error: '用户ID不能为空' });
   }
 
-  const user = localUsers[userId]
+  const user = getUser(userId);
 
-  // 关键修改：用户不存在时，返回默认值，而不是 404
   if (!user) {
-    console.log('用户不存在，返回默认值:', userId)
+    // 用户不存在时返回默认值
     return res.status(200).json({
       success: true,
       remaining: MAX_FREE,
-      canGenerate: true
-    })
+      canGenerate: true,
+    });
   }
 
-  const remaining = user.is_pro ? -1 : (MAX_FREE - (user.daily_count || 0))
-  
+  const remaining = user.isPro ? -1 : Math.max(0, MAX_FREE - user.dailyCount);
+
   return res.status(200).json({
     success: true,
     remaining,
-    canGenerate: user.is_pro || (user.daily_count || 0) < MAX_FREE
-  })
+    canGenerate: user.isPro || user.dailyCount < MAX_FREE,
+  });
 }

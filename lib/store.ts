@@ -1,25 +1,46 @@
 // lib/store.ts
+
+export interface VerificationCode {
+  code: string;
+  expires: number;
+}
+
 export interface UserRecord {
   phone: string;
-  passwordHash?: string;      // bcrypt 哈希后的密码（可选）
+  passwordHash?: string;
   isPro: boolean;
-  dailyCount: number;         // 当日已用次数
-  lastLoginDate: number;      // 上次登录日期（用于重置每日次数）
+  dailyCount: number;
+  lastLoginDate: number;
   createdAt: number;
 }
+
+export interface Order {
+  id: string;
+  userId: string;
+  amount: number;
+  points?: number;
+  status: 'pending' | 'paid' | 'expired';
+  createdAt: number;
+  paidAt?: number;
+  tradeNo?: string;
+}
+
+// 验证码存储
+export const codeStore = new Map<string, VerificationCode>();
 
 // 用户数据存储（内存）
 export const userStore = new Map<string, UserRecord>();
 
-// 验证码存储（5分钟过期）
-export const codeStore = new Map<string, { code: string; expires: number }>();
+// 订单存储
+export const orderStore = new Map<string, Order>();
 
-// 辅助函数：获取或初始化用户
+// 获取用户
 export function getUser(phone: string): UserRecord | undefined {
   return userStore.get(phone);
 }
 
-export function createOrUpdateUser(phone: string, data: Partial<UserRecord>): UserRecord {
+// 获取或创建用户
+export function getOrCreateUser(phone: string): UserRecord {
   let user = userStore.get(phone);
   if (!user) {
     user = {
@@ -31,12 +52,27 @@ export function createOrUpdateUser(phone: string, data: Partial<UserRecord>): Us
     };
     userStore.set(phone, user);
   }
+  return user;
+}
+
+// 创建或更新用户
+export function createOrUpdateUser(phone: string, data: Partial<UserRecord>): UserRecord {
+  let user = userStore.get(phone);
+  if (!user) {
+    user = {
+      phone,
+      isPro: false,
+      dailyCount: 0,
+      lastLoginDate: Date.now(),
+      createdAt: Date.now(),
+    };
+  }
   Object.assign(user, data);
   userStore.set(phone, user);
   return user;
 }
 
-// 重置每日次数（每天首次登录时调用）
+// 重置每日次数（如果跨天）
 export function resetDailyCountIfNeeded(user: UserRecord): void {
   const today = new Date().setHours(0, 0, 0, 0);
   const lastLoginDay = new Date(user.lastLoginDate).setHours(0, 0, 0, 0);
@@ -46,3 +82,13 @@ export function resetDailyCountIfNeeded(user: UserRecord): void {
     userStore.set(user.phone, user);
   }
 }
+
+// 清理过期数据（每小时执行一次）
+setInterval(() => {
+  const now = Date.now();
+  // 清理过期的验证码
+  codeStore.forEach((data, phone) => {
+    if (data.expires < now) codeStore.delete(phone);
+  });
+  // 注意：用户数据不过期，保留
+}, 60 * 60 * 1000);
