@@ -30,4 +30,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       is_pro: user.isPro,
       daily_count: user.dailyCount,  // 返回已使用次数，不是剩余次数
     }
-  })
+  });
+}
