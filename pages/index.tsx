@@ -423,39 +423,38 @@ export default function Home() {
             </h1>
 
             <div>
-            {user && (
-  <div className="flex items-center gap-3">
-    <div className="text-right">
-      <p className="text-sm text-white">{user.phone.slice(0, 3)}****{user.phone.slice(-4)}</p>
-      <p className="text-xs text-gray-400">
-        {user.is_pro ? 'Pro会员·无限次' : `今日剩余 ${6 - (user.daily_count || 0)} 次`}
-      </p>
-    </div>
-    {!user.is_pro && (
-      <button
-        onClick={() => alert('Pro会员升级功能开发中，请支付19元/月')}
-        className="px-3 py-1 bg-yellow-500 text-black rounded-lg text-sm font-medium hover:bg-yellow-400 transition"
-      >
-        升级Pro
-      </button>
-    )}
-    <button
-      onClick={() => setShowLogin(true)}
-      className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full text-white font-bold"
-    >
-      {user.phone.slice(-2)}
-    </button>
-  </div>
-)}
+            {user ? (
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-sm text-white">{user.phone.slice(0, 3)}****{user.phone.slice(-4)}</p>
+                  <p className="text-xs text-gray-400">
+                    {user.is_pro ? 'Pro会员·无限次' : `今日剩余 ${6 - (user.daily_count || 0)} 次`}
+                  </p>
+                </div>
+                {!user.is_pro && (
+                  <button
+                    onClick={() => alert('Pro会员升级功能开发中，请支付19元/月')}
+                    className="px-3 py-1 bg-yellow-500 text-black rounded-lg text-sm font-medium hover:bg-yellow-400 transition"
+                  >
+                    升级Pro
+                  </button>
+                )}
                 <button
                   onClick={() => setShowLogin(true)}
-                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium"
+                  className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full text-white font-bold"
                 >
-                  登录
+                  {user.phone.slice(-2)}
                 </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowLogin(true)}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium"
+              >
+                登录
+              </button>
+            )}
             </div>
-          </div>
-        </header>
 
         {/* 主要内容区 */}
         <main className="pt-24 pb-20 px-4 max-w-6xl mx-auto">
