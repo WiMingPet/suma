@@ -43,7 +43,6 @@ export default function Home() {
   const [prompt, setPrompt] = useState('')
   const [generatedCode, setGeneratedCode] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
-  const [remaining, setRemaining] = useState(3)
   
   // 图片上传状态
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -67,6 +66,13 @@ export default function Home() {
   // 生成格式（HTML 或 PDF）
   const [outputFormat, setOutputFormat] = useState<'html' | 'pdf'>('html')
 
+  // 辅助函数：计算剩余次数
+  const getRemaining = () => {
+    if (!user) return 0
+    if (user.is_pro) return -1
+    return Math.max(0, 3 - (user.daily_count || 0))
+  }
+
   // 初始化用户状态
   useEffect(() => {
     const savedUser = localStorage.getItem('suma_user')
@@ -80,38 +86,12 @@ export default function Home() {
     }
   }, [])
 
-  // 检查剩余次数
-  useEffect(() => {
-    if (user) {
-      checkLimit()
-    }
-  }, [user])
-
-  const checkLimit = async () => {
-    if (!user) return
-    
-    try {
-      const res = await fetch('/api/check-limit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id })
-      })
-      const data = await res.json()
-      setRemaining(data.remaining)
-    } catch (err) {
-      // 使用本地存储的计数
-      const localCount = localStorage.getItem(`suma_daily_count_${user.id}`)
-      if (localCount) {
-        setRemaining(Math.max(0, 3 - parseInt(localCount)))
-      }
-    }
-  }
-
   const handleLoginSuccess = (userData: User) => {
-    console.log('登录成功:', userData)  // 加这行调试
+    console.log('登录成功:', userData)
     setUser(userData)
-    localStorage.setItem('suma_user', JSON.stringify(userData))  // 添加这行
+    localStorage.setItem('suma_user', JSON.stringify(userData))
   }
+  
   const handleLogout = () => {
     localStorage.removeItem('suma_user')
     localStorage.removeItem('token')
@@ -119,7 +99,7 @@ export default function Home() {
     setShowMenu(false)
   }
 
-  // ========== 新增：恢复登录状态（页面刷新后保持登录）==========
+  // ========== 恢复登录状态（页面刷新后保持登录）==========
   useEffect(() => {
     const token = localStorage.getItem('token')
     const savedUser = localStorage.getItem('suma_user')
@@ -188,10 +168,6 @@ export default function Home() {
           created_at: new Date().toISOString()
         })
         localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
-        
-        if (data.remaining !== undefined) {
-          setRemaining(data.remaining)
-        }
       } else {
         alert(data.error || '生成失败')
       }
@@ -260,10 +236,6 @@ export default function Home() {
             created_at: new Date().toISOString()
           })
           localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
-          
-          if (data.remaining !== undefined) {
-            setRemaining(data.remaining)
-          }
         } else {
           alert(data.error || '生成失败')
         }
@@ -366,10 +338,6 @@ export default function Home() {
           created_at: new Date().toISOString()
         })
         localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
-        
-        if (data.remaining !== undefined) {
-          setRemaining(data.remaining)
-        }
       } else {
         alert(data.error || '生成失败')
       }
@@ -526,11 +494,11 @@ export default function Home() {
                 />
                 <div className="flex items-center justify-between mt-4">
                   <p className="text-sm text-gray-400">
-                    {user ? (user.is_pro ? 'Pro会员无限次' : `剩余 ${Math.max(0, 3 - (user.daily_count || 0))} 次`) : '登录后可使用'}
+                    {user ? (user.is_pro ? 'Pro会员无限次' : `剩余 ${getRemaining() === -1 ? '无限' : getRemaining()} 次`) : '登录后可使用'}
                   </p>
                   <button
                     onClick={handleGenerateText}
-                    disabled={isGenerating || !user || (!user.is_pro && (user?.daily_count || 0) >= 3)}
+                    disabled={isGenerating || !user || (!user.is_pro && getRemaining() === 0)}
                     className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium disabled:opacity-50"
                   >
                     {isGenerating ? '生成中...' : '生成应用'}
@@ -575,7 +543,7 @@ export default function Home() {
 
                   <button
                     onClick={handleGenerateImage}
-                    disabled={isGeneratingImage || !user || !imageFile || (!user.is_pro && (user?.daily_count || 0) >= 3)}
+                    disabled={isGeneratingImage || !user || !imageFile || (!user.is_pro && getRemaining() === 0)}
                     className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium disabled:opacity-50"
                   >
                     {isGeneratingImage ? '生成中...' : '生成应用'}
@@ -588,7 +556,7 @@ export default function Home() {
               <div className="text-center py-8">
                 <button
                   onClick={isRecording ? stopRecording : startRecording}
-                  disabled={isGeneratingVoice || !user || (!user.is_pro && (user?.daily_count || 0) >= 3)}
+                  disabled={isGeneratingVoice || !user || (!user.is_pro && getRemaining() === 0)}
                   className={`w-24 h-24 rounded-full flex items-center justify-center transition ${
                     isRecording 
                       ? 'bg-red-500 animate-pulse' 
