@@ -1,7 +1,7 @@
 // pages/api/register.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcrypt';
-import { getUser, createOrUpdateUser } from '../../lib/store';
+import { getUser, createOrUpdateUser, codeStore } from '../../lib/store';
 
 export default async function handler(
   req: NextApiRequest,
@@ -24,10 +24,14 @@ export default async function handler(
     return res.status(400).json({ error: '密码长度不能少于6位' });
   }
 
-  // 验证验证码（开发环境：123456）
-  if (!code || code !== '123456') {
-    return res.status(400).json({ error: '验证码错误' });
+  // ✅ 修改：从 codeStore 验证验证码（与登录保持一致）
+  const storedCode = codeStore.get(phone);
+  if (!storedCode || storedCode.code !== code || storedCode.expires < Date.now()) {
+    return res.status(400).json({ error: '验证码错误或已过期' });
   }
+
+  // 验证通过后删除验证码
+  codeStore.delete(phone);
 
   try {
     // 检查用户是否已存在且有密码（已注册）
