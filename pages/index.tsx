@@ -119,6 +119,12 @@ export default function Home() {
       setShowLogin(true)
       return
     }
+
+  // 次数检查
+  if (!user.is_pro && getRemaining() <= 0) {
+    alert('今日免费次数已用完，请升级Pro会员')
+    return
+  }
     
     if (!prompt.trim()) {
       alert('请输入应用描述')
@@ -141,7 +147,13 @@ export default function Home() {
 
       if (data.success) {
         setGeneratedCode(data.code)
-        
+
+        // 更新本地 user 状态（次数+1）
+        setUser({
+          ...user,
+          daily_count: (user.daily_count || 0) + 1
+        })
+
         // 保存到本地存储
         const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
         apps.unshift({
@@ -181,6 +193,12 @@ export default function Home() {
       setShowLogin(true)
       return
     }
+
+  // 次数检查
+  if (!user.is_pro && getRemaining() <= 0) {
+    alert('今日免费次数已用完，请升级Pro会员')
+    return
+  }
     
     if (!imageFile) {
       alert('请上传图片')
@@ -209,6 +227,12 @@ export default function Home() {
 
         if (data.success) {
           setGeneratedCode(data.code)
+
+          // 更新本地 user 状态（次数+1）
+          setUser({
+            ...user,
+            daily_count: (user.daily_count || 0) + 1
+          })
           
           // 保存到本地存储
           const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
@@ -295,6 +319,12 @@ export default function Home() {
       return
     }
 
+  // 次数检查
+  if (!user.is_pro && getRemaining() <= 0) {
+    alert('今日免费次数已用完，请升级Pro会员')
+    return
+  }
+
     setIsGeneratingVoice(true)
 
     try {
@@ -311,6 +341,12 @@ export default function Home() {
 
       if (data.success) {
         setGeneratedCode(data.code)
+
+        // 更新本地 user 状态（次数+1）
+        setUser({
+          ...user,
+          daily_count: (user.daily_count || 0) + 1
+        })
         
         // 保存到本地存储
         const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
@@ -417,7 +453,8 @@ export default function Home() {
             <div 
               onClick={() => setActiveTab('text')}
               className={`p-6 rounded-2xl border transition cursor-pointer ${
-                activeTab === 'text' 
+               
+               activeTab === 'text' 
                   ? 'bg-blue-600/20 border-blue-500' 
                   : 'bg-gray-900/50 border-gray-700 hover:border-gray-600'
               }`}
@@ -481,8 +518,14 @@ export default function Home() {
                     {user ? (user.is_pro ? 'Pro会员无限次' : `剩余 ${getRemaining() === -1 ? '无限' : getRemaining()} 次`) : '登录后可使用'}
                   </p>
                   <button
-                    onClick={handleGenerateText}
-                    disabled={isGenerating || !user || (!user.is_pro && getRemaining() === 0)}
+                    onClick={() => {
+                      if (!user.is_pro && getRemaining() <= 0) {
+                        alert('今日免费次数已用完，请升级Pro会员')
+                        return
+                      }
+                      handleGenerateText()
+                    }}
+                    disabled={isGenerating}
                     className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium disabled:opacity-50"
                   >
                     {isGenerating ? '生成中...' : '生成应用'}
@@ -526,8 +569,14 @@ export default function Home() {
                   />
 
                   <button
-                    onClick={handleGenerateImage}
-                    disabled={isGeneratingImage || !user || !imageFile || (!user.is_pro && getRemaining() === 0)}
+                    onClick={() => {
+                      if (!user.is_pro && getRemaining() <= 0) {
+                        alert('今日免费次数已用完，请升级Pro会员')
+                        return
+                      }
+                      handleGenerateImage()
+                    }}
+                    disabled={isGeneratingImage}
                     className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium disabled:opacity-50"
                   >
                     {isGeneratingImage ? '生成中...' : '生成应用'}
@@ -539,8 +588,14 @@ export default function Home() {
             {activeTab === 'voice' && (
               <div className="text-center py-8">
                 <button
-                  onClick={isRecording ? stopRecording : startRecording}
-                  disabled={isGeneratingVoice || !user || (!user.is_pro && getRemaining() === 0)}
+                  onClick={() => {
+                    if (!user.is_pro && getRemaining() <= 0) {
+                      alert('今日免费次数已用完，请升级Pro会员')
+                      return
+                    }
+                    isRecording ? stopRecording() : startRecording()
+                  }}
+                  disabled={isGeneratingVoice}
                   className={`w-24 h-24 rounded-full flex items-center justify-center transition ${
                     isRecording 
                       ? 'bg-red-500 animate-pulse' 
