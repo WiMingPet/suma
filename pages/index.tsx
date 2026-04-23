@@ -74,7 +74,7 @@ export default function Home() {
   const getRemaining = () => {
     if (!user) return 0
     if (user.is_pro) return -1
-    return Math.max(0, 3 - (user.daily_count || 0))
+    return user.daily_count ?? 0  // 直接使用后端返回的剩余次数
   }
 
   // 初始化用户状态（从 localStorage 恢复 token，再向后端验证获取最新数据）
