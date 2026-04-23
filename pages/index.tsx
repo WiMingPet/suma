@@ -114,9 +114,41 @@ export default function Home() {
   }
   const handleLogout = () => {
     localStorage.removeItem('suma_user')
+    localStorage.removeItem('token')
     setUser(null)
     setShowMenu(false)
   }
+
+  // ========== 新增：恢复登录状态（页面刷新后保持登录）==========
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    const savedUser = localStorage.getItem('suma_user')
+    
+    if (token && savedUser && !user) {
+      fetch('/api/user-info', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setUser({
+              id: data.user.id,
+              phone: data.user.phone,
+              is_pro: data.user.is_pro,
+              daily_count: data.user.daily_count
+            })
+          } else {
+            localStorage.removeItem('token')
+            localStorage.removeItem('suma_user')
+          }
+        })
+        .catch(() => {
+          localStorage.removeItem('token')
+          localStorage.removeItem('suma_user')
+        })
+    }
+  }, [user])
+  
   // 文字生成应用
   const handleGenerateText = async () => {
     if (!user) {

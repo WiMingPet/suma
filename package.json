@@ -18,6 +18,7 @@
     "@types/three": "^0.160.0",
     "alipay-sdk": "^4.14.0",
     "audiobuffer-to-wav": "^1.0.0",
+    "bcrypt": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "next": "14.2.35",
     "qrcode.react": "^4.2.0",
@@ -27,6 +28,7 @@
     "three": "^0.160.0"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.11.5",
     "@types/react": "^18.2.48",
