@@ -40,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       id: phone,
       phone,
       is_pro: user.isPro,
-      daily_count: user.dailyCount,  // 返回已使用次数
+      daily_count: Math.max(0, 3 - user.dailyCount),  // 返回剩余次数
     },
   });
 }
