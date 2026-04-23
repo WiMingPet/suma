@@ -70,7 +70,7 @@ export default function Home() {
   const getRemaining = () => {
     if (!user) return 0
     if (user.is_pro) return -1
-    return Math.max(0, 3 - (user.daily_count || 0))
+    return Math.max(0, 6 - (user.daily_count || 0))
   }
 
   // 初始化用户状态
