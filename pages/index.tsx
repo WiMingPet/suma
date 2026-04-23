@@ -70,7 +70,7 @@ export default function Home() {
   const getRemaining = () => {
     if (!user) return 0
     if (user.is_pro) return -1
-    return Math.max(0, 6 - (user.daily_count || 0))
+    return Math.max(0, 3 - (user.daily_count || 0))
   }
 
   // 初始化用户状态
@@ -380,7 +380,7 @@ export default function Home() {
                 <div className="text-right">
                   <p className="text-sm text-white">{user.phone.slice(0, 3)}****{user.phone.slice(-4)}</p>
                   <p className="text-xs text-gray-400">
-                    {user.is_pro ? 'Pro会员·无限次' : `今日剩余 ${6 - (user.daily_count || 0)} 次`}
+                    {user.is_pro ? 'Pro会员·无限次' : `今日剩余 ${3 - (user.daily_count || 0)} 次`}
                   </p>
                 </div>
                 {!user.is_pro && (
