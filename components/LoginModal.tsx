@@ -286,7 +286,95 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       </div>
     )
   }
+  // ========== 注册界面 ==========
+  if (loginMode === 'register') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center transition-all duration-300">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
+        
+        <div className="relative bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-8 w-full max-w-md mx-4 transform transition-all duration-300 scale-100 opacity-100 shadow-2xl border border-white/10">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-cyan-500/20 to-indigo-500/20 rounded-full blur-3xl" />
+          
+          <button onClick={handleClose} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
 
+          <h2 className="text-2xl font-bold text-white mb-2 text-center">注册新账号</h2>
+          <p className="text-gray-400 text-center mb-6">填写信息，立即注册</p>
+
+          {/* Tab 切换 */}
+          <div className="flex gap-2 mb-6 bg-gray-800/50 rounded-xl p-1">
+            <button onClick={() => { setLoginMode('code'); setError(''); }} className="flex-1 py-2 rounded-lg transition text-gray-400">验证码登录</button>
+            <button onClick={() => { setLoginMode('password'); setError(''); }} className="flex-1 py-2 rounded-lg transition text-gray-400">密码登录</button>
+            <button onClick={() => { setLoginMode('register'); setError(''); }} className="flex-1 py-2 rounded-lg transition bg-blue-600 text-white">注册</button>
+          </div>
+
+          <div className="space-y-4">
+            {/* 手机号 */}
+            <div>
+              <input 
+                type="tel" 
+                placeholder="手机号" 
+                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" 
+              />
+            </div>
+
+            {/* 密码 */}
+            <div>
+              <input 
+                type="password" 
+                placeholder="密码（至少6位）" 
+                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" 
+              />
+            </div>
+
+            {/* 确认密码 */}
+            <div>
+              <input 
+                type="password" 
+                placeholder="确认密码" 
+                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" 
+              />
+            </div>
+
+            {/* 验证码 */}
+            <div className="flex gap-3">
+              <input 
+                type="text" 
+                placeholder="验证码" 
+                className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" 
+              />
+              <button 
+                className="px-5 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium whitespace-nowrap"
+                onClick={() => alert('获取验证码功能开发中')}
+              >
+                获取验证码
+              </button>
+            </div>
+
+            {/* 注册按钮 */}
+            <button 
+              onClick={() => alert('注册功能开发中，暂不可用')}
+              className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+            >
+              立即注册
+            </button>
+
+            {/* 返回登录 */}
+            <button 
+              onClick={() => { setLoginMode('password'); setError(''); }} 
+              className="w-full text-center text-gray-400 text-sm hover:text-white transition"
+            >
+              已有账号？返回登录
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
   // ========== 正常登录界面 ==========
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center transition-all duration-300">
