@@ -522,7 +522,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         <div className="flex gap-2 mb-6 bg-gray-800/50 rounded-xl p-1">
           <button onClick={() => { setLoginMode('code'); setError(''); }} className={`flex-1 py-2 rounded-lg transition ${loginMode === 'code' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}>验证码登录</button>
           <button onClick={() => { setLoginMode('password'); setError(''); }} className={`flex-1 py-2 rounded-lg transition ${loginMode === 'password' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}>密码登录</button>
-          <button onClick={() => { setLoginMode('register'); setError(''); }} className={`flex-1 py-2 rounded-lg transition ${loginMode === 'register' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}>注册</button>
+          <button onClick={() => { setLoginMode('register'); setError(''); }} className="flex-1 py-2 rounded-lg transition text-gray-400">注册</button>
         </div>
 
         <div className="space-y-4">
