@@ -29,7 +29,10 @@ export default function AppCard({ app, isFavorite = false, onPreview, onDownload
   }[app.type] || '应用'
 
   return (
-    <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700 hover:border-gray-600 transition-all duration-200">
+    <div 
+      className="bg-gray-800/50 rounded-xl p-3 border border-gray-700 hover:border-gray-600 transition-all duration-200 cursor-pointer"
+      onClick={() => onPreview(app.code)}
+    >
       <div className="flex items-center gap-3">
         {/* 图标 */}
         <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-xl flex-shrink-0">
@@ -43,7 +46,7 @@ export default function AppCard({ app, isFavorite = false, onPreview, onDownload
         </div>
         
         {/* 按钮组 */}
-        <div className="flex gap-1 flex-shrink-0">
+        <div className="flex gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => onToggleFavorite(app.id, !isFavorite)}
             className="p-1.5 rounded-lg hover:bg-gray-700 transition"
