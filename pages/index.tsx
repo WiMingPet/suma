@@ -73,14 +73,49 @@ export default function Home() {
     return Math.max(0, 3 - (user.daily_count || 0))
   }
 
-  // 初始化用户状态
+  // 初始化用户状态（从 localStorage 恢复 token，再向后端验证获取最新数据）
   useEffect(() => {
+    const token = localStorage.getItem('token')
     const savedUser = localStorage.getItem('suma_user')
-    if (savedUser) {
+    
+    if (token && savedUser) {
+      // 从后端获取最新的用户信息（包括最新的 daily_count）
+      fetch('/api/user-info', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setUser({
+              id: data.user.id,
+              phone: data.user.phone,
+              is_pro: data.user.is_pro,
+              daily_count: data.user.daily_count  // 使用后端返回的最新次数
+            })
+            // 同步更新 localStorage
+            localStorage.setItem('suma_user', JSON.stringify({
+              id: data.user.id,
+              phone: data.user.phone,
+              is_pro: data.user.is_pro,
+              daily_count: data.user.daily_count
+            }))
+          } else {
+            // token 无效，清除本地存储
+            localStorage.removeItem('token')
+            localStorage.removeItem('suma_user')
+          }
+        })
+        .catch(() => {
+          // 网络错误时，降级使用 localStorage 的数据
+          try {
+            setUser(JSON.parse(savedUser))
+          } catch (e) {}
+        })
+    } else if (savedUser) {
+      // 没有 token 时，直接使用 localStorage 的数据（兼容旧版本）
       try {
         setUser(JSON.parse(savedUser))
       } catch (e) {
-        console.error('解析用户失败', e)
         localStorage.removeItem('suma_user')
       }
     }

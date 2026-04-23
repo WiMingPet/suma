@@ -155,7 +155,7 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
                 <div>
                   <p className="text-white font-medium">{user.phone.slice(0, 3)}****{user.phone.slice(-4)}</p>
                   <p className="text-xs text-gray-400">
-                    {user.is_pro ? 'Pro会员' : `剩余 ${6 - (user.daily_count || 0)} 次`}
+                    {user.is_pro ? 'Pro会员' : `剩余 ${3 - (user.daily_count || 0)} 次`}
                   </p>
                 </div>
               </div>
