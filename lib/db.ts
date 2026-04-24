@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: false,  // Zeabur 内置 PostgreSQL 不支持 SSL
 });
 
 export async function query(text: string, params?: any[]) {
