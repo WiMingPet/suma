@@ -1,39 +1,32 @@
 // pages/api/create-payment.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
+import NodeRSA from 'node-rsa';
 
 // 临时订单存储
 const orders = new Map();
 
-// 生成签名的简化版本
+// 生成签名
 function generateSign(params: Record<string, any>, privateKey: string): string {
   // 1. 过滤并排序参数
-  const sortedParams: Record<string, any> = {};
+  const filteredParams: Record<string, any> = {};
   Object.keys(params)
     .sort()
     .forEach(key => {
       if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
-        sortedParams[key] = params[key];
+        filteredParams[key] = params[key];
       }
     });
   
   // 2. 构建签名字符串
-  const signContent = Object.entries(sortedParams)
+  const signContent = Object.entries(filteredParams)
     .map(([key, value]) => `${key}=${value}`)
     .join('&');
   
-  // 3. 使用 Node.js 内置 crypto 签名
-  const crypto = require('crypto');
-  const sign = crypto.createSign('RSA-SHA256');
-  sign.update(signContent);
-  sign.end();
-  
-  // 处理私钥格式
-  let pemPrivateKey = privateKey;
-  if (!pemPrivateKey.includes('-----BEGIN')) {
-    pemPrivateKey = `-----BEGIN RSA PRIVATE KEY-----\n${pemPrivateKey}\n-----END RSA PRIVATE KEY-----`;
-  }
-  
-  return sign.sign(pemPrivateKey, 'base64');
+  // 3. 使用 node-rsa 签名
+  const key = new NodeRSA(privateKey, 'pkcs1-private-pem', {
+    signingScheme: 'pkcs1-sha256',
+  });
+  return key.sign(signContent, 'base64');
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -48,7 +41,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   orders.set(outTradeNo, { userId, amount, status: 'pending', createdAt: Date.now() });
 
   try {
-    // 准备业务参数
     const bizContent: Record<string, any> = {
       out_trade_no: outTradeNo,
       total_amount: amount,
@@ -63,7 +55,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       bizContent.product_code = 'FACE_TO_FACE_PAYMENT';
     }
 
-    // 准备公共参数
     const params: Record<string, any> = {
       app_id: process.env.ALIPAY_APP_ID,
       method: method,
@@ -80,7 +71,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const privateKey = process.env.ALIPAY_PRIVATE_KEY!.replace(/\\n/g, '\n');
     params.sign = generateSign(params, privateKey);
 
-    // 发送请求
     const gateway = process.env.ALIPAY_GATEWAY!;
     const formBody = new URLSearchParams(params).toString();
 
@@ -106,14 +96,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw new Error(aliResponse?.sub_msg || aliResponse?.msg || '创建订单失败');
       }
     } else {
-      // H5 支付
       const formHtml = `
         <!DOCTYPE html>
         <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>跳转支付宝...</title>
-        </head>
+        <head><meta charset="UTF-8"><title>跳转支付宝...</title></head>
         <body>
           <form id="alipayForm" action="${gateway}" method="POST">
             ${Object.entries(params).map(([k, v]) => `<input type="hidden" name="${k}" value="${v}">`).join('')}
