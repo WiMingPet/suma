@@ -140,7 +140,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw new Error(aliResponse?.sub_msg || aliResponse?.msg || '创建订单失败');
       }
     } else {
-      // 手机 H5 支付
+      // 手机 H5 支付 - 使用更标准的参数配置
+      const bizContent = {
+        out_trade_no: outTradeNo,
+        total_amount: amount,
+        subject: '速码AI Pro会员',
+        product_code: 'QUICK_WAP_WAY',
+      };
+
       const params: any = {
         app_id: appId,
         method: 'alipay.trade.wap.pay',
@@ -149,15 +156,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
         version: '1.0',
         notify_url: notifyUrl,
-        return_url: returnUrl,
-        biz_content: JSON.stringify({
-          ...bizContent,
-          product_code: 'QUICK_WAP_WAY',
-        }),
+        return_url: 'https://sumaai.cn/payment/result',
+        biz_content: JSON.stringify(bizContent),
       };
-      
-      params.sign = generateSign(params, privateKey);
-      
+
+      // 按照官方要求构建待签名字符串和签名
+      const sortedParams = Object.keys(params).sort().reduce((obj: any, key) => {
+        if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+          obj[key] = params[key];
+        }
+        return obj;
+      }, {});
+      const signContent = Object.entries(sortedParams)
+        .map(([k, v]) => `${k}=${v}`)
+        .join('&');
+      const sign = crypto.createSign('RSA-SHA256');
+      sign.update(signContent);
+      sign.end();
+      const signature = sign.sign(privateKey, 'base64');
+      params.sign = signature;
+
+      // 构建并返回自动提交的 HTML 表单
       const formHtml = `
         <!DOCTYPE html>
         <html>
@@ -170,7 +189,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         </body>
         </html>
       `;
-      
+
       res.setHeader('Content-Type', 'text/html');
       return res.status(200).send(formHtml);
     }
