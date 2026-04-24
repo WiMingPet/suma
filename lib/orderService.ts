@@ -1,13 +1,13 @@
 // lib/orderService.ts
 import { query } from './db';
 
-export async function createOrder(outTradeNo: string, userId: string, amount: string) {
+export async function createOrder(outTradeNo: string, userId: string, amount: string, plan?: string) {
   const result = await query(
-    `INSERT INTO orders (out_trade_no, user_id, amount, status) 
-     VALUES ($1, $2, $3, 'pending') 
+    `INSERT INTO orders (out_trade_no, user_id, amount, status, plan) 
+     VALUES ($1, $2, $3, 'pending', $4) 
      ON CONFLICT (out_trade_no) DO NOTHING 
      RETURNING *`,
-    [outTradeNo, userId, amount]
+    [outTradeNo, userId, amount, plan || null]
   );
   return result.rows[0];
 }
@@ -41,4 +41,49 @@ export async function upgradeUserToPro(userId: string) {
 export async function isUserPro(userId: string): Promise<boolean> {
   const result = await query(`SELECT is_pro FROM user_pro WHERE user_id = $1`, [userId]);
   return result.rows[0]?.is_pro || false;
+}
+
+// 获取用户已使用的免费次数
+export async function getFreeUsed(userId: string): Promise<number> {
+  const result = await query(`SELECT free_used FROM user_pro WHERE user_id = $1`, [userId]);
+  return result.rows[0]?.free_used || 0;
+}
+
+// 增加免费次数（每次生成后调用）
+export async function incrementFreeUsed(userId: string): Promise<void> {
+  await query(
+    `INSERT INTO user_pro (user_id, free_used, is_pro) 
+     VALUES ($1, 1, false) 
+     ON CONFLICT (user_id) 
+     DO UPDATE SET free_used = user_pro.free_used + 1`,
+    [userId]
+  );
+}
+
+
+// ========== 点币管理函数 ==========
+
+// 获取用户点币
+export async function getUserPoints(userId: string): Promise<number> {
+  const result = await query(`SELECT points FROM user_points WHERE user_id = $1`, [userId]);
+  return result.rows[0]?.points || 0;
+}
+
+// 增加点币
+export async function addPoints(userId: string, points: number): Promise<void> {
+  await query(
+    `INSERT INTO user_points (user_id, points) VALUES ($1, $2)
+     ON CONFLICT (user_id) 
+     DO UPDATE SET points = user_points.points + $2`,
+    [userId, points]
+  );
+}
+
+// 扣减点币
+export async function deductPoints(userId: string, points: number): Promise<void> {
+  const currentPoints = await getUserPoints(userId);
+  if (currentPoints < points) {
+    throw new Error(`点币不足: 需要 ${points}，当前 ${currentPoints}`);
+  }
+  await query(`UPDATE user_points SET points = points - $1 WHERE user_id = $2`, [points, userId]);
 }

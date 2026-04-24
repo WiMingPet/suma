@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { getOrCreateUser } from '../../lib/store'  // 改成 getOrCreateUser
+import { getOrCreateUser } from '../../lib/store'
+import { getUserPoints, deductPoints } from '../../lib/orderService'
 
 const MAX_FREE = 3
 
@@ -25,10 +26,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // 使用 getOrCreateUser，自动创建用户（如果不存在）
   const user = getOrCreateUser(userId)
 
-  // 检查次数
+  // 检查次数（免费用户）
   const remainingCount = Math.max(0, MAX_FREE - (user.dailyCount || 0))
   if (!user.isPro && remainingCount <= 0) {
-    return res.status(403).json({ error: `今日免费次数已用完（上限${MAX_FREE}次），请升级Pro会员` })
+    return res.status(403).json({ error: `免费次数已用完（共${MAX_FREE}次），请升级Pro会员或购买点币` })
+  }
+
+  // 获取用户点币（非Pro用户需要检查）
+  let userPoints = 0
+  if (!user.isPro) {
+    userPoints = await getUserPoints(userId)
+    if (userPoints <= 0) {
+      return res.status(403).json({ error: '点币余额不足，请购买点币套餐' })
+    }
   }
 
   // 调用阿里云百炼 API
@@ -87,19 +97,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     generatedCode = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>AI生成应用</title><style>body{font-family:sans-serif;padding:20px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;min-height:100vh;}</style></head><body><div style="max-width:600px;margin:0 auto;background:rgba(255,255,255,0.1);border-radius:16px;padding:24px"><h1>${prompt.substring(0, 30)}</h1><p>⚠️ ${errorMsg}</p><p>这是降级模拟代码</p><button onclick="alert('Hello!')">点击测试</button></div></body></html>`
   }
 
-  // 更新使用次数（仅当生成成功时）
+  // 更新使用次数和扣点币（仅当生成成功时）
   if (generatedCode) {
-    user.dailyCount = (user.dailyCount || 0) + 1
-    // 更新存储中的用户
-    const { userStore } = await import('../../lib/store')
-    userStore.set(userId, user)
+    // 计算实际字数（如果是纯代码，可估算）
+    let contentLength = generatedCode.length
+    // 更好的方法：提取文本内容计算中文字符
+    const chineseChars = generatedCode.match(/[\u4e00-\u9fa5]/g) || []
+    contentLength = chineseChars.length || generatedCode.length
+    
+    // 每100字2点币，向上取整
+    const costPerHundred = 2
+    const cost = Math.max(1, Math.ceil(contentLength / 100) * costPerHundred)
+    
+    console.log(`生成内容长度: ${contentLength}字，消耗点币: ${cost}`)
+
+    // 非Pro用户扣点币
+    if (!user.isPro) {
+      await deductPoints(userId, cost)
+    }
+
+    // 更新免费次数（仅当免费用户且还在免费次数内）
+    if (!user.isPro && remainingCount > 0) {
+      user.dailyCount = (user.dailyCount || 0) + 1
+      const { userStore } = await import('../../lib/store')
+      userStore.set(userId, user)
+    }
   }
 
   const remaining = user.isPro ? -1 : Math.max(0, MAX_FREE - (user.dailyCount || 0))
 
+  // 获取最新点币余额
+  const finalPoints = !user.isPro ? await getUserPoints(userId) : -1
+
   return res.status(200).json({
     success: true,
     code: generatedCode,
-    remaining: remaining
+    remaining: remaining,
+    points: finalPoints
   })
 }

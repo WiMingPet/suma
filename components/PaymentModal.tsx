@@ -13,14 +13,19 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess }: Pay
   const [outTradeNo, setOutTradeNo] = useState('');
   const [loading, setLoading] = useState(false);
   const [method, setMethod] = useState<'qrcode' | 'h5'>('qrcode');
+  const [plan, setPlan] = useState<'month' | 'season' | 'year'>('month');
+
+  const planPrices = { month: 29.9, season: 69.9, year: 199 };
+  const planPoints = { month: 500, season: 1500, year: 5000 };
 
   const createOrder = async () => {
     setLoading(true);
     try {
+      const amount = planPrices[plan];
       const res = await fetch('/api/create-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: method, amount: '0.01', userId }),
+        body: JSON.stringify({ type: method, amount, userId, plan }),
       });
 
       if (method === 'qrcode') {
@@ -75,7 +80,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess }: Pay
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl p-6 max-w-md w-full">
         <h2 className="text-xl font-bold mb-4">升级 Pro 会员</h2>
-        <p className="text-gray-600 mb-4">支付 0.01 元即可成为 Pro 会员，享受无限次生成</p>
+        <p className="text-gray-600 mb-4">选择套餐支付，获得对应点币，享受无限次生成</p>
 
         <div className="flex gap-4 mb-4">
           <button
@@ -90,6 +95,31 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess }: Pay
           >
             手机支付
           </button>
+        </div>
+
+        {/* 套餐选择 */}
+        <div className="mb-4">
+          <label className="block text-gray-700 font-medium mb-2">选择套餐</label>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              className={`py-2 rounded border ${plan === 'month' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
+              onClick={() => setPlan('month')}
+            >
+              📅 月卡<br/>29.9元
+            </button>
+            <button
+              className={`py-2 rounded border ${plan === 'season' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
+              onClick={() => setPlan('season')}
+            >
+              🌿 季卡<br/>69.9元
+            </button>
+            <button
+              className={`py-2 rounded border ${plan === 'year' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
+              onClick={() => setPlan('year')}
+            >
+              🏆 年卡<br/>199元
+            </button>
+          </div>
         </div>
 
         {!qrCode && !loading && (

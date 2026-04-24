@@ -84,7 +84,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: '私钥配置错误' });
   }
 
-  const { amount, userId, type: frontendType } = req.body;
+  const { amount, userId, type: frontendType, plan } = req.body;
   
   // 优先使用前端传的 type
   const userAgent = req.headers['user-agent'];
@@ -101,14 +101,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const returnUrl = `${baseUrl}/payment-result`;
 
   // 保存订单到数据库
-  await createOrder(outTradeNo, userId, amount);
+  await createOrder(outTradeNo, userId, amount, plan);
 
   try {
-    const bizContent = {
-      out_trade_no: outTradeNo,
-      total_amount: amount,
-      subject: '速码AI Pro会员',
-    };
+  // 套餐名称映射
+  const planNames: Record<string, string> = { month: '月卡', season: '季卡', year: '年卡' };
+  const planName = plan && planNames[plan] ? planNames[plan] : 'Pro会员';
+  
+  const bizContent = {
+    out_trade_no: outTradeNo,
+    total_amount: amount,
+    subject: `速码AI ${planName}`,
+  };
 
     if (type === 'qrcode') {
       // 电脑扫码支付

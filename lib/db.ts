@@ -33,12 +33,31 @@ export async function initDatabase() {
       user_id VARCHAR(50) PRIMARY KEY,
       is_pro BOOLEAN DEFAULT FALSE,
       pro_expire TIMESTAMP,
+      free_used INT DEFAULT 0,        -- 已使用的免费次数
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `;
 
+  const createPointsTable = `
+    CREATE TABLE IF NOT EXISTS user_points (
+      user_id VARCHAR(50) PRIMARY KEY,
+      points INT DEFAULT 0,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
+  await query(createPointsTable);
   await query(createOrdersTable);
   await query(createUserProTable);
+  
+  // 迁移：添加 plan 字段
+  try {
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS plan VARCHAR(20)`);
+    console.log('数据库迁移完成：orders 表添加 plan 字段');
+  } catch (err) {
+    console.log('迁移 plan 字段失败:', err);
+  }
+
   console.log('数据库表初始化完成');
 }
 

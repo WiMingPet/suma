@@ -163,7 +163,7 @@ export default function Home() {
 
   // 次数检查
   if (!user.is_pro && getRemaining() <= 0) {
-    alert('今日免费次数已用完，请升级Pro会员')
+    alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
     return
   }
     
@@ -237,7 +237,7 @@ export default function Home() {
 
   // 次数检查
   if (!user.is_pro && getRemaining() <= 0) {
-    alert('今日免费次数已用完，请升级Pro会员')
+    alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
     return
   }
     
@@ -362,7 +362,7 @@ export default function Home() {
 
   // 次数检查
   if (!user.is_pro && getRemaining() <= 0) {
-    alert('今日免费次数已用完，请升级Pro会员')
+    alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
     return
   }
 
@@ -457,7 +457,7 @@ export default function Home() {
                 <div className="text-right">
                   <p className="text-sm text-white">{user.phone.slice(0, 3)}****{user.phone.slice(-4)}</p>
                   <p className="text-xs text-gray-400">
-                    {user.is_pro ? 'Pro会员·无限次' : `今日剩余 ${3 - (user.daily_count || 0)} 次`}
+                    {user.is_pro ? 'Pro会员·无限次' : `剩余免费次数: ${Math.max(0, 3 - (user.daily_count || 0))}`}
                   </p>
                 </div>
                 {!user.is_pro && (
@@ -556,12 +556,12 @@ export default function Home() {
                 />
                 <div className="flex items-center justify-between mt-4">
                   <p className="text-sm text-gray-400">
-                    {user ? (user.is_pro ? 'Pro会员无限次' : `剩余 ${getRemaining() === -1 ? '无限' : getRemaining()} 次`) : '登录后可使用'}
+                    {user ? (user.is_pro ? 'Pro会员·无限次' : `剩余免费次数: ${getRemaining() === -1 ? '无限' : getRemaining()}`) : '登录后可使用'}
                   </p>
                   <button
                     onClick={() => {
                       if (!user.is_pro && getRemaining() <= 0) {
-                        alert('今日免费次数已用完，请升级Pro会员')
+                        alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
                         return
                       }
                       handleGenerateText()
@@ -612,7 +612,7 @@ export default function Home() {
                   <button
                     onClick={() => {
                       if (!user.is_pro && getRemaining() <= 0) {
-                        alert('今日免费次数已用完，请升级Pro会员')
+                        alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
                         return
                       }
                       handleGenerateImage()
@@ -631,7 +631,7 @@ export default function Home() {
                 <button
                   onClick={() => {
                     if (!user.is_pro && getRemaining() <= 0) {
-                      alert('今日免费次数已用完，请升级Pro会员')
+                      alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
                       return
                     }
                     isRecording ? stopRecording() : startRecording()
