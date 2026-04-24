@@ -1,15 +1,33 @@
 // pages/api/alipay-notify.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
+import fs from 'fs';
 import { orders } from './create-payment';
 import { createOrUpdateUser } from '../../lib/store';
 
-// 使用 require 方式导入
 const AlipaySdk = require('alipay-sdk').default;
+
+function getPrivateKey(): string {
+  const keyPath = process.env.ALIPAY_PRIVATE_KEY_PATH || '/app/alipay_private_key.pem';
+  try {
+    return fs.readFileSync(keyPath, 'utf-8');
+  } catch (error) {
+    return process.env.ALIPAY_PRIVATE_KEY?.replace(/\\n/g, '\n') || '';
+  }
+}
+
+function getAlipayPublicKey(): string {
+  const keyPath = process.env.ALIPAY_PUBLIC_KEY_PATH || '/app/alipay_public_key.pem';
+  try {
+    return fs.readFileSync(keyPath, 'utf-8');
+  } catch (error) {
+    return process.env.ALIPAY_ALIPAY_PUBLIC_KEY?.replace(/\\n/g, '\n') || '';
+  }
+}
 
 const alipaySdk = new AlipaySdk({
   appId: process.env.ALIPAY_APP_ID!,
-  privateKey: process.env.ALIPAY_PRIVATE_KEY!.replace(/\\n/g, '\n'),
-  alipayPublicKey: process.env.ALIPAY_ALIPAY_PUBLIC_KEY!.replace(/\\n/g, '\n'),
+  privateKey: getPrivateKey(),
+  alipayPublicKey: getAlipayPublicKey(),
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

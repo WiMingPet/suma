@@ -1,30 +1,69 @@
 // pages/api/create-payment.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
+import fs from 'fs';
 
-// 使用 require 导入主 SDK
 const AlipaySdk = require('alipay-sdk').default;
 
 // 临时订单存储
 const orders = new Map();
+
+// 从文件读取密钥
+function getPrivateKey(): string {
+  const keyPath = process.env.ALIPAY_PRIVATE_KEY_PATH || '/app/alipay_private_key.pem';
+  try {
+    return fs.readFileSync(keyPath, 'utf-8');
+  } catch (error) {
+    console.error(`读取私钥文件失败: ${keyPath}`, error);
+    return process.env.ALIPAY_PRIVATE_KEY?.replace(/\\n/g, '\n') || '';
+  }
+}
+
+function getAlipayPublicKey(): string {
+  const keyPath = process.env.ALIPAY_PUBLIC_KEY_PATH || '/app/alipay_public_key.pem';
+  try {
+    return fs.readFileSync(keyPath, 'utf-8');
+  } catch (error) {
+    console.error(`读取公钥文件失败: ${keyPath}`, error);
+    return process.env.ALIPAY_ALIPAY_PUBLIC_KEY?.replace(/\\n/g, '\n') || '';
+  }
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // 检查环境变量
+  const appId = process.env.ALIPAY_APP_ID;
+  const gateway = process.env.ALIPAY_GATEWAY;
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+
+  if (!appId || !baseUrl) {
+    console.error('支付宝环境变量缺失');
+    return res.status(500).json({ error: '支付服务配置错误，请联系管理员' });
+  }
+
+  const privateKey = getPrivateKey();
+  const alipayPublicKey = getAlipayPublicKey();
+
+  if (!privateKey || !alipayPublicKey) {
+    console.error('密钥读取失败');
+    return res.status(500).json({ error: '支付密钥配置错误，请联系管理员' });
+  }
+
   const { type, amount, userId } = req.body;
   const outTradeNo = `ORDER_${Date.now()}_${userId}`;
-  const notifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/alipay-notify`;
-  const returnUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/`;
+  const notifyUrl = `${baseUrl}/api/alipay-notify`;
+  const returnUrl = `${baseUrl}/`;
 
   orders.set(outTradeNo, { userId, amount, status: 'pending', createdAt: Date.now() });
 
-  // 初始化支付宝 SDK (配置保持不变)
+  // 初始化支付宝 SDK
   const alipaySdk = new AlipaySdk({
-    appId: process.env.ALIPAY_APP_ID!,
-    privateKey: process.env.ALIPAY_PRIVATE_KEY!.replace(/\\n/g, '\n'),
-    alipayPublicKey: process.env.ALIPAY_ALIPAY_PUBLIC_KEY!.replace(/\\n/g, '\n'),
-    gateway: process.env.ALIPAY_GATEWAY || 'https://openapi.alipay.com/gateway.do',
+    appId: appId,
+    privateKey: privateKey,
+    alipayPublicKey: alipayPublicKey,
+    gateway: gateway || 'https://openapi.alipay.com/gateway.do',
     signType: 'RSA2',
   });
 
@@ -38,7 +77,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     if (type === 'qrcode') {
-      // 电脑网站扫码支付 (不需要 AlipayFormData)
       const result = await alipaySdk.exec('alipay.trade.precreate', {
         bizContent: {
           ...bizContent,
@@ -53,8 +91,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw new Error(result.sub_msg || result.msg || '创建订单失败');
       }
     } else {
-      // 手机网站 H5 支付
-      // 直接调用 exec 方法，它会返回一个完整的 HTML 表单字符串
       const formHtml = await alipaySdk.exec('alipay.trade.wap.pay', {
         bizContent: {
           ...bizContent,
@@ -64,7 +100,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         returnUrl,
       });
 
-      // 返回 HTML 表单
       res.setHeader('Content-Type', 'text/html');
       return res.status(200).send(formHtml);
     }
