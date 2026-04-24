@@ -89,7 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   const outTradeNo = `ORDER_${Date.now()}_${userId}`;
   const notifyUrl = `${baseUrl}/api/alipay-notify`;
-  const returnUrl = `${baseUrl}/`;
+  const returnUrl = `${baseUrl}/payment/result`;
 
   // 保存订单到内存
   orders.set(outTradeNo, { userId, amount, status: 'pending', createdAt: Date.now() });
