@@ -1,19 +1,18 @@
 // pages/api/create-payment.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
+import crypto from 'crypto';
 import fs from 'fs';
-
-// 正确的导入方式
-const AlipaySdk = require('alipay-sdk');
 
 // 临时订单存储
 const orders = new Map();
 
+// 获取密钥
 function getPrivateKey(): string {
   const keyPath = process.env.ALIPAY_PRIVATE_KEY_PATH || '/app/alipay_private_key.pem';
   try {
     return fs.readFileSync(keyPath, 'utf-8');
   } catch (error) {
-    console.error(`读取私钥文件失败: ${keyPath}`, error);
+    console.error(`读取私钥文件失败: ${keyPath}`);
     return process.env.ALIPAY_PRIVATE_KEY?.replace(/\\n/g, '\n') || '';
   }
 }
@@ -23,9 +22,35 @@ function getAlipayPublicKey(): string {
   try {
     return fs.readFileSync(keyPath, 'utf-8');
   } catch (error) {
-    console.error(`读取公钥文件失败: ${keyPath}`, error);
+    console.error(`读取公钥文件失败: ${keyPath}`);
     return process.env.ALIPAY_ALIPAY_PUBLIC_KEY?.replace(/\\n/g, '\n') || '';
   }
+}
+
+// 生成支付宝签名
+function generateSign(params: Record<string, any>, privateKey: string): string {
+  // 1. 过滤参数
+  const filteredParams: Record<string, any> = {};
+  Object.keys(params)
+    .sort()
+    .forEach(key => {
+      if (key !== 'sign' && params[key] !== undefined && params[key] !== null && params[key] !== '') {
+        filteredParams[key] = params[key];
+      }
+    });
+  
+  // 2. 构建签名字符串
+  const signContent = Object.entries(filteredParams)
+    .map(([key, value]) => `${key}=${value}`)
+    .join('&');
+  
+  console.log('待签名字符串:', signContent);
+  
+  // 3. RSA-SHA256 签名
+  const sign = crypto.createSign('RSA-SHA256');
+  sign.update(signContent);
+  sign.end();
+  return sign.sign(privateKey, 'base64');
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -38,26 +63,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL;
 
   if (!appId || !baseUrl) {
-    console.error('支付宝环境变量缺失:', { appId: !!appId, baseUrl: !!baseUrl });
-    return res.status(500).json({ error: '支付服务配置错误' });
+    console.error('环境变量缺失:', { appId: !!appId, baseUrl: !!baseUrl });
+    return res.status(500).json({ error: '配置错误' });
   }
 
   const privateKey = getPrivateKey();
-  const alipayPublicKey = getAlipayPublicKey();
-
-  if (!privateKey || !alipayPublicKey) {
-    console.error('密钥读取失败');
-    return res.status(500).json({ error: '支付密钥配置错误' });
+  if (!privateKey) {
+    return res.status(500).json({ error: '私钥配置错误' });
   }
-
-  // 实例化 AlipaySdk
-  const alipaySdk = new AlipaySdk({
-    appId: appId,
-    privateKey: privateKey,
-    alipayPublicKey: alipayPublicKey,
-    gateway: gateway,
-    signType: 'RSA2',
-  });
 
   const { type, amount, userId } = req.body;
   const outTradeNo = `ORDER_${Date.now()}_${userId}`;
@@ -66,39 +79,82 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   orders.set(outTradeNo, { userId, amount, status: 'pending', createdAt: Date.now() });
 
+  // 公共参数
+  const commonParams: Record<string, any> = {
+    app_id: appId,
+    charset: 'utf-8',
+    sign_type: 'RSA2',
+    timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
+    version: '1.0',
+    notify_url: notifyUrl,
+  };
+
   try {
-    const bizContent = {
-      outTradeNo,
-      totalAmount: amount,
-      subject: '速码AI Pro会员',
-      body: '升级成为Pro会员，享受无限次生成',
-      timeoutExpress: '30m',
-    };
-
     if (type === 'qrcode') {
-      const result = await alipaySdk.exec('alipay.trade.precreate', {
-        bizContent: {
-          ...bizContent,
-          productCode: 'FACE_TO_FACE_PAYMENT',
-        },
-        notifyUrl,
+      // 电脑扫码支付
+      const bizContent = {
+        out_trade_no: outTradeNo,
+        total_amount: amount,
+        subject: '速码AI Pro会员',
+        product_code: 'FACE_TO_FACE_PAYMENT',
+      };
+      
+      const params = {
+        ...commonParams,
+        method: 'alipay.trade.precreate',
+        biz_content: JSON.stringify(bizContent),
+      };
+      
+      params.sign = generateSign(params, privateKey);
+      
+      // 发送请求
+      const formBody = new URLSearchParams(params).toString();
+      const response = await fetch(gateway, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formBody,
       });
-
-      if (result.code === '10000') {
-        return res.status(200).json({ success: true, qrCode: result.qr_code, outTradeNo });
+      
+      const result = await response.json();
+      const aliResponse = result.alipay_trade_precreate_response;
+      
+      if (aliResponse?.code === '10000') {
+        return res.status(200).json({ success: true, qrCode: aliResponse.qr_code, outTradeNo });
       } else {
-        throw new Error(result.sub_msg || result.msg || '创建订单失败');
+        throw new Error(aliResponse?.sub_msg || aliResponse?.msg || '创建订单失败');
       }
     } else {
-      const formHtml = await alipaySdk.exec('alipay.trade.wap.pay', {
-        bizContent: {
-          ...bizContent,
-          productCode: 'QUICK_WAP_WAY',
-        },
-        notifyUrl,
-        returnUrl,
-      });
-
+      // 手机 H5 支付
+      const bizContent = {
+        out_trade_no: outTradeNo,
+        total_amount: amount,
+        subject: '速码AI Pro会员',
+        product_code: 'QUICK_WAP_WAY',
+      };
+      
+      const params = {
+        ...commonParams,
+        method: 'alipay.trade.wap.pay',
+        biz_content: JSON.stringify(bizContent),
+        return_url: returnUrl,
+      };
+      
+      params.sign = generateSign(params, privateKey);
+      
+      // 构建表单
+      const formHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="UTF-8"><title>跳转支付宝...</title></head>
+        <body>
+          <form id="alipayForm" action="${gateway}" method="POST">
+            ${Object.entries(params).map(([k, v]) => `<input type="hidden" name="${k}" value="${String(v)}">`).join('')}
+          </form>
+          <script>document.getElementById('alipayForm').submit();</script>
+        </body>
+        </html>
+      `;
+      
       res.setHeader('Content-Type', 'text/html');
       return res.status(200).send(formHtml);
     }
