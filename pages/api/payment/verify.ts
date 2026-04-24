@@ -1,6 +1,6 @@
 // pages/api/payment/verify.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { orders } from '../create-payment';
+import { getOrder } from '../../../lib/orderService';
 import { createOrUpdateUser } from '../../../lib/store';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // 从内存获取订单
-  const order = orders.get(out_trade_no);
+  const order = await getOrder(out_trade_no);
   if (!order) {
     return res.status(404).json({ error: '订单不存在' });
   }
@@ -27,14 +27,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // 等待支付宝回调更新状态（最多等待5秒）
   let waitCount = 0;
   while (waitCount < 10) {
-    const currentOrder = orders.get(out_trade_no);
+    const currentOrder = await getOrder(out_trade_no);
     if (currentOrder?.status === 'paid') {
       return res.status(200).json({ success: true, message: '支付成功' });
     }
     await new Promise(resolve => setTimeout(resolve, 500));
     waitCount++;
   }
-
   // 如果等待超时，返回未支付
   return res.status(200).json({ success: false, error: '订单未支付' });
 }

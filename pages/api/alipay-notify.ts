@@ -2,8 +2,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
 import fs from 'fs';
-import { orders } from './create-payment';
-import { createOrUpdateUser } from '../../lib/store';
+// 替换为新的数据库服务
+import { getOrder, updateOrderStatus, upgradeUserToPro } from '../../lib/orderService';
 
 // 获取支付宝公钥（从文件或环境变量）
 function getAlipayPublicKey(): string {
@@ -88,17 +88,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).send('fail');
     }
 
-    const order = orders.get(out_trade_no);
+    // 从数据库查询订单
+    const order = await getOrder(out_trade_no);
     if (!order) {
       console.error(`❌ 订单不存在: ${out_trade_no}`);
       return res.status(404).send('fail');
     }
 
     if (trade_status === 'TRADE_SUCCESS') {
+      // 检查订单状态，避免重复处理
       if (order.status !== 'paid') {
-        order.status = 'paid';
-        createOrUpdateUser(order.userId, { isPro: true });
-        console.log(`✅ 订单 ${out_trade_no} 支付成功，用户 ${order.userId} 已升级为 Pro`);
+        // 更新数据库中的订单状态
+        await updateOrderStatus(out_trade_no, 'paid');
+        // 升级数据库中的用户会员状态
+        await upgradeUserToPro(order.user_id);
+        console.log(`✅ 订单 ${out_trade_no} 支付成功，用户 ${order.user_id} 已升级为 Pro`);
       } else {
         console.log(`订单 ${out_trade_no} 已处理过`);
       }

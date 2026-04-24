@@ -2,9 +2,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
 import fs from 'fs';
+import { createOrder } from '../../lib/orderService';
 
-// 临时订单存储
-const orders = new Map();
 
 // 检测是否为移动设备
 function isMobileClient(userAgent: string | undefined): boolean {
@@ -101,8 +100,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const notifyUrl = `${baseUrl}/api/alipay-notify`;
   const returnUrl = `${baseUrl}/payment-result`;
 
-  // 保存订单到内存
-  orders.set(outTradeNo, { userId, amount, status: 'pending', createdAt: Date.now() });
+  // 保存订单到数据库
+  await createOrder(outTradeNo, userId, amount);
 
   try {
     const bizContent = {
@@ -199,4 +198,3 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-export { orders };
