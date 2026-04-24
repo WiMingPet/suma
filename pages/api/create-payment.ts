@@ -1,16 +1,15 @@
 // pages/api/create-payment.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import * as AlipaySdk from 'alipay-sdk';
-import AlipayFormData from 'alipay-sdk/lib/form';
 
-const AlipaySdkClass = (AlipaySdk as any).default || AlipaySdk;
-
-const alipaySdk = new AlipaySdkClass({
-  appId: process.env.ALIPAY_APP_ID!,
-  privateKey: process.env.ALIPAY_PRIVATE_KEY!,
-  alipayPublicKey: process.env.ALIPAY_ALIPAY_PUBLIC_KEY!,
-  gateway: process.env.ALIPAY_GATEWAY!,
-});
+// 动态导入 alipay-sdk
+let AlipaySdk: any;
+async function getAlipaySdk() {
+  if (!AlipaySdk) {
+    const module = await import('alipay-sdk');
+    AlipaySdk = module.default;
+  }
+  return AlipaySdk;
+}
 
 // 临时订单存储
 const orders = new Map();
@@ -26,8 +25,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   orders.set(outTradeNo, { userId, amount, status: 'pending', createdAt: Date.now() });
 
   try {
-    const formData = new AlipayFormData();
-    formData.setMethod('GET');
+    const AlipaySdkClass = await getAlipaySdk();
+    const alipaySdk = new AlipaySdkClass({
+      appId: process.env.ALIPAY_APP_ID!,
+      privateKey: process.env.ALIPAY_PRIVATE_KEY!,
+      alipayPublicKey: process.env.ALIPAY_ALIPAY_PUBLIC_KEY!,
+      gateway: process.env.ALIPAY_GATEWAY!,
+    });
 
     const bizContent = {
       outTradeNo,
@@ -35,23 +39,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       subject: '速码AI Pro会员',
       productCode: type === 'h5' ? 'QUICK_WAP_WAY' : undefined,
       notifyUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/api/alipay-notify`,
+      timeoutExpress: '30m',
     };
-
-    formData.addField('bizContent', bizContent);
 
     let method = 'alipay.trade.precreate';
     if (type === 'h5') method = 'alipay.trade.wap.pay';
 
-    const result = await alipaySdk.exec(method, {}, { formData });
+    // 构建请求参数
+    const result = await alipaySdk.exec(method, {
+      bizContent: JSON.stringify(bizContent),
+    });
 
     if (type === 'qrcode') {
       return res.status(200).json({ success: true, qrCode: result.qr_code, outTradeNo });
     } else {
-      return res.status(200).send(result);
+      // H5 支付需要返回表单
+      const formHtml = alipaySdk.getPageResult(result);
+      return res.status(200).send(formHtml);
     }
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: '创建订单失败' });
+    console.error('创建订单失败:', error);
+    res.status(500).json({ error: '创建订单失败: ' + (error as Error).message });
   }
 }
 
