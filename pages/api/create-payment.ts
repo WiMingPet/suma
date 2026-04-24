@@ -149,18 +149,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw new Error(aliResponse?.sub_msg || aliResponse?.msg || '创建订单失败');
       }
     } else {
-      console.log('[手机支付] 1. 进入手机支付分支');
+      console.log('[手机支付] 进入手机支付分支');
       
-      console.log('[手机支付] 2. 开始构建 bizContent');
       const bizContent = {
         out_trade_no: outTradeNo,
         total_amount: amount,
         subject: '速码AI Pro会员',
         product_code: 'QUICK_WAP_WAY',
       };
-      console.log('[手机支付] 3. bizContent:', JSON.stringify(bizContent));
-      
-      console.log('[手机支付] 4. 开始构建 params');
+
       const params: any = {
         app_id: appId,
         method: 'alipay.trade.wap.pay',
@@ -172,10 +169,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return_url: 'https://sumaai.cn/payment/result',
         biz_content: JSON.stringify(bizContent),
       };
-      console.log('[手机支付] 5. params 构建完成，keys:', Object.keys(params));
       
-      console.log('[手机支付] 6. 开始生成签名');
-      // 按照官方要求构建待签名字符串和签名
+      // 生成签名
       const sortedParams = Object.keys(params).sort().reduce((obj: any, key) => {
         if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
           obj[key] = params[key];
@@ -190,27 +185,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       sign.end();
       const signature = sign.sign(privateKey, 'base64');
       params.sign = signature;
-      console.log('[手机支付] 7. 签名生成完成');
       
-      console.log('[手机支付] 8. 开始构建 HTML 表单');
-      // 构建并返回自动提交的 HTML 表单
-      const formHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head><meta charset="UTF-8"><title>跳转支付宝...</title></head>
-        <body>
-          <form id="alipayForm" action="${gateway}" method="POST">
-            ${Object.entries(params).map(([k, v]) => `<input type="hidden" name="${k}" value="${String(v)}">`).join('')}
-          </form>
-          <script>document.getElementById('alipayForm').submit();</script>
-        </body>
-        </html>
-      `;
-      console.log('[手机支付] 9. 表单构建完成，长度:', formHtml.length);
+      // 构建完整支付 URL
+      const payUrl = `${gateway}?${new URLSearchParams(params).toString()}`;
+      console.log('[手机支付] 支付 URL 长度:', payUrl.length);
       
-      console.log('[手机支付] 10. 准备返回响应');
-      res.setHeader('Content-Type', 'text/html');
-      return res.status(200).send(formHtml);
+      // 返回 JSON，让前端跳转
+      return res.status(200).json({ success: true, payUrl });
     }
   } catch (error) {
     console.error('创建订单失败:', error);

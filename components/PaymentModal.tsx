@@ -32,13 +32,12 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess }: Pay
           alert(data.error || '创建订单失败');
         }
       } else {
-        const html = await res.text();
-        console.log('=== 手机支付响应 ===');
-        console.log('HTML 长度:', html.length);
-        console.log('HTML 前500字符:', html.substring(0, 500));
-        console.log('==================');
-        document.write(html);
-        document.close();
+        const data = await res.json();
+        if (data.success && data.payUrl) {
+          window.location.href = data.payUrl;
+        } else {
+          alert(data.error || '创建订单失败');
+        }
         return;
       }
     } catch (error) {
