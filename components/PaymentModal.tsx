@@ -33,6 +33,10 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess }: Pay
         }
       } else {
         const html = await res.text();
+        console.log('=== 手机支付响应 ===');
+        console.log('HTML 长度:', html.length);
+        console.log('HTML 前500字符:', html.substring(0, 500));
+        console.log('==================');
         document.write(html);
         document.close();
         return;
