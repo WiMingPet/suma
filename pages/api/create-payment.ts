@@ -1,6 +1,5 @@
 // pages/api/create-payment.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import axios from 'axios';
 import crypto from 'crypto';
 
 // 临时订单存储
@@ -8,19 +7,20 @@ const orders = new Map();
 
 // 生成签名
 function generateSign(params: Record<string, any>, privateKey: string): string {
-  const sortedParams = Object.keys(params)
-    .sort()
-    .reduce((result: Record<string, any>, key) => {
-      if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
-        result[key] = params[key];
-      }
-      return result;
-    }, {});
+  // 过滤参数
+  const filteredParams: Record<string, any> = {};
+  for (const key of Object.keys(params).sort()) {
+    if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+      filteredParams[key] = params[key];
+    }
+  }
   
-  const signContent = Object.entries(sortedParams)
+  // 构建签名字符串
+  const signContent = Object.entries(filteredParams)
     .map(([key, value]) => `${key}=${value}`)
     .join('&');
   
+  // RSA-SHA256 签名
   const sign = crypto.createSign('RSA-SHA256');
   sign.update(signContent);
   sign.end();
@@ -35,70 +35,80 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { type, amount, userId } = req.body;
   const outTradeNo = `ORDER_${Date.now()}_${userId}`;
   const notifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/alipay-notify`;
-  const returnUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/`;
 
+  // 保存订单
   orders.set(outTradeNo, { userId, amount, status: 'pending', createdAt: Date.now() });
 
   try {
+    // 准备请求参数
     const bizContent: Record<string, any> = {
       out_trade_no: outTradeNo,
       total_amount: amount,
       subject: '速码AI Pro会员',
-      product_code: type === 'h5' ? 'QUICK_WAP_WAY' : undefined,
     };
 
-    if (type === 'qrcode') {
+    let method = 'alipay.trade.precreate';
+    if (type === 'h5') {
+      method = 'alipay.trade.wap.pay';
+      bizContent.product_code = 'QUICK_WAP_WAY';
+    } else {
       bizContent.product_code = 'FACE_TO_FACE_PAYMENT';
     }
 
     const params: Record<string, any> = {
       app_id: process.env.ALIPAY_APP_ID,
-      method: type === 'qrcode' ? 'alipay.trade.precreate' : 'alipay.trade.wap.pay',
+      method: method,
       format: 'JSON',
       charset: 'utf-8',
       sign_type: 'RSA2',
-      timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, '+08:00'),
+      timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
       version: '1.0',
       notify_url: notifyUrl,
       biz_content: JSON.stringify(bizContent),
     };
 
-    if (type === 'h5') {
-      params.return_url = returnUrl;
-    }
-
     // 生成签名
     const privateKey = process.env.ALIPAY_PRIVATE_KEY!.replace(/\\n/g, '\n');
     params.sign = generateSign(params, privateKey);
 
-    // 构建请求
+    // 使用 Node.js 原生 fetch (Next.js 12.2+ 支持)
     const gateway = process.env.ALIPAY_GATEWAY!;
-    
+    const formBody = new URLSearchParams(params).toString();
+
+    const response = await fetch(gateway, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formBody,
+    });
+
+    const result = await response.json();
+
     if (type === 'qrcode') {
-      // 二维码模式：调用 API 获取二维码
-      const response = await axios.post(gateway, new URLSearchParams(params), {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      });
-      
-      const result = response.data;
-      if (result.alipay_trade_precreate_response?.code === '10000') {
-        const qrCode = result.alipay_trade_precreate_response.qr_code;
-        return res.status(200).json({ success: true, qrCode, outTradeNo });
+      // 二维码支付
+      const aliResponse = result.alipay_trade_precreate_response;
+      if (aliResponse?.code === '10000') {
+        return res.status(200).json({
+          success: true,
+          qrCode: aliResponse.qr_code,
+          outTradeNo,
+        });
       } else {
-        throw new Error(result.alipay_trade_precreate_response?.sub_msg || '创建订单失败');
+        throw new Error(aliResponse?.sub_msg || aliResponse?.msg || '创建订单失败');
       }
     } else {
-      // H5 模式：生成表单直接返回
+      // H5 支付：返回表单
       const formHtml = `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="UTF-8">
-          <title>跳转支付宝支付...</title>
+          <title>跳转支付宝...</title>
         </head>
         <body>
           <form id="alipayForm" action="${gateway}" method="POST">
-            ${Object.entries(params).map(([key, value]) => `<input type="hidden" name="${key}" value="${value}"/>`).join('')}
+            ${Object.entries(params).map(([k, v]) => `<input type="hidden" name="${k}" value="${v}">`).join('')}
           </form>
           <script>document.getElementById('alipayForm').submit();</script>
         </body>
