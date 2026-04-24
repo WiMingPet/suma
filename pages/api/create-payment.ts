@@ -2,12 +2,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 
-const AlipaySdk = require('alipay-sdk').default;
+// 正确的导入方式
+const AlipaySdk = require('alipay-sdk');
 
 // 临时订单存储
 const orders = new Map();
 
-// 从文件读取密钥
 function getPrivateKey(): string {
   const keyPath = process.env.ALIPAY_PRIVATE_KEY_PATH || '/app/alipay_private_key.pem';
   try {
@@ -33,14 +33,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // 检查环境变量
   const appId = process.env.ALIPAY_APP_ID;
-  const gateway = process.env.ALIPAY_GATEWAY;
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+  const gateway = process.env.ALIPAY_GATEWAY || 'https://openapi.alipay.com/gateway.do';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL;
 
   if (!appId || !baseUrl) {
-    console.error('支付宝环境变量缺失');
-    return res.status(500).json({ error: '支付服务配置错误，请联系管理员' });
+    console.error('支付宝环境变量缺失:', { appId: !!appId, baseUrl: !!baseUrl });
+    return res.status(500).json({ error: '支付服务配置错误' });
   }
 
   const privateKey = getPrivateKey();
@@ -48,8 +47,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!privateKey || !alipayPublicKey) {
     console.error('密钥读取失败');
-    return res.status(500).json({ error: '支付密钥配置错误，请联系管理员' });
+    return res.status(500).json({ error: '支付密钥配置错误' });
   }
+
+  // 实例化 AlipaySdk
+  const alipaySdk = new AlipaySdk({
+    appId: appId,
+    privateKey: privateKey,
+    alipayPublicKey: alipayPublicKey,
+    gateway: gateway,
+    signType: 'RSA2',
+  });
 
   const { type, amount, userId } = req.body;
   const outTradeNo = `ORDER_${Date.now()}_${userId}`;
@@ -57,15 +65,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const returnUrl = `${baseUrl}/`;
 
   orders.set(outTradeNo, { userId, amount, status: 'pending', createdAt: Date.now() });
-
-  // 初始化支付宝 SDK
-  const alipaySdk = new AlipaySdk({
-    appId: appId,
-    privateKey: privateKey,
-    alipayPublicKey: alipayPublicKey,
-    gateway: gateway || 'https://openapi.alipay.com/gateway.do',
-    signType: 'RSA2',
-  });
 
   try {
     const bizContent = {
