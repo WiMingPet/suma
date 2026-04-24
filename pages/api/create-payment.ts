@@ -6,30 +6,25 @@ import fs from 'fs';
 // 临时订单存储
 const orders = new Map();
 
+// 检测是否为移动设备
+function isMobileClient(userAgent: string | undefined): boolean {
+  if (!userAgent) return false;
+  const mobileKeywords = ['mobile', 'android', 'iphone', 'ipad', 'ipod', 'blackberry', 'windows phone'];
+  return mobileKeywords.some(keyword => userAgent.toLowerCase().includes(keyword));
+}
+
 // 获取密钥
 function getPrivateKey(): string {
   const keyPath = process.env.ALIPAY_PRIVATE_KEY_PATH || '/app/alipay_private_key.pem';
   try {
     return fs.readFileSync(keyPath, 'utf-8');
   } catch (error) {
-    console.error(`读取私钥文件失败: ${keyPath}`);
     return process.env.ALIPAY_PRIVATE_KEY?.replace(/\\n/g, '\n') || '';
-  }
-}
-
-function getAlipayPublicKey(): string {
-  const keyPath = process.env.ALIPAY_PUBLIC_KEY_PATH || '/app/alipay_public_key.pem';
-  try {
-    return fs.readFileSync(keyPath, 'utf-8');
-  } catch (error) {
-    console.error(`读取公钥文件失败: ${keyPath}`);
-    return process.env.ALIPAY_ALIPAY_PUBLIC_KEY?.replace(/\\n/g, '\n') || '';
   }
 }
 
 // 生成支付宝签名
 function generateSign(params: Record<string, any>, privateKey: string): string {
-  // 1. 过滤参数
   const filteredParams: Record<string, any> = {};
   Object.keys(params)
     .sort()
@@ -39,14 +34,10 @@ function generateSign(params: Record<string, any>, privateKey: string): string {
       }
     });
   
-  // 2. 构建签名字符串
   const signContent = Object.entries(filteredParams)
     .map(([key, value]) => `${key}=${value}`)
     .join('&');
   
-  console.log('待签名字符串:', signContent);
-  
-  // 3. RSA-SHA256 签名
   const sign = crypto.createSign('RSA-SHA256');
   sign.update(signContent);
   sign.end();
@@ -72,22 +63,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: '私钥配置错误' });
   }
 
-  const { type, amount, userId } = req.body;
+  const { amount, userId } = req.body;
+  
+  // 根据 User-Agent 判断设备类型
+  const userAgent = req.headers['user-agent'];
+  const isMobile = isMobileClient(userAgent);
+  const type = isMobile ? 'h5' : 'qrcode';
+  
   const outTradeNo = `ORDER_${Date.now()}_${userId}`;
   const notifyUrl = `${baseUrl}/api/alipay-notify`;
   const returnUrl = `${baseUrl}/`;
 
   orders.set(outTradeNo, { userId, amount, status: 'pending', createdAt: Date.now() });
-
-  // 公共参数
-  const commonParams: Record<string, any> = {
-    app_id: appId,
-    charset: 'utf-8',
-    sign_type: 'RSA2',
-    timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
-    version: '1.0',
-    notify_url: notifyUrl,
-  };
 
   try {
     if (type === 'qrcode') {
@@ -99,15 +86,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         product_code: 'FACE_TO_FACE_PAYMENT',
       };
       
-      const params = {
-        ...commonParams,
+      // 使用 any 类型避免 TypeScript 错误
+      const params: any = {
+        app_id: appId,
         method: 'alipay.trade.precreate',
+        charset: 'utf-8',
+        sign_type: 'RSA2',
+        timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        version: '1.0',
+        notify_url: notifyUrl,
         biz_content: JSON.stringify(bizContent),
       };
       
       params.sign = generateSign(params, privateKey);
       
-      // 发送请求
       const formBody = new URLSearchParams(params).toString();
       const response = await fetch(gateway, {
         method: 'POST',
@@ -119,7 +111,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const aliResponse = result.alipay_trade_precreate_response;
       
       if (aliResponse?.code === '10000') {
-        return res.status(200).json({ success: true, qrCode: aliResponse.qr_code, outTradeNo });
+        return res.status(200).json({ 
+          success: true, 
+          qrCode: aliResponse.qr_code, 
+          outTradeNo,
+        });
       } else {
         throw new Error(aliResponse?.sub_msg || aliResponse?.msg || '创建订单失败');
       }
@@ -132,16 +128,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         product_code: 'QUICK_WAP_WAY',
       };
       
-      const params = {
-        ...commonParams,
+      const params: any = {
+        app_id: appId,
         method: 'alipay.trade.wap.pay',
-        biz_content: JSON.stringify(bizContent),
+        charset: 'utf-8',
+        sign_type: 'RSA2',
+        timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        version: '1.0',
+        notify_url: notifyUrl,
         return_url: returnUrl,
+        biz_content: JSON.stringify(bizContent),
       };
       
       params.sign = generateSign(params, privateKey);
       
-      // 构建表单
       const formHtml = `
         <!DOCTYPE html>
         <html>
