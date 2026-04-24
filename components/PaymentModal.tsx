@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import QRCode from 'qrcode.react';
+import { QRCodeCanvas } from 'qrcode.react';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -62,7 +62,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess }: Pay
         {loading && <p>生成中...</p>}
         {qrCode && (
           <div className="flex flex-col items-center">
-            <QRCode value={qrCode} size={200} />
+            <QRCodeCanvas value={qrCode} size={200} />
             <p className="mt-2 text-sm text-gray-600">请使用支付宝扫一扫支付</p>
           </div>
         )}
