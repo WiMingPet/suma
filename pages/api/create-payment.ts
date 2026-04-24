@@ -67,6 +67,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  console.log('[请求] 接收到的 body:', req.body);
+  console.log('[请求] 前端传的 type:', req.body.type);
+  console.log('[请求] User-Agent:', req.headers['user-agent']);
+
   const appId = process.env.ALIPAY_APP_ID;
   const gateway = process.env.ALIPAY_GATEWAY || 'https://openapi.alipay.com/gateway.do';
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL;
@@ -87,6 +91,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const userAgent = req.headers['user-agent'];
   const isMobile = isMobileClient(userAgent);
   const type = frontendType || (isMobile ? 'h5' : 'qrcode');
+
+  // ========== 添加调试日志 ==========
+  console.log('[请求] frontendType:', frontendType);
+  console.log('[请求] isMobile:', isMobile);
+  console.log('[请求] 最终 type:', type);
   
   const outTradeNo = `ORDER_${Date.now()}_${userId}`;
   const notifyUrl = `${baseUrl}/api/alipay-notify`;
