@@ -63,12 +63,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: '私钥配置错误' });
   }
 
-  const { amount, userId } = req.body;
-  
-  // 根据 User-Agent 判断设备类型
+  const { amount, userId, type: frontendType } = req.body;  // ← 取出前端传的 type
+
+  // 优先使用前端传的 type，如果没有再根据 User-Agent 判断
   const userAgent = req.headers['user-agent'];
   const isMobile = isMobileClient(userAgent);
-  const type = isMobile ? 'h5' : 'qrcode';
+  const type = frontendType || (isMobile ? 'h5' : 'qrcode');
   
   const outTradeNo = `ORDER_${Date.now()}_${userId}`;
   const notifyUrl = `${baseUrl}/api/alipay-notify`;
