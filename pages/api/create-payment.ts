@@ -1,30 +1,39 @@
 // pages/api/create-payment.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import crypto from 'crypto';
 
 // 临时订单存储
 const orders = new Map();
 
-// 生成签名
+// 生成签名的简化版本
 function generateSign(params: Record<string, any>, privateKey: string): string {
-  // 过滤参数
-  const filteredParams: Record<string, any> = {};
-  for (const key of Object.keys(params).sort()) {
-    if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
-      filteredParams[key] = params[key];
-    }
-  }
+  // 1. 过滤并排序参数
+  const sortedParams: Record<string, any> = {};
+  Object.keys(params)
+    .sort()
+    .forEach(key => {
+      if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+        sortedParams[key] = params[key];
+      }
+    });
   
-  // 构建签名字符串
-  const signContent = Object.entries(filteredParams)
+  // 2. 构建签名字符串
+  const signContent = Object.entries(sortedParams)
     .map(([key, value]) => `${key}=${value}`)
     .join('&');
   
-  // RSA-SHA256 签名
+  // 3. 使用 Node.js 内置 crypto 签名
+  const crypto = require('crypto');
   const sign = crypto.createSign('RSA-SHA256');
   sign.update(signContent);
   sign.end();
-  return sign.sign(privateKey, 'base64');
+  
+  // 处理私钥格式
+  let pemPrivateKey = privateKey;
+  if (!pemPrivateKey.includes('-----BEGIN')) {
+    pemPrivateKey = `-----BEGIN RSA PRIVATE KEY-----\n${pemPrivateKey}\n-----END RSA PRIVATE KEY-----`;
+  }
+  
+  return sign.sign(pemPrivateKey, 'base64');
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -36,11 +45,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const outTradeNo = `ORDER_${Date.now()}_${userId}`;
   const notifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/alipay-notify`;
 
-  // 保存订单
   orders.set(outTradeNo, { userId, amount, status: 'pending', createdAt: Date.now() });
 
   try {
-    // 准备请求参数
+    // 准备业务参数
     const bizContent: Record<string, any> = {
       out_trade_no: outTradeNo,
       total_amount: amount,
@@ -55,6 +63,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       bizContent.product_code = 'FACE_TO_FACE_PAYMENT';
     }
 
+    // 准备公共参数
     const params: Record<string, any> = {
       app_id: process.env.ALIPAY_APP_ID,
       method: method,
@@ -71,7 +80,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const privateKey = process.env.ALIPAY_PRIVATE_KEY!.replace(/\\n/g, '\n');
     params.sign = generateSign(params, privateKey);
 
-    // 使用 Node.js 原生 fetch (Next.js 12.2+ 支持)
+    // 发送请求
     const gateway = process.env.ALIPAY_GATEWAY!;
     const formBody = new URLSearchParams(params).toString();
 
@@ -86,7 +95,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const result = await response.json();
 
     if (type === 'qrcode') {
-      // 二维码支付
       const aliResponse = result.alipay_trade_precreate_response;
       if (aliResponse?.code === '10000') {
         return res.status(200).json({
@@ -98,7 +106,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw new Error(aliResponse?.sub_msg || aliResponse?.msg || '创建订单失败');
       }
     } else {
-      // H5 支付：返回表单
+      // H5 支付
       const formHtml = `
         <!DOCTYPE html>
         <html>
