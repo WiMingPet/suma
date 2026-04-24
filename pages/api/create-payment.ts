@@ -13,35 +13,52 @@ function isMobileClient(userAgent: string | undefined): boolean {
   return mobileKeywords.some(keyword => userAgent.toLowerCase().includes(keyword));
 }
 
-// 获取密钥
+// 获取私钥
 function getPrivateKey(): string {
   const keyPath = process.env.ALIPAY_PRIVATE_KEY_PATH || '/app/alipay_private_key.pem';
   try {
-    return fs.readFileSync(keyPath, 'utf-8');
+    const key = fs.readFileSync(keyPath, 'utf-8');
+    console.log('[私钥] 从文件读取成功');
+    return key;
   } catch (error) {
-    return process.env.ALIPAY_PRIVATE_KEY?.replace(/\\n/g, '\n') || '';
+    console.log('[私钥] 从文件读取失败，尝试从环境变量读取');
+    const envKey = process.env.ALIPAY_PRIVATE_KEY;
+    if (envKey) {
+      return envKey.replace(/\\n/g, '\n');
+    }
+    console.error('[私钥] 私钥未找到');
+    return '';
   }
 }
 
-// 生成支付宝签名
+// 生成签名（与 alipay-notify.ts 的验证逻辑对应）
 function generateSign(params: Record<string, any>, privateKey: string): string {
-  const filteredParams: Record<string, any> = {};
+  // 过滤参数：排除 sign，排除空值，按 key 排序
+  const filteredParams: Record<string, string> = {};
   Object.keys(params)
     .sort()
     .forEach(key => {
-      if (key !== 'sign' && params[key] !== undefined && params[key] !== null && params[key] !== '') {
-        filteredParams[key] = params[key];
+      const value = params[key];
+      if (key !== 'sign' && value !== undefined && value !== null && value !== '') {
+        filteredParams[key] = String(value);
       }
     });
   
+  // 构建待签名字符串
   const signContent = Object.entries(filteredParams)
     .map(([key, value]) => `${key}=${value}`)
     .join('&');
   
+  console.log('[生成签名] 待签名字符串:', signContent);
+  
+  // 签名
   const sign = crypto.createSign('RSA-SHA256');
   sign.update(signContent);
   sign.end();
-  return sign.sign(privateKey, 'base64');
+  const signature = sign.sign(privateKey, 'base64');
+  
+  console.log('[生成签名] 签名结果:', signature.substring(0, 50) + '...');
+  return signature;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -63,9 +80,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: '私钥配置错误' });
   }
 
-  const { amount, userId, type: frontendType } = req.body;  // ← 取出前端传的 type
-
-  // 优先使用前端传的 type，如果没有再根据 User-Agent 判断
+  const { amount, userId, type: frontendType } = req.body;
+  
+  // 优先使用前端传的 type
   const userAgent = req.headers['user-agent'];
   const isMobile = isMobileClient(userAgent);
   const type = frontendType || (isMobile ? 'h5' : 'qrcode');
@@ -74,19 +91,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const notifyUrl = `${baseUrl}/api/alipay-notify`;
   const returnUrl = `${baseUrl}/`;
 
+  // 保存订单到内存
   orders.set(outTradeNo, { userId, amount, status: 'pending', createdAt: Date.now() });
 
   try {
+    const bizContent = {
+      out_trade_no: outTradeNo,
+      total_amount: amount,
+      subject: '速码AI Pro会员',
+    };
+
     if (type === 'qrcode') {
       // 电脑扫码支付
-      const bizContent = {
-        out_trade_no: outTradeNo,
-        total_amount: amount,
-        subject: '速码AI Pro会员',
-        product_code: 'FACE_TO_FACE_PAYMENT',
-      };
-      
-      // 使用 any 类型避免 TypeScript 错误
       const params: any = {
         app_id: appId,
         method: 'alipay.trade.precreate',
@@ -95,7 +111,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
         version: '1.0',
         notify_url: notifyUrl,
-        biz_content: JSON.stringify(bizContent),
+        biz_content: JSON.stringify({
+          ...bizContent,
+          product_code: 'FACE_TO_FACE_PAYMENT',
+        }),
       };
       
       params.sign = generateSign(params, privateKey);
@@ -121,13 +140,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     } else {
       // 手机 H5 支付
-      const bizContent = {
-        out_trade_no: outTradeNo,
-        total_amount: amount,
-        subject: '速码AI Pro会员',
-        product_code: 'QUICK_WAP_WAY',
-      };
-      
       const params: any = {
         app_id: appId,
         method: 'alipay.trade.wap.pay',
@@ -137,7 +149,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         version: '1.0',
         notify_url: notifyUrl,
         return_url: returnUrl,
-        biz_content: JSON.stringify(bizContent),
+        biz_content: JSON.stringify({
+          ...bizContent,
+          product_code: 'QUICK_WAP_WAY',
+        }),
       };
       
       params.sign = generateSign(params, privateKey);
