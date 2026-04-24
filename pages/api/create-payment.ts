@@ -50,6 +50,7 @@ function generateSign(params: Record<string, any>, privateKey: string): string {
     .join('&');
   
   console.log('[生成签名] 待签名字符串:', signContent);
+  console.log('[生成签名] 字符串长度:', signContent.length);
   
   // 签名
   const sign = crypto.createSign('RSA-SHA256');
