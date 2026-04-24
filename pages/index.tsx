@@ -12,6 +12,7 @@ const ThreeBackground = dynamic(() => import('../components/ThreeBackground'), {
 // 组件导入
 import LoginModal from '../components/LoginModal'
 import SideMenu from '../components/SideMenu'
+import PaymentModal from '../components/PaymentModal'
 import GameSnake from '../components/GameSnake'
 import GameTetris from '../components/GameTetris'
 import GameBubble from '../components/GameBubble'
@@ -38,6 +39,7 @@ export default function Home() {
   const [showMenu, setShowMenu] = useState(false)
   const [showGames, setShowGames] = useState(false)
   const [currentGame, setCurrentGame] = useState<string | null>(null)
+  const [showPayment, setShowPayment] = useState(false)
   
   // 生成功能状态
   const [generatedCode, setGeneratedCode] = useState('')
@@ -460,7 +462,7 @@ export default function Home() {
                 </div>
                 {!user.is_pro && (
                   <button
-                    onClick={() => alert('Pro会员升级功能开发中，请支付19元/月')}
+                    onClick={() => setShowPayment(true)}
                     className="px-3 py-1 bg-yellow-500 text-black rounded-lg text-sm font-medium hover:bg-yellow-400 transition"
                   >
                     升级Pro
@@ -711,6 +713,25 @@ export default function Home() {
         isOpen={showLogin}
         onClose={() => setShowLogin(false)}
         onLoginSuccess={handleLoginSuccess}
+      />
+
+      {/* 支付弹窗 */}
+      <PaymentModal
+        isOpen={showPayment}
+        onClose={() => setShowPayment(false)}
+        userId={user?.id || ''}
+        onSuccess={() => {
+          setShowPayment(false)
+          // 刷新用户信息
+          fetch('/api/user-info', {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          }).then(res => res.json()).then(data => {
+            if (data.success) {
+              setUser(data.user)
+              localStorage.setItem('suma_user', JSON.stringify(data.user))
+            }
+          })
+        }}
       />
 
       {/* 侧滑菜单 */}
