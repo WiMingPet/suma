@@ -1,26 +1,28 @@
+// pages/api/create-payment.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import AlipaySdk from 'alipay-sdk';
+import * as AlipaySdk from 'alipay-sdk';
 import AlipayFormData from 'alipay-sdk/lib/form';
 
-// 临时订单存储（生产环境请换成数据库）
-const orders = new Map();
+const AlipaySdkClass = (AlipaySdk as any).default || AlipaySdk;
 
-const alipaySdk = new AlipaySdk({
+const alipaySdk = new AlipaySdkClass({
   appId: process.env.ALIPAY_APP_ID!,
   privateKey: process.env.ALIPAY_PRIVATE_KEY!,
   alipayPublicKey: process.env.ALIPAY_ALIPAY_PUBLIC_KEY!,
   gateway: process.env.ALIPAY_GATEWAY!,
 });
 
+// 临时订单存储
+const orders = new Map();
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { type, amount, userId } = req.body; // type: 'qrcode' 或 'h5'
+  const { type, amount, userId } = req.body;
   const outTradeNo = `ORDER_${Date.now()}_${userId}`;
 
-  // 保存订单（初始状态 pending）
   orders.set(outTradeNo, { userId, amount, status: 'pending', createdAt: Date.now() });
 
   try {
@@ -37,16 +39,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     formData.addField('bizContent', bizContent);
 
-    let method = 'alipay.trade.precreate'; // 默认二维码
+    let method = 'alipay.trade.precreate';
     if (type === 'h5') method = 'alipay.trade.wap.pay';
 
     const result = await alipaySdk.exec(method, {}, { formData });
 
     if (type === 'qrcode') {
-      // 返回二维码内容
       return res.status(200).json({ success: true, qrCode: result.qr_code, outTradeNo });
     } else {
-      // H5 返回表单页面
       return res.status(200).send(result);
     }
   } catch (error) {
@@ -55,5 +55,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-// 导出 orders 供其他路由使用（简单共享）
 export { orders };

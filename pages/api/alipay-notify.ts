@@ -1,9 +1,12 @@
+// pages/api/alipay-notify.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import AlipaySdk from 'alipay-sdk';
+import * as AlipaySdk from 'alipay-sdk';
 import { orders } from './create-payment';
 import { createOrUpdateUser } from '../../lib/store';
 
-const alipaySdk = new AlipaySdk({
+const AlipaySdkClass = (AlipaySdk as any).default || AlipaySdk;
+
+const alipaySdk = new AlipaySdkClass({
   appId: process.env.ALIPAY_APP_ID!,
   privateKey: process.env.ALIPAY_PRIVATE_KEY!,
   alipayPublicKey: process.env.ALIPAY_ALIPAY_PUBLIC_KEY!,
