@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { getUser, createOrUpdateUser } from '../../lib/store';
+import { setPasswordHash } from '../../lib/orderService';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -29,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const hashed = await bcrypt.hash(password, 10);
-  createOrUpdateUser(phone, { passwordHash: hashed });
+  await setPasswordHash(phone, hashed);
 
   res.status(200).json({ success: true });
 }

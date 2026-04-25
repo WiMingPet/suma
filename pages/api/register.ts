@@ -1,8 +1,7 @@
 // pages/api/register.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcrypt';
-import { getUser } from '../../lib/store';
-import { setPasswordHash, getOrCreateUserInDB } from '../../lib/orderService';
+import { getPasswordHash, setPasswordHash, getOrCreateUserInDB } from '../../lib/orderService';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -27,10 +26,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // 检查用户是否已存在且有密码（已注册）
-    const existingUser = getUser(phone);
-    
-    if (existingUser && existingUser.passwordHash) {
+    // 从数据库检查用户是否已有密码（已注册）
+    const existingHash = await getPasswordHash(phone);
+    if (existingHash) {
       return res.status(400).json({ error: '该手机号已注册，请直接登录' });
     }
 
