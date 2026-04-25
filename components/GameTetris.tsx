@@ -96,9 +96,17 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
 
   const hardDrop = useCallback(() => {
     if (!piece || !isPlaying || gameOver || isPaused) return
-    while (!checkCollision(piece.shape, piece.x, piece.y + 1, board)) {
-      setPiece(p => ({ ...p!, y: p!.y + 1 }))
+    
+    // 计算最终 Y 位置（不触发渲染）
+    let finalY = piece.y
+    while (!checkCollision(piece.shape, piece.x, finalY + 1, board)) {
+      finalY++
     }
+    
+    // 一次性更新位置
+    setPiece({ ...piece, y: finalY })
+    
+    // 立即固定方块
     mergePiece()
   }, [piece, board, isPlaying, gameOver, isPaused, checkCollision, mergePiece])
 
