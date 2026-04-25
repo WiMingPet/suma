@@ -35,11 +35,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(403).json({ error: `免费次数已用完（共${MAX_FREE}次），请升级Pro会员或购买点币` })
   }
 
-  // 获取用户点币（非Pro用户需要检查）
-  let userPoints = 0
-  if (!isPro) {
-    userPoints = await getUserPoints(userId)
-    if (userPoints <= 0) {
+  // 只有 Pro 用户才检查点币余额
+  if (isPro) {
+    const points = await getUserPoints(userId)
+    if (points <= 0) {
       return res.status(403).json({ error: '点币余额不足，请购买点币套餐' })
     }
   }
