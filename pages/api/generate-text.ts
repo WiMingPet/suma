@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { getOrCreateUser } from '../../lib/store'
-import { getUserPoints, deductPoints, incrementFreeUsed, getFreeUsed } from '../../lib/orderService'
+import { getUserPoints, deductPoints, incrementFreeUsed, getFreeUsed, getOrCreateUserInDB } from '../../lib/orderService'
 
 const MAX_FREE = 3
 
@@ -23,21 +22,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: '用户ID不能为空' })
   }
 
-  // 使用 getOrCreateUser，自动创建用户（如果不存在）
-  const user = getOrCreateUser(userId)
+  // 从数据库获取或创建用户
+  const userRecord = await getOrCreateUserInDB(userId)
+  const isPro = userRecord.is_pro
 
   // 从数据库获取已使用的免费次数
   const freeUsed = await getFreeUsed(userId)
   const remainingCount = Math.max(0, MAX_FREE - freeUsed)
 
   // 检查次数（免费用户）
-  if (!user.isPro && remainingCount <= 0) {
+  if (!isPro && remainingCount <= 0) {
     return res.status(403).json({ error: `免费次数已用完（共${MAX_FREE}次），请升级Pro会员或购买点币` })
   }
 
   // 获取用户点币（非Pro用户需要检查）
   let userPoints = 0
-  if (!user.isPro) {
+  if (!isPro) {
     userPoints = await getUserPoints(userId)
     if (userPoints <= 0) {
       return res.status(403).json({ error: '点币余额不足，请购买点币套餐' })
@@ -114,7 +114,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`生成内容长度: ${contentLength}字，消耗点币: ${cost}`)
 
     // 非Pro用户扣点币并增加免费次数
-    if (!user.isPro) {
+    if (!isPro) {
       await deductPoints(userId, cost)
       await incrementFreeUsed(userId)
     }
@@ -122,7 +122,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // 获取最新的剩余次数和点币余额
   const newFreeUsed = await getFreeUsed(userId)
-  const remaining = user.isPro ? -1 : Math.max(0, MAX_FREE - newFreeUsed)
+  const remaining = isPro ? -1 : Math.max(0, MAX_FREE - newFreeUsed)
   const finalPoints = await getUserPoints(userId)
 
   return res.status(200).json({
