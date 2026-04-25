@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
 import { getUser } from '../../lib/store';
-import { getFreeUsed } from '../../lib/orderService';
+import { getFreeUsed, getUserPoints } from '../../lib/orderService';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const authHeader = req.headers.authorization;
@@ -25,8 +25,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(404).json({ error: '用户不存在' });
   }
 
-  // 从数据库获取免费已使用次数
+  // 从数据库获取免费已使用次数和点币余额
   const freeUsed = await getFreeUsed(phone);
+  const points = await getUserPoints(phone);
 
   res.status(200).json({
     success: true,
@@ -34,8 +35,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       id: phone,
       phone,
       is_pro: user.isPro,
-      daily_count: user.dailyCount,  // 已使用次数
-      free_used: freeUsed,           // 免费已使用次数（永久3次）
+      daily_count: user.dailyCount,
+      free_used: freeUsed,
+      points: points,  // 新增：点币余额
     }
   });
 }

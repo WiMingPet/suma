@@ -23,6 +23,7 @@ interface User {
   is_pro: boolean
   daily_count: number
   free_used: number   // 免费已使用次数（永久3次）
+  points: number   // 新增：点币余额
 }
 
 interface SavedApp {
@@ -76,8 +77,8 @@ export default function Home() {
   // 辅助函数：计算剩余次数
   const getRemaining = () => {
     if (!user) return 0
-    if (user.is_pro) return -1
-    return Math.max(0, 3 - (user.free_used || 0))  // ← 应该用 free_used
+    if (user.is_pro) return user.points || 0  // Pro 用户返回点币余额
+    return Math.max(0, 3 - (user.free_used || 0))  // 免费用户返回剩余次数
   }
 
   // 初始化用户状态（从 localStorage 恢复 token，再向后端验证获取最新数据）
@@ -460,7 +461,7 @@ export default function Home() {
                 <div className="text-right">
                   <p className="text-sm text-white">{user.phone.slice(0, 3)}****{user.phone.slice(-4)}</p>
                   <p className="text-xs text-gray-400">
-                    {user.is_pro ? 'Pro会员·无限次' : `剩余免费次数: ${Math.max(0, 3 - (user.free_used || 0))}`}
+                    {user.is_pro ? `点币余额: ${user.points || 0}` : `剩余免费次数: ${Math.max(0, 3 - (user.free_used || 0))}`}
                   </p>
                 </div>
                 {!user.is_pro && (
@@ -559,7 +560,7 @@ export default function Home() {
                 />
                 <div className="flex items-center justify-between mt-4">
                   <p className="text-sm text-gray-400">
-                    {user ? (user.is_pro ? 'Pro会员·无限次' : `剩余免费次数: ${getRemaining()}`) : '登录后可使用'}
+                    {user ? (user.is_pro ? `点币余额: ${user.points || 0}` : `剩余免费次数: ${getRemaining()}`) : '登录后可使用'}
                   </p>
                   <button
                     onClick={() => {
