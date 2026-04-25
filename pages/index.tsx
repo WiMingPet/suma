@@ -99,7 +99,8 @@ export default function Home() {
               phone: data.user.phone,
               is_pro: data.user.is_pro,
               daily_count: data.user.daily_count,
-              free_used: data.user.free_used ?? 0
+              free_used: data.user.free_used ?? 0,
+              points: data.user.points ?? 0
             })
             // 同步更新 localStorage
             localStorage.setItem('suma_user', JSON.stringify({
@@ -107,7 +108,8 @@ export default function Home() {
               phone: data.user.phone,
               is_pro: data.user.is_pro,
               daily_count: data.user.daily_count,
-              free_used: data.user.free_used ?? 0
+              free_used: data.user.free_used ?? 0,
+              points: data.user.points ?? 0
             }))
           } else {
             // token 无效，清除本地存储
@@ -196,7 +198,8 @@ export default function Home() {
         // 更新本地 user 状态（次数+1）
         setUser({
           ...user,
-          daily_count: (user.daily_count || 0) + 1
+          daily_count: (user.daily_count || 0) + 1,
+          points: user.points  // 保留点币
         })
 
         // 保存到本地存储
@@ -276,7 +279,8 @@ export default function Home() {
           // 更新本地 user 状态（次数+1）
           setUser({
             ...user,
-            daily_count: (user.daily_count || 0) + 1
+            daily_count: (user.daily_count || 0) + 1,
+            points: user.points  // 保留点币
           })
           
           // 保存到本地存储
@@ -390,7 +394,8 @@ export default function Home() {
         // 更新本地 user 状态（次数+1）
         setUser({
           ...user,
-          daily_count: (user.daily_count || 0) + 1
+          daily_count: (user.daily_count || 0) + 1,
+          points: user.points  // 保留点币
         })
         
         // 保存到本地存储
