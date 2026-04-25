@@ -62,11 +62,9 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
     })
     for (let i = 0; i < rowsCleared; i++) finalBoard.unshift(Array(BOARD_WIDTH).fill(0))
 
-    // 播放消除行音效（多行依次播放）
+    // 播放消除行音效（传入消除行数，行数越多音效越震撼）
     if (rowsCleared > 0) {
-      for (let i = 0; i < rowsCleared; i++) {
-        setTimeout(() => soundManager.clearLine(), i * 50)
-      }
+      soundManager.clearLine(rowsCleared)
     }
 
     const newScore = score + [0, 40, 100, 300, 1200][rowsCleared] * (level + 1)
@@ -77,6 +75,7 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
     const newPiece = getRandomPiece()
     if (checkCollision(newPiece.shape, newPiece.x, newPiece.y, finalBoard)) {
       soundManager.gameOver()  // 游戏结束音效
+      soundManager.stopBGM()   // 停止背景音乐
       setGameOver(true)
       setIsPlaying(false)
       if (intervalRef.current) clearInterval(intervalRef.current)
@@ -91,6 +90,7 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
     if (!checkCollision(piece.shape, newX, newY, board)) {
       setPiece({ ...piece, x: newX, y: newY })
       if (dx !== 0) soundManager.move()  // 左右移动音效
+      else if (dy === 1) soundManager.softDrop()  // 向下移动音效
     } else if (dy === 1) {
       soundManager.drop()  // 下落音效
       mergePiece()
@@ -117,7 +117,7 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
     
     // 一次性更新位置
     setPiece({ ...piece, y: finalY })
-    soundManager.drop()  // 下落到底音效
+    soundManager.hardDrop()   // 改为强效硬降音效
     
     // 立即固定方块
     mergePiece()
@@ -147,6 +147,8 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
 
   const startGame = () => {
     soundManager.init()  // 用户点击时初始化音效
+    soundManager.startGame()   // 播放开始音效
+    soundManager.startBGM()    // 启动背景音乐
     setBoard(Array(BOARD_HEIGHT).fill(0).map(() => Array(BOARD_WIDTH).fill(0)))
     setScore(0); setLevel(0); setGameOver(false); setIsPaused(false); setIsPlaying(true)
     setPiece(getRandomPiece())
