@@ -46,16 +46,24 @@ export async function initDatabase() {
     );
   `;
 
-  await query(createPointsTable);
   await query(createOrdersTable);
   await query(createUserProTable);
+  await query(createPointsTable);
   
-  // 迁移：添加 plan 字段
+  // 迁移：添加 plan 字段（如果不存在）
   try {
     await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS plan VARCHAR(20)`);
-    console.log('数据库迁移完成：orders 表添加 plan 字段');
+    console.log('迁移完成：orders 表添加 plan 字段');
   } catch (err) {
     console.log('迁移 plan 字段失败:', err);
+  }
+
+  // 迁移：添加 free_used 字段（如果不存在）
+  try {
+    await query(`ALTER TABLE user_pro ADD COLUMN IF NOT EXISTS free_used INT DEFAULT 0`);
+    console.log('迁移完成：user_pro 表添加 free_used 字段');
+  } catch (err) {
+    console.log('迁移 free_used 字段失败:', err);
   }
 
   console.log('数据库表初始化完成');
