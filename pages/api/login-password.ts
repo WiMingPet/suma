@@ -2,7 +2,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
-import { getUser, createOrUpdateUser, resetDailyCountIfNeeded } from '../../lib/store';
+import { getUser, createOrUpdateUser } from '../../lib/store';
+import { getFreeUsed } from '../../lib/orderService';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -24,7 +25,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: '手机号或密码错误' });
   }
 
-  resetDailyCountIfNeeded(user);
+  // 注意：不再调用 resetDailyCountIfNeeded（永久免费3次）
+
+  // 从数据库获取免费已使用次数
+  const freeUsed = await getFreeUsed(phone);
 
   const token = jwt.sign(
     { phone, loginAt: Date.now() },
@@ -39,7 +43,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       id: phone,
       phone,
       is_pro: user.isPro,
-      daily_count: Math.max(0, 3 - user.dailyCount),
+      daily_count: user.dailyCount,  // 返回已使用次数
+      free_used: freeUsed,           // 免费已使用次数
     },
   });
 }

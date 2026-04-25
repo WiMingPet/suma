@@ -1,7 +1,8 @@
 // pages/api/login.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
-import { codeStore, getOrCreateUser, resetDailyCountIfNeeded } from '../../lib/store';
+import { codeStore, getOrCreateUser } from '../../lib/store';
+import { getFreeUsed } from '../../lib/orderService';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -24,7 +25,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // 获取或创建用户
   let user = getOrCreateUser(phone);
-  resetDailyCountIfNeeded(user);
+  // 注意：不再调用 resetDailyCountIfNeeded（永久免费3次）
+
+  // 从数据库获取免费已使用次数
+  const freeUsed = await getFreeUsed(phone);
 
   // 生成 JWT token
   const token = jwt.sign(
@@ -40,7 +44,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       id: phone,
       phone,
       is_pro: user.isPro,
-      daily_count: Math.max(0, 3 - user.dailyCount),  // 返回剩余次数
+      daily_count: user.dailyCount,  // 返回已使用次数
+      free_used: freeUsed,           // 免费已使用次数
     },
   });
 }

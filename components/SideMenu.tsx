@@ -8,6 +8,7 @@ interface User {
   phone: string
   is_pro: boolean
   daily_count: number
+  free_used: number
 }
 
 interface SideMenuProps {
@@ -155,7 +156,7 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
                 <div>
                   <p className="text-white font-medium">{user.phone.slice(0, 3)}****{user.phone.slice(-4)}</p>
                   <p className="text-xs text-gray-400">
-                    {user.is_pro ? 'Pro会员' : `剩余 ${3 - (user.daily_count || 0)} 次`}
+                    {user.is_pro ? 'Pro会员·无限次' : `剩余免费次数: ${Math.max(0, 3 - (user.free_used || 0))}`}
                   </p>
                 </div>
               </div>
