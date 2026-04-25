@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { soundManager } from '@/lib/sounds'
 
 interface GameTetrisProps { onClose: () => void }
 
@@ -61,6 +62,13 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
     })
     for (let i = 0; i < rowsCleared; i++) finalBoard.unshift(Array(BOARD_WIDTH).fill(0))
 
+    // 播放消除行音效（多行依次播放）
+    if (rowsCleared > 0) {
+      for (let i = 0; i < rowsCleared; i++) {
+        setTimeout(() => soundManager.clearLine(), i * 50)
+      }
+    }
+
     const newScore = score + [0, 40, 100, 300, 1200][rowsCleared] * (level + 1)
     setScore(newScore)
     setLevel(Math.floor(newScore / 500))
@@ -68,6 +76,7 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
 
     const newPiece = getRandomPiece()
     if (checkCollision(newPiece.shape, newPiece.x, newPiece.y, finalBoard)) {
+      soundManager.gameOver()  // 游戏结束音效
       setGameOver(true)
       setIsPlaying(false)
       if (intervalRef.current) clearInterval(intervalRef.current)
@@ -81,7 +90,9 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
     const newX = piece.x + dx, newY = piece.y + dy
     if (!checkCollision(piece.shape, newX, newY, board)) {
       setPiece({ ...piece, x: newX, y: newY })
+      if (dx !== 0) soundManager.move()  // 左右移动音效
     } else if (dy === 1) {
+      soundManager.drop()  // 下落音效
       mergePiece()
     }
   }, [piece, board, isPlaying, gameOver, isPaused, checkCollision, mergePiece])
@@ -91,6 +102,7 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
     const rotated = piece.shape[0].map((_, idx) => piece.shape.map(row => row[idx]).reverse())
     if (!checkCollision(rotated, piece.x, piece.y, board)) {
       setPiece({ ...piece, shape: rotated })
+      soundManager.rotate()  // 旋转音效
     }
   }, [piece, board, isPlaying, gameOver, isPaused, checkCollision])
 
@@ -105,6 +117,7 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
     
     // 一次性更新位置
     setPiece({ ...piece, y: finalY })
+    soundManager.drop()  // 下落到底音效
     
     // 立即固定方块
     mergePiece()
@@ -133,6 +146,7 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
   }, [isPlaying, gameOver, isPaused, move, level])
 
   const startGame = () => {
+    soundManager.init()  // 用户点击时初始化音效
     setBoard(Array(BOARD_HEIGHT).fill(0).map(() => Array(BOARD_WIDTH).fill(0)))
     setScore(0); setLevel(0); setGameOver(false); setIsPaused(false); setIsPlaying(true)
     setPiece(getRandomPiece())
