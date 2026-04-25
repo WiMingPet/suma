@@ -195,12 +195,13 @@ export default function Home() {
       if (data.success) {
         setGeneratedCode(data.code)
 
-        // 更新本地 user 状态（次数+1）
-        setUser({
-          ...user,
-          daily_count: (user.daily_count || 0) + 1,
-          points: user.points  // 保留点币
-        })
+          // 更新本地 user 状态
+          const updatedUser = {
+            ...user,
+            daily_count: (user.daily_count || 0) + 1,
+            points: data.points ?? user.points
+          }
+          setUser(updatedUser)
 
         // 保存到本地存储
         const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
@@ -276,12 +277,13 @@ export default function Home() {
         if (data.success) {
           setGeneratedCode(data.code)
 
-          // 更新本地 user 状态（次数+1）
-          setUser({
+          // 更新本地 user 状态（次数+1，点币用后端返回的最新值）
+          const updatedUser = {
             ...user,
             daily_count: (user.daily_count || 0) + 1,
-            points: user.points  // 保留点币
-          })
+            points: data.points ?? user.points
+          }
+          setUser(updatedUser)
           
           // 保存到本地存储
           const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
@@ -391,12 +393,13 @@ export default function Home() {
       if (data.success) {
         setGeneratedCode(data.code)
 
-        // 更新本地 user 状态（次数+1）
-        setUser({
-          ...user,
-          daily_count: (user.daily_count || 0) + 1,
-          points: user.points  // 保留点币
-        })
+          // 更新本地 user 状态
+          const updatedUser = {
+            ...user,
+            daily_count: (user.daily_count || 0) + 1,
+            points: data.points ?? user.points
+          }
+          setUser(updatedUser)
         
         // 保存到本地存储
         const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')

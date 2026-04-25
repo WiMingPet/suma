@@ -125,9 +125,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const remaining = user.isPro ? -1 : Math.max(0, MAX_FREE - (user.dailyCount || 0))
-
-  // 获取最新点币余额
-  const finalPoints = !user.isPro ? await getUserPoints(userId) : -1
+  // 所有用户都返回点币余额（Pro 用户显示点币，免费用户显示0）
+  const finalPoints = await getUserPoints(userId)
 
   return res.status(200).json({
     success: true,
