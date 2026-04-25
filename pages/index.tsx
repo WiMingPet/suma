@@ -199,7 +199,8 @@ export default function Home() {
           const updatedUser = {
             ...user,
             daily_count: (user.daily_count || 0) + 1,
-            points: data.points ?? user.points
+            points: data.points ?? user.points,
+            free_used: data.free_used ?? user.free_used  // 添加这行
           }
           setUser(updatedUser)
 
@@ -281,7 +282,8 @@ export default function Home() {
           const updatedUser = {
             ...user,
             daily_count: (user.daily_count || 0) + 1,
-            points: data.points ?? user.points
+            points: data.points ?? user.points,
+            free_used: data.free_used ?? user.free_used  // 添加这行
           }
           setUser(updatedUser)
           
@@ -397,7 +399,8 @@ export default function Home() {
           const updatedUser = {
             ...user,
             daily_count: (user.daily_count || 0) + 1,
-            points: data.points ?? user.points
+            points: data.points ?? user.points,
+            free_used: data.free_used ?? user.free_used  // 添加这行
           }
           setUser(updatedUser)
         

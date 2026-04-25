@@ -113,9 +113,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     console.log(`生成内容长度: ${contentLength}字，消耗点币: ${cost}`)
 
-    // 非Pro用户扣点币并增加免费次数
+    // 所有用户都扣点币
+    await deductPoints(userId, cost)
+
+    // 只有免费用户才增加免费次数
     if (!isPro) {
-      await deductPoints(userId, cost)
       await incrementFreeUsed(userId)
     }
   }

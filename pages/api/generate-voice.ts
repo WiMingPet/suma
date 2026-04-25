@@ -145,9 +145,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log(`音频大小: ${Math.round(audioSize)}KB，估算时长: ${estimatedDuration}秒，消耗点币: ${cost}`)
     }
 
-    // 非Pro用户扣点币并增加免费次数
+    // 所有用户都扣点币
+    await deductPoints(userId, cost)
+
+    // 只有免费用户才增加免费次数
     if (!isPro) {
-      await deductPoints(userId, cost)
       await incrementFreeUsed(userId)
     }
   }
