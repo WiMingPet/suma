@@ -1,7 +1,6 @@
 // pages/api/payment/verify.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getOrder } from '../../../lib/orderService';
-import { createOrUpdateUser } from '../../../lib/store';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -14,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: '缺少订单号' });
   }
 
-  // 从内存获取订单
+  // 从数据库获取订单
   const order = await getOrder(out_trade_no);
   if (!order) {
     return res.status(404).json({ error: '订单不存在' });
@@ -34,6 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await new Promise(resolve => setTimeout(resolve, 500));
     waitCount++;
   }
+
   // 如果等待超时，返回未支付
   return res.status(200).json({ success: false, error: '订单未支付' });
 }

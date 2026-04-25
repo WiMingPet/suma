@@ -1,8 +1,8 @@
 // pages/api/login.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
-import { codeStore, getOrCreateUser } from '../../lib/store';
-import { getFreeUsed } from '../../lib/orderService';
+import { codeStore } from '../../lib/store';
+import { getOrCreateUserInDB, getUserPoints } from '../../lib/orderService';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -23,12 +23,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // 清除已使用的验证码
   codeStore.delete(phone);
 
-  // 获取或创建用户
-  let user = getOrCreateUser(phone);
-  // 注意：不再调用 resetDailyCountIfNeeded（永久免费3次）
-
-  // 从数据库获取免费已使用次数
-  const freeUsed = await getFreeUsed(phone);
+  // 从数据库获取或创建用户
+  const userRecord = await getOrCreateUserInDB(phone);
+  
+  // 从数据库获取点币余额
+  const points = await getUserPoints(phone);
 
   // 生成 JWT token
   const token = jwt.sign(
@@ -43,9 +42,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     user: {
       id: phone,
       phone,
-      is_pro: user.isPro,
-      daily_count: user.dailyCount,  // 返回已使用次数
-      free_used: freeUsed,           // 免费已使用次数
+      is_pro: userRecord.is_pro,
+      daily_count: 0,  // 保留兼容，不再使用
+      free_used: userRecord.free_used,
+      points: points,
     },
   });
 }

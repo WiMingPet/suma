@@ -162,6 +162,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     code: generatedCode,
     recognizedText,
     remaining: remaining,
-    points: finalPoints
+    points: finalPoints,
+    free_used: newFreeUsed
   })
 }

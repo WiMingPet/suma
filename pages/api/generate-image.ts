@@ -143,6 +143,7 @@ ${prompt ? `补充要求：${prompt}` : ''}
     success: true,
     code: generatedCode,
     remaining: remaining,
-    points: finalPoints
+    points: finalPoints,
+    free_used: newFreeUsed
   })
 }

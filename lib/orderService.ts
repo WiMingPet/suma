@@ -87,3 +87,61 @@ export async function deductPoints(userId: string, points: number): Promise<void
   }
   await query(`UPDATE user_points SET points = points - $1 WHERE user_id = $2`, [points, userId]);
 }
+// ========== 用户管理函数（数据库持久化）==========
+
+// 从数据库获取用户完整信息
+export async function getUserFromDB(userId: string) {
+  const result = await query(
+    `SELECT user_id, is_pro, free_used FROM user_pro WHERE user_id = $1`,
+    [userId]
+  );
+  return result.rows[0] || null;
+}
+
+// 从数据库创建新用户
+export async function createUserInDB(userId: string) {
+  const result = await query(
+    `INSERT INTO user_pro (user_id, is_pro, free_used) 
+     VALUES ($1, false, 0) 
+     ON CONFLICT (user_id) DO NOTHING 
+     RETURNING *`,
+    [userId]
+  );
+  return result.rows[0] || { user_id: userId, is_pro: false, free_used: 0 };
+}
+
+// 获取或创建用户（数据库版本）
+export async function getOrCreateUserInDB(userId: string) {
+  let user = await getUserFromDB(userId);
+  if (!user) {
+    user = await createUserInDB(userId);
+  }
+  return user;
+}
+
+// 更新用户 Pro 状态
+export async function updateUserProStatus(userId: string, isPro: boolean) {
+  await query(
+    `UPDATE user_pro SET is_pro = $1 WHERE user_id = $2`,
+    [isPro, userId]
+  );
+}
+
+// ========== 密码哈希管理 ==========
+
+// 获取用户密码哈希
+export async function getPasswordHash(userId: string): Promise<string | null> {
+  const result = await query(`SELECT password_hash FROM user_pro WHERE user_id = $1`, [userId]);
+  return result.rows[0]?.password_hash || null;
+}
+
+// 设置用户密码哈希
+export async function setPasswordHash(userId: string, passwordHash: string): Promise<void> {
+  await query(
+    `INSERT INTO user_pro (user_id, password_hash) 
+     VALUES ($1, $2) 
+     ON CONFLICT (user_id) 
+     DO UPDATE SET password_hash = $2`,
+    [userId, passwordHash]
+  );
+}

@@ -1,8 +1,7 @@
 // pages/api/user-info.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
-import { getUser } from '../../lib/store';
-import { getFreeUsed, getUserPoints } from '../../lib/orderService';
+import { getOrCreateUserInDB, getUserPoints } from '../../lib/orderService';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const authHeader = req.headers.authorization;
@@ -19,14 +18,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: '登录已过期' });
   }
 
-  // 获取用户（从内存）
-  const user = getUser(phone);
-  if (!user) {
-    return res.status(404).json({ error: '用户不存在' });
-  }
-
-  // 从数据库获取免费已使用次数和点币余额
-  const freeUsed = await getFreeUsed(phone);
+  // 从数据库获取用户信息
+  const userRecord = await getOrCreateUserInDB(phone);
   const points = await getUserPoints(phone);
 
   res.status(200).json({
@@ -34,10 +27,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     user: {
       id: phone,
       phone,
-      is_pro: user.isPro,
-      daily_count: user.dailyCount,
-      free_used: freeUsed,
-      points: points,  // 新增：点币余额
+      is_pro: userRecord.is_pro,
+      daily_count: 0,  // 保留兼容，不再使用
+      free_used: userRecord.free_used,
+      points: points,
     }
   });
 }

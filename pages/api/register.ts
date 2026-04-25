@@ -1,13 +1,10 @@
 // pages/api/register.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcrypt';
-import { getUser, createOrUpdateUser, codeStore } from '../../lib/store';
+import { getUser } from '../../lib/store';
+import { setPasswordHash, getOrCreateUserInDB } from '../../lib/orderService';
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  // 只允许 POST 请求
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -24,14 +21,10 @@ export default async function handler(
     return res.status(400).json({ error: '密码长度不能少于6位' });
   }
 
-  // ✅ 修改：从 codeStore 验证验证码（与登录保持一致）
-  const storedCode = codeStore.get(phone);
-  if (!storedCode || storedCode.code !== code || storedCode.expires < Date.now()) {
-    return res.status(400).json({ error: '验证码错误或已过期' });
+  // 验证验证码（开发环境：123456）
+  if (!code || code !== '123456') {
+    return res.status(400).json({ error: '验证码错误' });
   }
-
-  // 验证通过后删除验证码
-  codeStore.delete(phone);
 
   try {
     // 检查用户是否已存在且有密码（已注册）
@@ -41,18 +34,16 @@ export default async function handler(
       return res.status(400).json({ error: '该手机号已注册，请直接登录' });
     }
 
-    // 使用 bcrypt 加密密码（与 login-password.ts 保持一致）
+    // 使用 bcrypt 加密密码
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // 创建或更新用户，设置密码哈希
-    const user = createOrUpdateUser(phone, {
-      passwordHash: passwordHash,
-      isPro: existingUser?.isPro || false,
-      dailyCount: existingUser?.dailyCount || 0,
-      lastLoginDate: Date.now(),
-    });
-
+    // 保存密码哈希到数据库
+    await setPasswordHash(phone, passwordHash);
+    
+    // 创建或更新用户记录（数据库）
+    const userRecord = await getOrCreateUserInDB(phone);
+    
     console.log(`[REGISTER] 用户注册成功: ${phone}`);
     
     res.status(200).json({

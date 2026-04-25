@@ -100,7 +100,7 @@ export default function Home() {
               is_pro: data.user.is_pro,
               daily_count: data.user.daily_count,
               free_used: data.user.free_used ?? 0,
-              points: data.user.points ?? 0
+              points: data.user.points ?? 0,
             })
             // 同步更新 localStorage
             localStorage.setItem('suma_user', JSON.stringify({

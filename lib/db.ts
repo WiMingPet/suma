@@ -33,7 +33,8 @@ export async function initDatabase() {
       user_id VARCHAR(50) PRIMARY KEY,
       is_pro BOOLEAN DEFAULT FALSE,
       pro_expire TIMESTAMP,
-      free_used INT DEFAULT 0,        -- 已使用的免费次数
+      free_used INT DEFAULT 0,
+      password_hash VARCHAR(255),
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `;
@@ -65,6 +66,14 @@ export async function initDatabase() {
   } catch (err) {
     console.log('迁移 free_used 字段失败:', err);
   }
+
+  // 迁移：添加 password_hash 字段
+try {
+  await query(`ALTER TABLE user_pro ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`);
+  console.log('迁移完成：user_pro 表添加 password_hash 字段');
+} catch (err) {
+  console.log('迁移 password_hash 字段失败:', err);
+}
 
   console.log('数据库表初始化完成');
 }
