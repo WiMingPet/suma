@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getOrCreateUser } from '../../lib/store'
-import { getUserPoints, deductPoints } from '../../lib/orderService'
+import { getUserPoints, deductPoints, incrementFreeUsed, getFreeUsed } from '../../lib/orderService'
 
 const MAX_FREE = 3
 
@@ -26,8 +26,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // 使用 getOrCreateUser，自动创建用户（如果不存在）
   const user = getOrCreateUser(userId)
 
+  // 从数据库获取已使用的免费次数
+  const freeUsed = await getFreeUsed(userId)
+  const remainingCount = Math.max(0, MAX_FREE - freeUsed)
+
   // 检查次数（免费用户）
-  const remainingCount = Math.max(0, MAX_FREE - (user.dailyCount || 0))
   if (!user.isPro && remainingCount <= 0) {
     return res.status(403).json({ error: `免费次数已用完（共${MAX_FREE}次），请升级Pro会员或购买点币` })
   }
@@ -99,9 +102,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // 更新使用次数和扣点币（仅当生成成功时）
   if (generatedCode) {
-    // 计算实际字数（如果是纯代码，可估算）
+    // 计算实际字数
     let contentLength = generatedCode.length
-    // 更好的方法：提取文本内容计算中文字符
     const chineseChars = generatedCode.match(/[\u4e00-\u9fa5]/g) || []
     contentLength = chineseChars.length || generatedCode.length
     
@@ -111,21 +113,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     console.log(`生成内容长度: ${contentLength}字，消耗点币: ${cost}`)
 
-    // 非Pro用户扣点币
+    // 非Pro用户扣点币并增加免费次数
     if (!user.isPro) {
       await deductPoints(userId, cost)
-    }
-
-    // 更新免费次数（仅当免费用户且还在免费次数内）
-    if (!user.isPro && remainingCount > 0) {
-      user.dailyCount = (user.dailyCount || 0) + 1
-      const { userStore } = await import('../../lib/store')
-      userStore.set(userId, user)
+      await incrementFreeUsed(userId)
     }
   }
 
-  const remaining = user.isPro ? -1 : Math.max(0, MAX_FREE - (user.dailyCount || 0))
-  // 所有用户都返回点币余额（Pro 用户显示点币，免费用户显示0）
+  // 获取最新的剩余次数和点币余额
+  const newFreeUsed = await getFreeUsed(userId)
+  const remaining = user.isPro ? -1 : Math.max(0, MAX_FREE - newFreeUsed)
   const finalPoints = await getUserPoints(userId)
 
   return res.status(200).json({

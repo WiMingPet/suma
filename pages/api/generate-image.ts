@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getOrCreateUser } from '../../lib/store'
-import { getUserPoints, deductPoints } from '../../lib/orderService'
+import { getUserPoints, deductPoints, incrementFreeUsed, getFreeUsed } from '../../lib/orderService'
 
 const MAX_FREE = 3
 
@@ -27,8 +27,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // 使用 getOrCreateUser，自动创建用户（如果不存在）
   const user = getOrCreateUser(userId)
 
+  // 从数据库获取已使用的免费次数
+  const freeUsed = await getFreeUsed(userId)
+  const remainingCount = Math.max(0, MAX_FREE - freeUsed)
+
   // 检查次数（免费用户）
-  const remainingCount = Math.max(0, MAX_FREE - (user.dailyCount || 0))
   if (!user.isPro && remainingCount <= 0) {
     return res.status(403).json({ error: `免费次数已用完（共${MAX_FREE}次），请升级Pro会员或购买点币` })
   }
@@ -116,30 +119,24 @@ ${prompt ? `补充要求：${prompt}` : ''}
   }
 
   if (generatedCode) {
-    // 图片识别按分辨率估算点币（默认30点币）
-    // 可以更精细：根据图片大小计算（每100KB = 10点币）
-    let cost = 30  // 基础费用
+    // 图片识别按分辨率估算点币
+    let cost = 30
     if (imageBase64) {
-      const imageSize = (imageBase64.length * 0.75) / 1024  // 估算KB
+      const imageSize = (imageBase64.length * 0.75) / 1024
       cost = Math.max(30, Math.floor(imageSize / 100) * 10)
       console.log(`图片大小: ${Math.round(imageSize)}KB，消耗点币: ${cost}`)
     }
 
-    // 非Pro用户扣点币
+    // 非Pro用户扣点币并增加免费次数
     if (!user.isPro) {
       await deductPoints(userId, cost)
-    }
-
-    // 更新免费次数（仅当免费用户且还在免费次数内）
-    if (!user.isPro && remainingCount > 0) {
-      user.dailyCount = (user.dailyCount || 0) + 1
-      const { userStore } = await import('../../lib/store')
-      userStore.set(userId, user)
+      await incrementFreeUsed(userId)
     }
   }
 
-  const remaining = user.isPro ? -1 : Math.max(0, MAX_FREE - (user.dailyCount || 0))
-  // 所有用户都返回点币余额（Pro 用户显示点币，免费用户显示0）
+  // 获取最新的剩余次数和点币余额
+  const newFreeUsed = await getFreeUsed(userId)
+  const remaining = user.isPro ? -1 : Math.max(0, MAX_FREE - newFreeUsed)
   const finalPoints = await getUserPoints(userId)
 
   return res.status(200).json({
