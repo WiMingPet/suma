@@ -20,10 +20,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: '密码长度不能少于6位' });
   }
 
-  // 验证验证码（开发环境：123456）
-  if (!code || code !== '123456') {
-    return res.status(400).json({ error: '验证码错误' });
+  // 验证验证码（从 codeStore 读取）
+  const { codeStore } = await import('../../lib/store');
+  const storedCode = codeStore.get(phone);
+  if (!storedCode || storedCode.code !== code || storedCode.expires < Date.now()) {
+    return res.status(400).json({ error: '验证码错误或已过期' });
   }
+  
+  // 验证通过后删除验证码
+  codeStore.delete(phone);
 
   try {
     // 从数据库检查用户是否已有密码（已注册）
