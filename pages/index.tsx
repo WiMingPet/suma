@@ -719,6 +719,14 @@ export default function Home() {
             >
               轻松时刻 ☕
             </button>
+            <a
+              href="https://beian.miit.gov.cn"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-gray-400 hover:text-white transition"
+            >
+              粤ICP备2026044431号
+            </a>
           </div>
         </footer>
       </div>
