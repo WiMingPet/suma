@@ -440,7 +440,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>速码 - AI 应用生成器</title>
+        <title>智码 - AI 应用生成器</title>
         <meta name="description" content="使用 AI 生成 Web 应用" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
@@ -463,7 +463,7 @@ export default function Home() {
             </button>
 
             <h1 className="text-xl font-bold text-white">
-              <span className="text-blue-400">速</span>码
+              <span className="text-blue-400">智</span>码
             </h1>
 
             <div>
