@@ -70,6 +70,11 @@ export default function Home() {
   
   // 当前激活的功能标签
   const [activeTab, setActiveTab] = useState<'text' | 'image' | 'voice'>('text')
+  // 切换Tab时清空生成结果
+  useEffect(() => {
+    setGeneratedCode('');
+    setPreviewCode(null);
+  }, [activeTab]);
 
   // 生成格式（HTML 或 PDF）
   const [outputFormat, setOutputFormat] = useState<'html' | 'pdf'>('html')
@@ -745,7 +750,7 @@ export default function Home() {
         userId={user?.id || ''}
         onSuccess={() => {
           setShowPayment(false)
-          // 刷新用户信息
+          alert('支付成功！正在确认充值，请稍候...')
           fetch('/api/user-info', {
             headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
           }).then(res => res.json()).then(data => {
@@ -753,7 +758,12 @@ export default function Home() {
               console.log('支付后用户信息:', data.user);
               setUser(data.user)
               localStorage.setItem('suma_user', JSON.stringify(data.user))
+              alert(`充值成功！点币余额：${data.user.points}，感谢您的支持！`)
+            } else {
+              alert('充值已成功，但获取最新余额失败，请刷新页面查看')
             }
+          }).catch(() => {
+            alert('充值已成功，但获取最新余额失败，请刷新页面查看')
           })
         }}
       />
