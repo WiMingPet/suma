@@ -174,6 +174,25 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
           )}
         </div>
 
+        {/* 帮助与客服 */}
+        <button
+          onClick={() => {
+            alert('📞 客服联系方式：\n\n邮箱：3060302415@qq.com\n电话：15920978058\n工作时间：9:00-18:00\n\n我们会尽快回复您的问题。')
+          }}
+          className="flex items-center justify-between px-4 py-3 mx-3 my-2 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl transition border border-blue-500/20"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xl">💬</span>
+            <div className="text-left">
+              <p className="text-white font-medium">帮助与客服</p>
+              <p className="text-xs text-gray-400">遇到问题？联系我们</p>
+            </div>
+          </div>
+          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+
         {/* 标签页 */}
         <div className="flex border-b border-gray-800 flex-shrink-0">
           <button
