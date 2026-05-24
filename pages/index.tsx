@@ -775,7 +775,7 @@ export default function Home() {
               </div>
             </div>
           )}
-
+        </main>
         {/* 底部 */}
         <footer className="fixed bottom-0 left-0 right-0 bg-black/50 backdrop-blur-md border-t border-white/10 py-3">
           <div className="max-w-6xl mx-auto px-4 flex items-center justify-center gap-4">
