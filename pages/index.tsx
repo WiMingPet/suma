@@ -46,6 +46,8 @@ export default function Home() {
   // 生成功能状态
   const [generatedCode, setGeneratedCode] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  // 在现有 useState 后面添加
+  const [hasConsentedToAI, setHasConsentedToAI] = useState(false);
 
   // 各个Tab独立的输入状态
   const [textPrompt, setTextPrompt] = useState('')      // 文字生成输入
@@ -164,6 +166,25 @@ export default function Home() {
       }
     }
   }, [user])
+
+  // AI授权检查函数
+  const checkAIConsent = async () => {
+    if (hasConsentedToAI) return true;
+    
+    return new Promise((resolve) => {
+      const confirmed = window.confirm(
+        '速码方舟将把您的输入内容发送给第三方AI服务商（阿里云）以生成代码。\n\n' +
+        '服务商不会使用您的数据训练其模型。\n\n' +
+        '是否继续？'
+      );
+      if (confirmed) {
+        setHasConsentedToAI(true);
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    });
+  };
   
   // 文字生成应用
   const handleGenerateText = async () => {
@@ -177,11 +198,17 @@ export default function Home() {
     alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
     return
   }
-    
-    if (!textPrompt.trim()) {
-      alert('请输入应用描述')
-      return
-    }
+  
+  // 添加 AI 授权检查
+  if (!(await checkAIConsent())) {
+    alert('您需要同意AI服务协议才能使用此功能');
+    return;
+  }
+  
+  if (!textPrompt.trim()) {
+    alert('请输入应用描述')
+    return
+  }
 
     setIsGenerating(true)
 
@@ -253,6 +280,11 @@ export default function Home() {
   if (!user.is_pro && getRemaining() <= 0) {
     alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
     return
+  }
+  // AI 授权检查（新增）
+  if (!(await checkAIConsent())) {
+    alert('您需要同意AI服务协议才能使用此功能');
+    return;
   }
     
     if (!imageFile) {
@@ -381,6 +413,11 @@ export default function Home() {
   if (!user.is_pro && getRemaining() <= 0) {
     alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
     return
+  }
+  // AI 授权检查（新增）
+  if (!(await checkAIConsent())) {
+    alert('您需要同意AI服务协议才能使用此功能');
+    return;
   }
 
     setIsGeneratingVoice(true)
@@ -688,7 +725,12 @@ export default function Home() {
           {generatedCode && (
             <div className="mt-8 bg-gray-900/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-700">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-white">生成结果</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-white">生成结果</h3>
+                  <span className="px-2 py-0.5 text-xs bg-purple-600/30 text-purple-300 rounded-full border border-purple-500/50">
+                    🤖 AI生成
+                  </span>
+                </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setPreviewCode(generatedCode)}
@@ -702,6 +744,26 @@ export default function Home() {
                   >
                     下载 HTML
                   </button>
+                  {/* 举报按钮 */}
+                  <button
+                    onClick={() => {
+                      const reason = prompt('请描述举报原因（选填）：');
+                      fetch('/api/report', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          content: generatedCode,
+                          reason: reason || '用户举报',
+                          userId: user?.id,
+                          timestamp: new Date().toISOString()
+                        })
+                      }).catch(console.error);
+                      alert('举报已提交，我们会尽快处理。感谢反馈！');
+                    }}
+                    className="px-4 py-2 bg-red-600/20 text-red-400 rounded-lg text-sm hover:bg-red-600/30 transition"
+                  >
+                    🚨 举报
+                  </button>
                 </div>
               </div>
               <div className="h-64 bg-gray-800 rounded-lg overflow-hidden">
@@ -713,11 +775,10 @@ export default function Home() {
               </div>
             </div>
           )}
-        </main>
 
         {/* 底部 */}
         <footer className="fixed bottom-0 left-0 right-0 bg-black/50 backdrop-blur-md border-t border-white/10 py-3">
-          <div className="max-w-6xl mx-auto px-4 flex items-center justify-center">
+          <div className="max-w-6xl mx-auto px-4 flex items-center justify-center gap-4">
             <button
               onClick={() => setShowGames(true)}
               className="text-sm text-gray-400 hover:text-white transition"
@@ -731,6 +792,14 @@ export default function Home() {
               className="text-sm text-gray-400 hover:text-white transition"
             >
               粤ICP备2026044431号
+            </a>
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-gray-400 hover:text-white transition"
+            >
+              隐私政策
             </a>
           </div>
         </footer>
