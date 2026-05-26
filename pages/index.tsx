@@ -69,6 +69,7 @@ export default function Home() {
   
   // 预览弹窗
   const [previewCode, setPreviewCode] = useState<string | null>(null)
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   
   // 当前激活的功能标签
   const [activeTab, setActiveTab] = useState<'text' | 'image' | 'voice'>('text')
@@ -776,33 +777,48 @@ export default function Home() {
             </div>
           )}
         </main>
-        {/* 底部 */}
-        <footer className="fixed bottom-0 left-0 right-0 bg-black/50 backdrop-blur-md border-t border-white/10 py-3">
-          <div className="max-w-6xl mx-auto px-4 flex items-center justify-center gap-4">
-            <button
-              onClick={() => setShowGames(true)}
-              className="text-sm text-gray-400 hover:text-white transition"
-            >
-              轻松时刻 ☕
-            </button>
-            <a
-              href="https://beian.miit.gov.cn"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-gray-400 hover:text-white transition"
-            >
-              粤ICP备2026044431号
-            </a>
-            <a
-              href="/privacy"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-gray-400 hover:text-white transition"
-            >
-              隐私政策
-            </a>
+      {/* 底部 */}
+      <footer className="fixed bottom-0 left-0 right-0 bg-black/50 backdrop-blur-md border-t border-white/10 py-3">
+        <div className="max-w-6xl mx-auto px-4 flex items-center justify-center gap-4">
+          <button
+            onClick={() => setShowGames(true)}
+            className="text-sm text-gray-400 hover:text-white transition"
+          >
+            轻松时刻 ☕
+          </button>
+          <a
+            href="https://beian.miit.gov.cn"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-gray-400 hover:text-white transition"
+          >
+            粤ICP备2026044431号
+          </a>
+          <button
+            onClick={() => setShowPrivacyModal(true)}
+            className="text-sm text-gray-400 hover:text-white transition cursor-pointer"
+          >
+            隐私政策
+          </button>
+        </div>
+      </footer>
+
+        {/* 隐私政策模态框 */}
+        {showPrivacyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setShowPrivacyModal(false)}>
+            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col relative" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">隐私政策</h3>
+                <button onClick={() => setShowPrivacyModal(false)} className="text-gray-400 hover:text-gray-600 transition text-2xl leading-none">
+                  ✕
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto p-4">
+                <iframe src="/privacy" className="w-full h-full min-h-[400px] border-0" title="隐私政策" />
+              </div>
+            </div>
           </div>
-        </footer>
+        )}
       </div>
 
       {/* 登录弹窗 */}
