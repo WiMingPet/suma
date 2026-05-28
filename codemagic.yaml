@@ -8,6 +8,7 @@ workflows:
       vars:
         XCODE_SCHEME: "App"
     scripts:
+    scripts:
       - name: Install npm dependencies
         script: npm install
       - name: Build web project
@@ -32,11 +33,11 @@ workflows:
     artifacts:
       - /tmp/xcodebuild_logs/*.log
     publishing:
-      email:
-        recipients:
-          - postmaster@sumaai.cn
-        notify: success
       app_store_connect:
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY
         key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
         issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+      email:
+        recipients:
+          - postmaster@sumaai.cn
+        notify: success
