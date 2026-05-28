@@ -1,7 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  swcMinify: true,
-}
+  output: 'export',
+  trailingSlash: true,
+  images: { unoptimized: true },
 
-module.exports = nextConfig
+  env: {
+    NEXT_PUBLIC_APP_NAME: '速码方舟AI软件',
+    NEXT_PUBLIC_APP_VERSION: '1.0.0',
+  },
+};
+
+module.exports = nextConfig;

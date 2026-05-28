@@ -1,12 +1,15 @@
 {
-  "name": "suma",
+  "name": "速码方舟ai软件",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:ios": "cross-env IS_CAPACITOR=true next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "cap:sync": "npx cap sync ios",
+    "cap:open": "npx cap open ios"
   },
   "dependencies": {
     "@alicloud/dysmsapi20170525": "^4.5.1",
@@ -14,6 +17,9 @@
     "@alicloud/openapi-client": "^0.4.15",
     "@alicloud/pop-core": "^1.7.12",
     "@alicloud/tea-util": "^1.4.9",
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/ios": "^8.3.4",
+    "@capgo/native-purchases": "^8.4.0",
     "@supabase/supabase-js": "^2.39.0",
     "@types/three": "^0.160.0",
     "audiobuffer-to-wav": "^1.0.0",
@@ -28,6 +34,7 @@
     "three": "^0.160.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.3.1",
     "@types/bcrypt": "^6.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.11.5",
@@ -35,6 +42,7 @@
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
     "autoprefixer": "^10.4.17",
+    "cross-env": "^10.1.0",
     "eslint": "^8.56.0",
     "eslint-config-next": "14.2.35",
     "postcss": "^8.4.33",

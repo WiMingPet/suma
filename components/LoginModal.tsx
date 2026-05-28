@@ -86,7 +86,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const res = await fetch('/api/send-sms', {
+      const res = await fetch('https://sumaai.cn/api/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone })
@@ -122,7 +122,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const res = await fetch('/api/send-sms', {
+      const res = await fetch('https://sumaai.cn/api/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: registerPhone })
@@ -157,7 +157,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const res = await fetch('/api/login', {
+      const res = await fetch('https://sumaai.cn/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, code })
@@ -192,7 +192,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const res = await fetch('/api/login-password', {
+      const res = await fetch('https://sumaai.cn/api/login-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, password })
@@ -226,7 +226,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const res = await fetch('/api/send-sms', {
+      const res = await fetch('https://sumaai.cn/api/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone })
@@ -266,7 +266,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const res = await fetch('/api/reset-password', {
+      const res = await fetch('https://sumaai.cn/api/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, code, newPassword })
@@ -321,7 +321,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const res = await fetch('/api/register', {
+      const res = await fetch('https://sumaai.cn/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
