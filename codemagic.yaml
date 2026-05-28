@@ -17,8 +17,7 @@ workflows:
         script: npx cap sync ios
       - name: Build iOS app
         script: |
-          cd ios/App
-          xcodebuild build -workspace App.xcworkspace -scheme App -configuration Release -sdk iphoneos
+          xcodebuild -workspace $CM_BUILD_DIR/ios/App/App.xcworkspace -scheme App -configuration Release -sdk iphoneos build
     artifacts:
       - /tmp/xcodebuild_logs/*.log
     publishing:
