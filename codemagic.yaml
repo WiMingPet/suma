@@ -5,7 +5,6 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.sumaai.app
-      team_id: 892N82TP6H   # <--- 移到这里，和 ios_signing 平级
       vars:
         XCODE_SCHEME: "App"
     scripts:
@@ -17,7 +16,7 @@ workflows:
         script: npx cap sync ios
       - name: Build iOS app
         script: |
-          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos build
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos build DEVELOPMENT_TEAM=892N82TP6H
     artifacts:
       - /tmp/xcodebuild_logs/*.log
     publishing:
