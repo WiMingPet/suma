@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "build:ios": "cross-env IS_CAPACITOR=true next build",
-    "start": "next start",
-    "lint": "next lint",
-    "cap:sync": "npx cap sync ios",
-    "cap:open": "npx cap open ios"
+      "dev": "next dev",
+      "build": "next build",
+      "build:ios": "cross-env IS_CAPACITOR=true next build && next export",
+      "start": "next start",
+      "lint": "next lint",
+      "cap:sync": "npx cap sync ios",
+      "cap:open": "npx cap open ios"
   },
   "dependencies": {
     "@alicloud/dysmsapi20170525": "^4.5.1",
