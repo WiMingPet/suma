@@ -5,6 +5,7 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.sumaai.app
+        team_id: 892N82TP6H
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
