@@ -33,6 +33,10 @@ workflows:
     artifacts:
       - /tmp/xcodebuild_logs/*.log
     publishing:
+      email:
+        recipients:
+          - postmaster@sumaai.cn
+        notify: success
       app_store_connect:
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY
         key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
