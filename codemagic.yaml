@@ -12,7 +12,9 @@ workflows:
       - name: Install npm dependencies
         script: npm install
       - name: Sync Capacitor
-        script: npx cap sync ios
+        script: |
+          npm install -g @capacitor/cli
+          npx cap sync ios
       - name: Build iOS app
         script: |
           cd ios/App
