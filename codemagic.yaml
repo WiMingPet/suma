@@ -40,4 +40,5 @@ workflows:
       email:
         recipients:
           - postmaster@sumaai.cn
-        notify: success
+        notify:
+          success: true
