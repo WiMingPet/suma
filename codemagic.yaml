@@ -28,9 +28,31 @@ workflows:
         script: npx cap sync ios
       - name: Build iOS app
         script: |
-          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos build CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="iPhone Distribution" PROVISIONING_PROFILE_SPECIFIER="SumaAppStore" DEVELOPMENT_TEAM=892N82TP6H
+          # 1. 清理旧构建
+          xcodebuild clean -project ios/App/App.xcodeproj -scheme App
+          # 2. 归档 (Archive)
+          xcodebuild archive -project ios/App/App.xcodeproj -scheme App -archivePath $HOME/App.xcarchive CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="iPhone Distribution" PROVISIONING_PROFILE_SPECIFIER="SumaAppStore" DEVELOPMENT_TEAM=892N82TP6H
+          # 3. 导出 IPA
+          xcodebuild -exportArchive -archivePath $HOME/App.xcarchive -exportPath $HOME -exportOptionsPlist <(cat <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>teamID</key>
+              <string>892N82TP6H</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>com.sumaai.app</key>
+                  <string>SumaAppStore</string>
+              </dict>
+          </dict>
+          </plist>
+          EOF)
     artifacts:
       - /tmp/xcodebuild_logs/*.log
+      - $HOME/*.ipa
       - /Users/builder/Library/Developer/Xcode/DerivedData/App-*/Build/Products/Release-iphoneos/*.ipa
     publishing:
       app_store_connect:
