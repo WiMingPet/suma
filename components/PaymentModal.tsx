@@ -8,14 +8,15 @@ interface PaymentModalProps {
   onClose: () => void;
   userId: string;
   onSuccess: () => void;
+  plan?: 'month' | 'season' | 'year';
 }
 
-export default function PaymentModal({ isOpen, onClose, userId, onSuccess }: PaymentModalProps) {
+export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan: initialPlan }: PaymentModalProps) {
   const [qrCode, setQrCode] = useState('');
   const [outTradeNo, setOutTradeNo] = useState('');
   const [loading, setLoading] = useState(false);
   const [method, setMethod] = useState<'qrcode' | 'h5'>('qrcode');
-  const [plan, setPlan] = useState<'month' | 'season' | 'year'>('month');
+  const [plan, setPlan] = useState<'month' | 'season' | 'year'>(initialPlan || 'month');  // ✅ 修正
 
   const planPrices = { month: 29.9, season: 69.9, year: 199 };
   const planPoints = { month: 500, season: 1500, year: 5000 };
