@@ -7,6 +7,7 @@ workflows:
         bundle_identifier: com.sumaai.app
       vars:
         XCODE_SCHEME: "App"
+        BUILD_NUMBER: 2
     scripts:
       - name: Install npm dependencies
         script: npm install
@@ -26,6 +27,10 @@ workflows:
           echo "out folder verification passed"
       - name: Sync Capacitor
         script: npx cap sync ios
+      - name: Set build number  # <--- 新增这个步骤
+        script: |
+          cd ios/App
+          agvtool new-version -all $BUILD_NUMBER
       - name: Build iOS app
         script: |
           # 1. 清理旧构建
