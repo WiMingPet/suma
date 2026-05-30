@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/router' 
 import AppCard from './AppCard'
 
 interface User {
@@ -28,11 +29,17 @@ interface SavedApp {
 }
 
 export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<'apps' | 'favorites'>('apps')
   const [apps, setApps] = useState<SavedApp[]>([])
   const [favorites, setFavorites] = useState<SavedApp[]>([])
   const [loading, setLoading] = useState(false)
   const [previewCode, setPreviewCode] = useState<string | null>(null)
+
+  const goToMemberCenter = () => {
+    onClose()  // 先关闭侧边栏
+    router.push('/member-center')
+  }
 
   const loadApps = () => {
     if (!user) return
@@ -154,7 +161,10 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
                 <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
                   {user.phone.slice(-2)}
                 </div>
-                <div>
+                <div 
+                  onClick={goToMemberCenter}
+                  className="cursor-pointer hover:bg-white/5 transition rounded-lg p-2 -m-2"
+                >
                   <p className="text-white font-medium">{user.phone.slice(0, 3)}****{user.phone.slice(-4)}</p>
                   <p className="text-xs text-gray-400">
                     {user.is_pro ? `点币余额: ${user.points || 0}` : `剩余免费次数: ${Math.max(0, 3 - (user.free_used || 0))}`}
