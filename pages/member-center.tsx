@@ -1,5 +1,6 @@
 // pages/member-center.tsx
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import PaymentModal from '../components/PaymentModal';
 import { getPlatform } from '../lib/payment';
 
@@ -11,6 +12,7 @@ interface UserInfo {
 }
 
 export default function MemberCenter() {
+  const router = useRouter();
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'month' | 'season' | 'year'>('month');
@@ -23,16 +25,44 @@ export default function MemberCenter() {
     year: { name: '年卡', price: 199, points: 5000, days: 365 },
   };
 
-  // 获取用户信息
+  // 获取用户信息 - 修正版
   const fetchUserInfo = async () => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) return;
+      console.log('获取到的 token:', token);  // 调试
+      
+      if (!token) {
+        console.log('未找到 token');
+        setLoading(false);
+        return;
+      }
+      
       const res = await fetch('https://sumaai.cn/api/user-info', {
         headers: { Authorization: `Bearer ${token}` }
       });
+      
       const data = await res.json();
-      setUserInfo(data);
+      console.log('API 返回数据:', data);  // 调试
+      
+      // 根据实际返回结构解析
+      if (data.success && data.user) {
+        setUserInfo({
+          phone: data.user.phone,
+          points: data.user.points,
+          is_pro: data.user.is_pro,
+          pro_expire_at: data.user.pro_expire_at
+        });
+      } else if (data.phone) {
+        // 直接返回用户对象
+        setUserInfo({
+          phone: data.phone,
+          points: data.points,
+          is_pro: data.is_pro,
+          pro_expire_at: data.pro_expire_at
+        });
+      } else {
+        console.error('无法解析用户数据');
+      }
     } catch (error) {
       console.error('获取用户信息失败:', error);
     } finally {
@@ -58,26 +88,41 @@ export default function MemberCenter() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      {/* 头部 */}
-      <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6">
-        <h1 className="text-2xl font-bold">会员中心</h1>
-        <div className="mt-4 flex justify-between items-end">
-          <div>
-            <p className="text-sm opacity-90">手机号</p>
-            <p className="text-lg font-semibold">{userInfo?.phone || '未登录'}</p>
+      <div className="min-h-screen bg-gray-50 pb-20">
+        {/* 头部 */}
+        <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6">
+          {/* 返回按钮和标题行 */}
+          <div className="flex items-center justify-between mb-4">
+            <button 
+              onClick={() => router.back()} 
+              className="p-2 hover:bg-white/20 rounded-lg transition flex items-center gap-1"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              返回
+            </button>
+            <h1 className="text-xl font-bold">会员中心</h1>
+            <div className="w-16"></div> {/* 占位保持对称 */}
           </div>
-          <div className="text-right">
-            <p className="text-sm opacity-90">点币余额</p>
-            <p className="text-2xl font-bold">{userInfo?.points || 0}</p>
+          
+          {/* 用户信息 */}
+          <div className="mt-4 flex justify-between items-end">
+            <div>
+              <p className="text-sm opacity-90">手机号</p>
+              <p className="text-lg font-semibold">{userInfo?.phone || '未登录'}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm opacity-90">点币余额</p>
+              <p className="text-2xl font-bold">{userInfo?.points || 0}</p>
+            </div>
           </div>
+          {userInfo?.is_pro && userInfo?.pro_expire_at && (
+            <div className="mt-3 text-sm bg-white/20 rounded-lg p-2 text-center">
+              会员有效期至：{new Date(userInfo.pro_expire_at).toLocaleDateString()}
+            </div>
+          )}
         </div>
-        {userInfo?.is_pro && userInfo?.pro_expire_at && (
-          <div className="mt-3 text-sm bg-white/20 rounded-lg p-2 text-center">
-            会员有效期至：{new Date(userInfo.pro_expire_at).toLocaleDateString()}
-          </div>
-        )}
-      </div>
 
       {/* 套餐列表 */}
       <div className="p-4 space-y-4">

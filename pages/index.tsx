@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
 import dynamic from 'next/dynamic'
+import { useRouter } from 'next/router'
 
 // 动态导入 Three.js 背景组件（避免 SSR 问题）
 const ThreeBackground = dynamic(() => import('../components/ThreeBackground'), {
@@ -42,6 +43,11 @@ export default function Home() {
   const [showGames, setShowGames] = useState(false)
   const [currentGame, setCurrentGame] = useState<string | null>(null)
   const [showPayment, setShowPayment] = useState(false)
+  const router = useRouter();
+
+  const goToMemberCenter = () => {
+    router.push('/member-center');
+  };
   
   // 生成功能状态
   const [generatedCode, setGeneratedCode] = useState('')
@@ -512,7 +518,10 @@ export default function Home() {
             <div>
             {user ? (
               <div className="flex items-center gap-3">
-                <div className="text-right">
+                <div 
+                  onClick={goToMemberCenter}
+                  className="text-right cursor-pointer hover:opacity-80 transition"
+                >
                   <p className="text-sm text-white">{user.phone.slice(0, 3)}****{user.phone.slice(-4)}</p>
                   <p className="text-xs text-gray-400">
                     {user.is_pro ? `点币余额: ${user.points || 0}` : `剩余免费次数: ${Math.max(0, 3 - (user.free_used || 0))}`}
@@ -533,7 +542,7 @@ export default function Home() {
                   {user.phone.slice(-2)}
                 </button>
               </div>
-            ) : (
+            ) : ( 
               <button
                 onClick={() => setShowLogin(true)}
                 className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium"
