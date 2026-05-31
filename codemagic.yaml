@@ -7,7 +7,7 @@ workflows:
         bundle_identifier: com.sumaai.app
       vars:
         XCODE_SCHEME: "App"
-        BUILD_NUMBER: 3
+        BUILD_NUMBER: 4
         MARKETING_VERSION: 1.1
     scripts:
       - name: Install npm dependencies
