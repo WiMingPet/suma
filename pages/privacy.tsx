@@ -5,8 +5,8 @@ export default function Privacy() {
   return (
     <>
       <Head>
-        <title>隐私政策 - 速码方舟AI</title>
-        <meta name="description" content="速码方舟AI隐私政策" />
+        <title>隐私政策 - 速码方舟AI软件</title>
+        <meta name="description" content="速码方舟AI软件隐私政策" />
       </Head>
       <div className="min-h-screen bg-gray-50 py-12 px-4">
         <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg p-8">
@@ -16,7 +16,7 @@ export default function Privacy() {
           <div className="space-y-6 text-gray-700">
             <section>
               <h2 className="text-xl font-semibold mb-3">1. 信息收集</h2>
-              <p>速码方舟AI App（以下简称“本App”）由广州速码智能信息有限公司（以下简称“我们”）运营。为了向您提供AI代码生成服务，我们可能会收集以下信息：</p>
+              <p>速码方舟AI软件 App（以下简称“本App”）由广州速码智能信息有限公司（以下简称“我们”）运营。为了向您提供AI代码生成服务，我们可能会收集以下信息：</p>
               <ul className="list-disc pl-6 mt-2 space-y-1">
                 <li><strong>手机号</strong>：用于用户注册、登录及账户识别。</li>
                 <li><strong>提示词/问题描述</strong>：您在使用文字生成、图片识别、语音对话功能时输入的文本内容。</li>

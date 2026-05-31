@@ -180,7 +180,7 @@ export default function Home() {
     
     return new Promise((resolve) => {
       const confirmed = window.confirm(
-        '速码方舟将把您的输入内容发送给第三方AI服务商（阿里云）以生成代码。\n\n' +
+        '速码方舟AI软件将把您的输入内容发送给第三方AI服务商（阿里云）以生成代码。\n\n' +
         '服务商不会使用您的数据训练其模型。\n\n' +
         '是否继续？'
       );
@@ -489,7 +489,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>速码方舟 - AI 应用生成器</title>
+        <title>速码方舟AI软件 - AI 应用生成器</title>
         <meta name="description" content="使用 AI 生成 Web 应用" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
@@ -512,7 +512,7 @@ export default function Home() {
             </button>
 
             <h1 className="text-xl font-bold text-white">
-              <span className="text-blue-400">速码</span>方舟
+              <span className="text-blue-400">速码</span>方舟AI软件
             </h1>
 
             <div>

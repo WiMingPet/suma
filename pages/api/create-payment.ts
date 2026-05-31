@@ -111,7 +111,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const bizContent = {
     out_trade_no: outTradeNo,
     total_amount: amount,
-    subject: `速码AI ${planName}`,
+    subject: `速码方舟AI软件 ${planName}`,
   };
 
     if (type === 'qrcode') {
@@ -157,7 +157,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const bizContent = {
         out_trade_no: outTradeNo,
         total_amount: amount,
-        subject: '速码AI Pro会员',
+        subject: '速码方舟AI软件 Pro会员',
         product_code: 'QUICK_WAP_WAY',
       };
 
