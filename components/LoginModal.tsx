@@ -17,6 +17,35 @@ interface LoginModalProps {
 
 type LoginMode = 'code' | 'password' | 'register'
 
+// ========== 带超时和重试的 fetch ==========
+const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 15000, retries = 2) => {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      lastError = error as Error;
+      console.log(`请求失败，第 ${attempt + 1} 次尝试:`, error);
+      
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+  }
+  
+  throw lastError || new Error('请求失败');
+};
+
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps) {
   // UI 状态
   const [loginMode, setLoginMode] = useState<LoginMode>('code')
@@ -86,7 +115,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const res = await fetch('https://sumaai.cn/api/send-sms', {
+      const res = await fetchWithTimeout('https://sumaai.cn/api/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone })
@@ -105,7 +134,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         setError(data.error || '发送失败')
       }
     } catch (err) {
-      setError('网络错误，请稍后重试')
+      console.error('发送注册验证码错误:', err)
+      setError('网络连接失败，请检查网络后重试')
     } finally {
       setSending(false)
     }
@@ -122,7 +152,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const res = await fetch('https://sumaai.cn/api/send-sms', {
+      const res = await fetchWithTimeout('https://sumaai.cn/api/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: registerPhone })
@@ -140,7 +170,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         setError(data.error || '发送失败')
       }
     } catch (err) {
-      setError('网络错误，请稍后重试')
+      console.error('发送注册验证码错误:', err)
+      setError('网络连接失败，请检查网络后重试')
     } finally {
       setSending(false)
     }
@@ -157,7 +188,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const res = await fetch('https://sumaai.cn/api/login', {
+      const res = await fetchWithTimeout('https://sumaai.cn/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, code })
@@ -175,7 +206,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         setError(data.error || '登录失败')
       }
     } catch (err) {
-      setError('网络错误，请稍后重试')
+      console.error('登录请求失败:', err)
+      setError('网络连接失败，请检查网络后重试')
     } finally {
       setLoading(false)
     }
@@ -192,7 +224,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const res = await fetch('https://sumaai.cn/api/login-password', {
+      const res = await fetchWithTimeout('https://sumaai.cn/api/login-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, password })
@@ -209,7 +241,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         setError(data.error || '手机号或密码错误')
       }
     } catch (err) {
-      setError('网络错误，请稍后重试')
+      console.error('密码登录请求失败:', err)
+      setError('网络连接失败，请检查网络后重试')
     } finally {
       setLoading(false)
     }
@@ -226,7 +259,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const res = await fetch('https://sumaai.cn/api/send-sms', {
+      const res = await fetchWithTimeout('https://sumaai.cn/api/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone })
@@ -245,7 +278,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         setError(data.error || '发送失败')
       }
     } catch (err) {
-      setError('网络错误，请稍后重试')
+      console.error('忘记密码发送验证码错误:', err)
+      setError('网络连接失败，请检查网络后重试')
     } finally {
       setSending(false)
     }
@@ -266,7 +300,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const res = await fetch('https://sumaai.cn/api/reset-password', {
+      const res = await fetchWithTimeout('https://sumaai.cn/api/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, code, newPassword })
@@ -285,7 +319,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         setError(data.error || '重置失败')
       }
     } catch (err) {
-      setError('网络错误，请稍后重试')
+      console.error('重置密码请求失败:', err)
+      setError('网络连接失败，请检查网络后重试')
     } finally {
       setLoading(false)
     }
@@ -321,7 +356,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const res = await fetch('https://sumaai.cn/api/register', {
+      const res = await fetchWithTimeout('https://sumaai.cn/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -348,7 +383,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         setError(data.error || '注册失败')
       }
     } catch (err) {
-      setError('注册失败，请稍后重试')
+      console.error('注册请求失败:', err)
+      setError('网络连接失败，请稍后重试')
     } finally {
       setLoading(false)
     }

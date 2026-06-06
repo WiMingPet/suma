@@ -355,59 +355,95 @@ export default function Home() {
 
   // 开始录音
   const startRecording = async () => {
+    console.log('=== 开始录音 ===');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = mediaRecorder
-      audioChunksRef.current = []
+      console.log('请求麦克风权限...');
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('麦克风授权成功，track数量:', stream.getTracks().length);
+      
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (e) => {
-        audioChunksRef.current.push(e.data)
-      }
+        console.log('收到音频数据，大小:', e.data.size);
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        console.log('录音停止，总数据块数:', audioChunksRef.current.length);
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        console.log('音频Blob大小:', audioBlob.size);
         
-        // 转换为 base64
-        const reader = new FileReader()
+        const reader = new FileReader();
         reader.onload = async (e) => {
-          const base64 = (e.target?.result as string).split(',')[1]
-          await generateFromVoice(base64)
-        }
-        reader.readAsDataURL(audioBlob)
+          const base64 = (e.target?.result as string).split(',')[1];
+          console.log('Base64长度:', base64?.length);
+          await generateFromVoice(base64);
+        };
+        reader.onerror = (err) => {
+          console.error('FileReader错误:', err);
+        };
+        reader.readAsDataURL(audioBlob);
         
         // 停止所有轨道
-        stream.getTracks().forEach(track => track.stop())
+        stream.getTracks().forEach(track => {
+          console.log('停止track:', track.kind);
+          track.stop();
+        });
+      };
+
+      mediaRecorder.start();
+      console.log('MediaRecorder已启动');
+      setIsRecording(true);
+      setRecordingTime(0);
+
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
       }
-
-      mediaRecorder.start()
-      setIsRecording(true)
-      setRecordingTime(0)
-
       timerRef.current = setInterval(() => {
         setRecordingTime(t => {
           if (t >= 30) {
-            stopRecording()
-            return t
+            console.log('录音达到30秒，自动停止');
+            stopRecording();
+            return t;
           }
-          return t + 1
-        })
-      }, 1000)
+          return t + 1;
+        });
+      }, 1000);
     } catch (err) {
-      alert('无法访问麦克风，请检查权限')
+      console.error('麦克风错误详情:', err);
+      console.error('错误名称:', err.name);
+      console.error('错误消息:', err.message);
+      
+      if (err.name === 'NotAllowedError') {
+        alert('请允许麦克风权限以使用语音功能');
+      } else if (err.name === 'NotFoundError') {
+        alert('未检测到麦克风设备');
+      } else if (err.name === 'NotReadableError') {
+        alert('麦克风被其他应用占用');
+      } else {
+        alert('麦克风初始化失败: ' + err.message);
+      }
     }
-  }
+  };
 
   // 停止录音
   const stopRecording = () => {
+    console.log('=== 停止录音 ===');
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
       if (timerRef.current) {
-        clearInterval(timerRef.current)
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
+    } else {
+      console.log('无法停止录音：mediaRecorder不存在或未在录音');
     }
-  }
+  };
 
   // 从语音生成应用
   const generateFromVoice = async (audioBase64: string) => {
