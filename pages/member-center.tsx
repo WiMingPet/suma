@@ -37,7 +37,7 @@ export default function MemberCenter() {
         return;
       }
       
-      const res = await fetch('https://sumaai.cn/api/user-info', {
+      const res = await fetch('https://suma.zeabur.app/api/user-info', {
         headers: { Authorization: `Bearer ${token}` }
       });
       

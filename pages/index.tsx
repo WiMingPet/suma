@@ -102,7 +102,7 @@ export default function Home() {
     
     if (token && savedUser) {
       // 从后端获取最新的用户信息（包括最新的 daily_count）
-      fetch('https://sumaai.cn/api/user-info', {
+      fetch('https://suma.zeabur.app/api/user-info', {
         headers: { Authorization: `Bearer ${token}` }
       })
         .then(res => res.json())
@@ -220,7 +220,7 @@ export default function Home() {
     setIsGenerating(true)
 
     try {
-      const res = await fetch('https://sumaai.cn/api/generate-text', {
+      const res = await fetch('https://suma.zeabur.app/api/generate-text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -307,7 +307,7 @@ export default function Home() {
       reader.onload = async (e) => {
         const base64 = (e.target?.result as string).split(',')[1]
         
-        const res = await fetch('https://sumaai.cn/api/generate-image', {
+        const res = await fetch('https://suma.zeabur.app/api/generate-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -466,7 +466,7 @@ export default function Home() {
     setIsGeneratingVoice(true)
 
     try {
-      const res = await fetch('https://sumaai.cn/api/generate-voice', {
+      const res = await fetch('https://suma.zeabur.app/api/generate-voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -794,7 +794,7 @@ export default function Home() {
                   <button
                     onClick={() => {
                       const reason = prompt('请描述举报原因（选填）：');
-                      fetch('https://sumaai.cn/api/report', {
+                      fetch('https://suma.zeabur.app/api/report', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -881,7 +881,7 @@ export default function Home() {
         onSuccess={() => {
           setShowPayment(false)
           alert('支付成功！正在确认充值，请稍候...')
-          fetch('https://sumaai.cn/api/user-info', {
+          fetch('https://suma.zeabur.app/api/user-info', {
             headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
           }).then(res => res.json()).then(data => {
             if (data.success) {

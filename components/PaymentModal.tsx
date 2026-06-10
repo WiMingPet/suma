@@ -71,7 +71,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
     setLoading(true);
     try {
       const amount = planPrices[plan];
-      const res = await fetch('https://sumaai.cn/api/create-payment', {
+      const res = await fetch('https://suma.zeabur.app/api/create-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: method, amount, userId, plan }),
