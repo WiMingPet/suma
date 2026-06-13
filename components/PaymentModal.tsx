@@ -118,7 +118,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/order-status?outTradeNo=${outTradeNo}`);
+        const res = await fetch(`https://suma.zeabur.app/api/order-status?outTradeNo=${outTradeNo}`);
         const data = await res.json();
         if (data.status === 'paid') {
           clearInterval(interval);

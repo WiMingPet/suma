@@ -2,13 +2,15 @@ workflows:
   ios-workflow:
     name: iOS Build
     environment:
+      groups:
+        - app_config  # 引入你刚创建的变量组
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.sumaai.app
       vars:
         XCODE_SCHEME: "App"
-        BUILD_NUMBER: 7
-        MARKETING_VERSION: 1.0.7
+        BUILD_NUMBER: 8
+        MARKETING_VERSION: 1.0.8
     scripts:
       - name: Install npm dependencies
         script: npm install
