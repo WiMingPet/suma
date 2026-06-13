@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-      "dev": "next dev",
-      "build": "next build",
-      "build:ios": "cross-env BUILD_FOR_IOS=true next build && next export",
-      "start": "next start",
-      "lint": "next lint",
-      "cap:sync": "npx cap sync ios",
-      "cap:open": "npx cap open ios"
+    "dev": "next dev",
+    "build": "next build",
+    "build:ios": "cross-env BUILD_FOR_IOS=true next build",
+    "start": "next start",
+    "lint": "next lint",
+    "cap:sync": "npx cap sync ios",
+    "cap:open": "npx cap open ios"
   },
   "dependencies": {
     "@alicloud/dysmsapi20170525": "^4.5.1",
@@ -18,7 +18,7 @@
     "@alicloud/pop-core": "^1.7.12",
     "@alicloud/tea-util": "^1.4.9",
     "@capacitor/android": "^8.3.1",
-    "@capacitor/ios": "^8.3.4",
+    "@capacitor/ios": "^8.4.0",
     "@capgo/native-purchases": "^8.4.0",
     "@supabase/supabase-js": "^2.39.0",
     "@types/three": "^0.160.0",
