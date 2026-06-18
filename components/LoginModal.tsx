@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { logger } from '../lib/logger'  
 
 interface User {
   id: string
@@ -104,149 +105,200 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     onClose()
   }
 
-  // ========== 发送验证码 ==========
-  const handleSendCode = async () => {
-    if (!/^1[3-9]\d{9}$/.test(phone)) {
-      setError('请输入有效的手机号')
-      return
-    }
+// ========== 发送验证码 ==========
+const handleSendCode = async () => {
+  // 🔹 记录开始发送验证码
+  logger.info('开始发送验证码', { phone });
 
-    setSending(true)
-    setError('')
-
-    try {
-      const res = await fetchWithTimeout('https://suma.zeabur.app/api/send-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone })
-      })
-
-      const data = await res.json()
-
-      if (data.success) {
-        setCountdown(60)
-        setError('')
-        if (data.devCode) {
-          console.log(`[DEV] 验证码: ${data.devCode}`)
-          alert(`开发环境验证码: ${data.devCode}`)
-        }
-      } else {
-        setError(data.error || '发送失败')
-      }
-    } catch (err) {
-      console.error('发送注册验证码错误:', err)
-      setError('网络连接失败，请检查网络后重试')
-    } finally {
-      setSending(false)
-    }
+  if (!/^1[3-9]\d{9}$/.test(phone)) {
+    logger.warn('手机号格式错误', { phone });
+    setError('请输入有效的手机号');
+    return;
   }
+
+  setSending(true);
+  setError('');
+
+  try {
+    const url = 'https://suma.zeabur.app/api/send-sms';
+    logger.info('发起发送验证码请求', { url, phone });
+
+    const res = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone })
+    });
+
+    logger.info('发送验证码响应', { status: res.status });
+
+    const data = await res.json();
+    logger.info('发送验证码结果', { success: data.success });
+
+    if (data.success) {
+      setCountdown(60);
+      setError('');
+      if (data.devCode) {
+        console.log(`[DEV] 验证码: ${data.devCode}`);
+        alert(`开发环境验证码: ${data.devCode}`);
+      }
+    } else {
+      logger.warn('发送验证码失败', { error: data.error });
+      setError(data.error || '发送失败');
+    }
+  } catch (err) {
+    const error = err as Error;
+    logger.error('发送验证码请求异常', error, { phone });
+    console.error('发送注册验证码错误:', err);
+    setError('网络连接失败，请检查网络后重试');
+  } finally {
+    setSending(false);
+  }
+};
 
   // ========== 发送注册验证码 ==========
   const handleRegisterSendCode = async () => {
+    logger.info('开始发送注册验证码', { registerPhone });
+
     if (!/^1[3-9]\d{9}$/.test(registerPhone)) {
-      setError('请输入有效的手机号')
-      return
+      logger.warn('注册手机号格式错误', { registerPhone });
+      setError('请输入有效的手机号');
+      return;
     }
 
-    setSending(true)
-    setError('')
+    setSending(true);
+    setError('');
 
     try {
-      const res = await fetchWithTimeout('https://suma.zeabur.app/api/send-sms', {
+      const url = 'https://suma.zeabur.app/api/send-sms';
+      logger.info('发起发送注册验证码请求', { url, registerPhone });
+
+      const res = await fetchWithTimeout(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: registerPhone })
-      })
+      });
 
-      const data = await res.json()
+      logger.info('发送注册验证码响应', { status: res.status });
+
+      const data = await res.json();
+      logger.info('发送注册验证码结果', { success: data.success });
 
       if (data.success) {
-        setRegisterCountdown(60)
-        setError('')
+        setRegisterCountdown(60);
+        setError('');
         if (data.devCode) {
-          alert(`开发环境验证码: ${data.devCode}`)
+          alert(`开发环境验证码: ${data.devCode}`);
         }
       } else {
-        setError(data.error || '发送失败')
+        logger.warn('发送注册验证码失败', { error: data.error });
+        setError(data.error || '发送失败');
       }
     } catch (err) {
-      console.error('发送注册验证码错误:', err)
-      setError('网络连接失败，请检查网络后重试')
+      const error = err as Error;
+      logger.error('发送注册验证码请求异常', error, { registerPhone });
+      console.error('发送注册验证码错误:', err);
+      setError('网络连接失败，请检查网络后重试');
     } finally {
-      setSending(false)
+      setSending(false);
     }
-  }
+  };
 
   // ========== 验证码登录 ==========
   const handleCodeLogin = async () => {
+    logger.info('开始验证码登录', { phone, hasCode: !!code });
+
     if (!phone || !code) {
-      setError('请填写手机号和验证码')
-      return
+      logger.warn('登录字段不完整', { phone, code });
+      setError('请填写手机号和验证码');
+      return;
     }
 
-    setLoading(true)
-    setError('')
+    setLoading(true);
+    setError('');
 
     try {
-      const res = await fetchWithTimeout('https://suma.zeabur.app/api/login', {
+      const url = 'https://suma.zeabur.app/api/login';
+      logger.info('发起验证码登录请求', { url, phone });
+
+      const res = await fetchWithTimeout(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, code })
-      })
+      });
 
-      const data = await res.json()
+      logger.info('验证码登录响应', { status: res.status });
+
+      const data = await res.json();
+      logger.info('验证码登录响应数据', { success: data.success, hasUser: !!data.user });
 
       if (data.success) {
         // 保存 token 和用户信息
-        localStorage.setItem('token', data.token)
-        localStorage.setItem('suma_user', JSON.stringify(data.user))
-        onLoginSuccess(data.user)
-        onClose()
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('suma_user', JSON.stringify(data.user));
+        logger.info('验证码登录成功', { phone });
+        onLoginSuccess(data.user);
+        onClose();
       } else {
-        setError(data.error || '登录失败')
+        logger.warn('验证码登录失败', { error: data.error });
+        setError(data.error || '登录失败');
       }
     } catch (err) {
-      console.error('登录请求失败:', err)
-      setError('网络连接失败，请检查网络后重试')
+      const error = err as Error;
+      logger.error('验证码登录请求异常', error, { phone });
+      console.error('登录请求失败:', err);
+      setError('网络连接失败，请检查网络后重试');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // ========== 密码登录 ==========
   const handlePasswordLogin = async () => {
+    logger.info('开始密码登录', { phone, hasPassword: !!password });
+
     if (!phone || !password) {
-      setError('请填写手机号和密码')
-      return
+      logger.warn('密码登录字段不完整', { phone });
+      setError('请填写手机号和密码');
+      return;
     }
 
-    setLoading(true)
-    setError('')
+    setLoading(true);
+    setError('');
 
     try {
-      const res = await fetchWithTimeout('https://suma.zeabur.app/api/login-password', {
+      const url = 'https://suma.zeabur.app/api/login-password';
+      logger.info('发起密码登录请求', { url, phone });
+
+      const res = await fetchWithTimeout(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, password })
-      })
+      });
 
-      const data = await res.json()
+      logger.info('密码登录响应', { status: res.status });
+
+      const data = await res.json();
+      logger.info('密码登录响应数据', { success: data.success });
 
       if (data.success) {
-        localStorage.setItem('token', data.token)
-        localStorage.setItem('suma_user', JSON.stringify(data.user))
-        onLoginSuccess(data.user)
-        onClose()
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('suma_user', JSON.stringify(data.user));
+        logger.info('密码登录成功', { phone });
+        onLoginSuccess(data.user);
+        onClose();
       } else {
-        setError(data.error || '手机号或密码错误')
+        logger.warn('密码登录失败', { error: data.error });
+        setError(data.error || '手机号或密码错误');
       }
     } catch (err) {
-      console.error('密码登录请求失败:', err)
-      setError('网络连接失败，请检查网络后重试')
+      const error = err as Error;
+      logger.error('密码登录请求异常', error, { phone });
+      console.error('密码登录请求失败:', err);
+      setError('网络连接失败，请检查网络后重试');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // ========== 忘记密码：发送验证码 ==========
   const handleForgotSendCode = async () => {
