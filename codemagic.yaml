@@ -32,14 +32,16 @@ workflows:
           echo "out folder verification passed"
       - name: Sync Capacitor
         script: npx cap sync ios
+      - name: Fix Cordova plugin signing
+        script: |
+          cd ios/App
+          find Pods -name "*.pbxproj" -exec sed -i '' 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' {} \;
+          echo "Cordova plugin signing fixed"
       - name: Enable In-App Purchase capability
         script: |
           echo "Enabling In-App Purchase capability..."
           cd ios/App
           /usr/libexec/PlistBuddy -c "Add :com.apple.InAppPurchase bool true" App/Info.plist 2>/dev/null || echo "IAP key already exists"
-          sed -i '' '/com.apple.InAppPurchase/d' App.xcodeproj/project.pbxproj
-          sed -i '' '/ATTRIBUTES/a\
-          , com.apple.InAppPurchase' App.xcodeproj/project.pbxproj
           echo "IAP capability enabled"
       - name: Set build number
         script: |
@@ -50,7 +52,8 @@ workflows:
           # 1. 清理旧构建
           xcodebuild clean -project ios/App/App.xcodeproj -scheme App
           # 2. 归档 (Archive)
-          xcodebuild archive -project ios/App/App.xcodeproj -scheme App -archivePath $HOME/App.xcarchive CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="iPhone Distribution" PROVISIONING_PROFILE_SPECIFIER="SumaAppStore" DEVELOPMENT_TEAM=892N82TP6H
+          xcodebuild archive -project ios/App/App.xcodeproj -scheme App -archivePath $HOME/App.xcarchive CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="iPhone Distribution" PROVISIONING_PROFILE_SPECIFIER="SumaAppStore" DEVELOPMENT_TEAM=892N82TP6H -allowProvisioningUpdates
+          # 3. 创建 exportOptions.plist 文件
           cat > $HOME/exportOptions.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -68,6 +71,7 @@ workflows:
           </dict>
           </plist>
           EOF
+          # 4. 导出 IPA
           xcodebuild -exportArchive -archivePath $HOME/App.xcarchive -exportPath $HOME -exportOptionsPlist $HOME/exportOptions.plist
     artifacts:
       - /tmp/xcodebuild_logs/*.log
