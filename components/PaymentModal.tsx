@@ -1,8 +1,7 @@
 // components/PaymentModal.tsx
 import { useState, useEffect } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
-// ✅ 移除 CapacitorHttp 导入
-import { initiatePayment, getPaymentMethod, initIAP, getPlatform } from '../lib/payment';
+import { initiatePayment, getPaymentMethod, initIAP, getPlatform, restorePurchases, fetchProducts } from '../lib/payment';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -18,28 +17,73 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
   const [loading, setLoading] = useState(false);
   const [method, setMethod] = useState<'qrcode' | 'h5'>('qrcode');
   const [plan, setPlan] = useState<'month' | 'season' | 'year'>(initialPlan || 'month');
+  const [plans, setPlans] = useState<any[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
 
   const planPrices = { month: 29.9, season: 69.9, year: 199 };
   const planPoints = { month: 500, season: 1500, year: 5000 };
 
-  // 检测当前支付方式
   const paymentMethod = getPaymentMethod();
   const platform = getPlatform();
   const isIAP = paymentMethod === 'iap';
 
-  // 初始化 IAP（仅 iOS）
   useEffect(() => {
     if (platform === 'ios') {
       initIAP();
     }
   }, [platform]);
 
-  // 创建订单（新版本，统一支付入口）
+  // 加载产品信息
+  useEffect(() => {
+    if (isOpen && isIAP) {
+      loadProducts();
+    }
+  }, [isOpen, isIAP]);
+
+  const loadProducts = async () => {
+    setLoadingProducts(true);
+    try {
+      const products = await fetchProducts();
+      const planList = products.map((p: any) => {
+        let name = '月卡';
+        let points = 500;
+        if (p.identifier?.includes('seasonal')) { name = '季卡'; points = 1500; }
+        if (p.identifier?.includes('yearly')) { name = '年卡'; points = 5000; }
+        return {
+          id: p.identifier,
+          name,
+          price: p.priceString || `¥${planPrices[plan]}`,
+          points,
+        };
+      });
+      setPlans(planList);
+    } catch (error) {
+      console.error('加载产品失败:', error);
+      setPlans([
+        { id: 'com.sumaai.monthly', name: '月卡', price: '¥29.00', points: 500 },
+        { id: 'com.sumaai.seasonal', name: '季卡', price: '¥69.00', points: 1500 },
+        { id: 'com.sumaai.yearly', name: '年卡', price: '¥199.00', points: 5000 },
+      ]);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  // 恢复购买
+  const handleRestore = async () => {
+    setLoading(true);
+    const result = await restorePurchases();
+    alert(result.message);
+    if (result.success) {
+      onSuccess();
+      onClose();
+    }
+    setLoading(false);
+  };
+
   const createOrder = async () => {
     setLoading(true);
-    
     try {
-      // 使用统一支付接口
       const result = await initiatePayment({
         plan,
         amount: String(planPrices[plan]),
@@ -48,12 +92,10 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
       
       if (result.success) {
         if (isIAP) {
-          // IAP 支付成功，直接返回
           alert(`支付成功！获得 ${planPoints[plan]} 点币`);
           onSuccess();
           onClose();
         } else {
-          // 支付宝支付：需要轮询
           setOutTradeNo(result.orderId || '');
         }
       } else {
@@ -67,12 +109,10 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
     }
   };
 
-  // 支付宝旧版订单创建（保留兼容）
   const createAlipayOrder = async () => {
     setLoading(true);
     try {
       const amount = planPrices[plan];
-      // ✅ 使用标准 fetch
       const res = await fetch('https://suma.zeabur.app/api/create-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -103,24 +143,19 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
     }
   };
 
-  // 处理支付按钮点击
   const handlePayment = () => {
     if (isIAP) {
-      // iOS IAP 支付
       createOrder();
     } else {
-      // 安卓/Web 支付宝支付
       createAlipayOrder();
     }
   };
 
-  // 轮询查询订单状态（仅支付宝）
   useEffect(() => {
     if (!outTradeNo || isIAP) return;
 
     const interval = setInterval(async () => {
       try {
-        // ✅ 使用标准 fetch
         const res = await fetch(`https://suma.zeabur.app/api/order-status?outTradeNo=${outTradeNo}`);
         const data = await res.json();
         if (data.status === 'paid') {
@@ -139,20 +174,37 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
 
   if (!isOpen) return null;
 
+  const getDisplayPrice = () => {
+    if (isIAP && plans.length > 0) {
+      const id = plan === 'month' ? 'com.sumaai.monthly' : 
+                 plan === 'season' ? 'com.sumaai.seasonal' : 'com.sumaai.yearly';
+      const p = plans.find((item: any) => item.id === id);
+      if (p) return p.price;
+    }
+    return `¥${planPrices[plan]}`;
+  };
+
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 max-w-md w-full">
+      <div className="bg-white rounded-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-4">升级 Pro 会员</h2>
         <p className="text-gray-600 mb-4">选择套餐支付，获得对应点币，享受无限次生成</p>
 
-        {/* 支付方式提示（仅 iOS 显示） */}
         {isIAP && (
-          <div className="mb-4 p-2 bg-blue-50 rounded-lg text-center text-sm text-blue-700">
-            🍎 使用 Apple 内购支付
-          </div>
+          <>
+            <div className="mb-4 p-2 bg-blue-50 rounded-lg text-center text-sm text-blue-700">
+              🍎 使用 Apple 内购支付
+            </div>
+            <button
+              onClick={handleRestore}
+              disabled={loading}
+              className="w-full mb-4 py-2 text-sm text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition disabled:opacity-50"
+            >
+              🔄 恢复购买
+            </button>
+          </>
         )}
 
-        {/* 支付方式选择（仅非 iOS 显示） */}
         {!isIAP && (
           <div className="flex gap-4 mb-4">
             <button
@@ -170,44 +222,59 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
           </div>
         )}
 
-        {/* 套餐选择 */}
         <div className="mb-4">
           <label className="block text-gray-700 font-medium mb-2">选择套餐</label>
           <div className="grid grid-cols-3 gap-2">
-            <button
-              className={`py-2 rounded border ${plan === 'month' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
-              onClick={() => setPlan('month')}
-            >
-              📅 月卡<br/>{planPrices.month}元
-            </button>
-            <button
-              className={`py-2 rounded border ${plan === 'season' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
-              onClick={() => setPlan('season')}
-            >
-              🌿 季卡<br/>{planPrices.season}元
-            </button>
-            <button
-              className={`py-2 rounded border ${plan === 'year' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
-              onClick={() => setPlan('year')}
-            >
-              🏆 年卡<br/>{planPrices.year}元
-            </button>
+            {isIAP && loadingProducts ? (
+              <div className="col-span-3 text-center py-4 text-gray-500">加载套餐信息...</div>
+            ) : (
+              <>
+                <button
+                  className={`py-2 rounded border ${plan === 'month' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
+                  onClick={() => setPlan('month')}
+                >
+                  📅 月卡<br/>
+                  {isIAP && plans.length > 0 ? 
+                    plans.find((p: any) => p.id === 'com.sumaai.monthly')?.price || '¥29.00' : 
+                    '¥29.00'
+                  }
+                </button>
+                <button
+                  className={`py-2 rounded border ${plan === 'season' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
+                  onClick={() => setPlan('season')}
+                >
+                  🌿 季卡<br/>
+                  {isIAP && plans.length > 0 ? 
+                    plans.find((p: any) => p.id === 'com.sumaai.seasonal')?.price || '¥69.00' : 
+                    '¥69.00'
+                  }
+                </button>
+                <button
+                  className={`py-2 rounded border ${plan === 'year' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
+                  onClick={() => setPlan('year')}
+                >
+                  🏆 年卡<br/>
+                  {isIAP && plans.length > 0 ? 
+                    plans.find((p: any) => p.id === 'com.sumaai.yearly')?.price || '¥199.00' : 
+                    '¥199.00'
+                  }
+                </button>
+              </>
+            )}
           </div>
         </div>
 
-        {/* 支付按钮 */}
         {!qrCode && !loading && (
           <button
             onClick={handlePayment}
             className="w-full py-3 bg-green-600 text-white rounded-lg disabled:opacity-50"
           >
-            {isIAP ? `¥${planPrices[plan]} 立即购买` : '生成订单'}
+            {isIAP ? `${getDisplayPrice()} 立即购买` : '生成订单'}
           </button>
         )}
 
         {loading && <p className="text-center py-4">处理中...</p>}
 
-        {/* 支付宝二维码 */}
         {qrCode && !isIAP && (
           <div className="flex flex-col items-center">
             <QRCodeCanvas value={qrCode} size={200} />

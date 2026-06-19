@@ -10,7 +10,7 @@ interface User {
   is_pro: boolean
   daily_count: number
   free_used: number
-  points: number   // 添加点币余额
+  points: number
 }
 
 interface SideMenuProps {
@@ -37,7 +37,7 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
   const [previewCode, setPreviewCode] = useState<string | null>(null)
 
   const goToMemberCenter = () => {
-    onClose()  // 先关闭侧边栏
+    onClose()
     router.push('/member-center')
   }
 
@@ -145,7 +145,6 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
       />
 
       <div className="fixed top-0 left-0 bottom-0 z-50 w-80 bg-gray-900 shadow-2xl flex flex-col">
-        {/* 头部 - 手机号 + 退出按钮 */}
         <div className="p-5 border-b border-gray-800 flex-shrink-0">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-white">我的空间</h2>
@@ -158,7 +157,10 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
           {user && (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
+                <div
+                  onClick={goToMemberCenter}
+                  className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold cursor-pointer hover:opacity-80 transition"
+                >
                   {user.phone.slice(-2)}
                 </div>
                 <div 
@@ -184,7 +186,6 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
           )}
         </div>
 
-        {/* 帮助与客服 */}
         <button
           onClick={() => {
             alert('📞 客服联系方式：\n\n邮箱：3060302415@qq.com\n电话：15920978058\n工作时间：9:00-18:00\n\n我们会尽快回复您的问题。')
@@ -203,7 +204,6 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
           </svg>
         </button>
 
-        {/* 标签页 */}
         <div className="flex border-b border-gray-800 flex-shrink-0">
           <button
             onClick={() => setActiveTab('apps')}
@@ -233,7 +233,6 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
           </button>
         </div>
 
-        {/* 内容区域 */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {loading ? (
             <div className="flex justify-center py-8">

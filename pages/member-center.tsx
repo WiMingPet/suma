@@ -1,7 +1,6 @@
 // pages/member-center.tsx
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-// ✅ 移除 CapacitorHttp 导入
 import PaymentModal from '../components/PaymentModal';
 import { getPlatform } from '../lib/payment';
 
@@ -19,49 +18,86 @@ export default function MemberCenter() {
   const [selectedPlan, setSelectedPlan] = useState<'month' | 'season' | 'year'>('month');
   const [loading, setLoading] = useState(true);
 
-  // 套餐配置
   const plans = {
     month: { name: '月卡', price: 29.9, points: 500, days: 30 },
     season: { name: '季卡', price: 69.9, points: 1500, days: 90 },
     year: { name: '年卡', price: 199, points: 5000, days: 365 },
   };
 
-  // 获取用户信息（使用标准 fetch）
   const fetchUserInfo = async () => {
     try {
       const token = localStorage.getItem('token');
-      console.log('获取到的 token:', token);
+      const savedUser = localStorage.getItem('suma_user');
       
+      // 先使用 localStorage 中的缓存数据（如果有）
+      if (savedUser) {
+        try {
+          const cached = JSON.parse(savedUser);
+          setUserInfo({
+            phone: cached.phone || '',
+            points: cached.points ?? 0,
+            is_pro: cached.is_pro ?? false,
+            pro_expire_at: cached.pro_expire_at || null,
+          });
+        } catch (e) {
+          console.error('解析缓存用户数据失败:', e);
+        }
+      }
+
+      // 如果没有 token，直接使用缓存数据
       if (!token) {
-        console.log('未找到 token');
+        console.log('未找到 token，使用缓存数据');
         setLoading(false);
         return;
       }
       
-      // ✅ 使用标准 fetch
+      // 从 API 获取最新数据
       const res = await fetch('https://suma.zeabur.app/api/user-info', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
+      // 如果 token 无效，保留缓存数据
+      if (res.status === 401 || res.status === 403) {
+        console.log('Token 无效，使用缓存数据');
+        setLoading(false);
+        return;
+      }
+
+      // 如果响应不是 JSON（比如 404），直接返回
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('API 返回非 JSON 数据，使用缓存数据');
+        setLoading(false);
+        return;
+      }
+
       const data = await res.json();
       console.log('API 返回数据:', data);
       
+      // 解析 API 返回的用户数据
+      let userData = null;
       if (data.success && data.user) {
-        setUserInfo({
-          phone: data.user.phone,
-          points: data.user.points,
-          is_pro: data.user.is_pro,
-          pro_expire_at: data.user.pro_expire_at
-        });
+        userData = {
+          phone: data.user.phone || '',
+          points: data.user.points ?? 0,
+          is_pro: data.user.is_pro ?? false,
+          pro_expire_at: data.user.pro_expire_at || null,
+        };
       } else if (data.phone) {
-        setUserInfo({
-          phone: data.phone,
-          points: data.points,
-          is_pro: data.is_pro,
-          pro_expire_at: data.pro_expire_at
-        });
+        userData = {
+          phone: data.phone || '',
+          points: data.points ?? 0,
+          is_pro: data.is_pro ?? false,
+          pro_expire_at: data.pro_expire_at || null,
+        };
+      }
+
+      // 如果成功获取到用户数据，更新状态和缓存
+      if (userData) {
+        setUserInfo(userData);
+        localStorage.setItem('suma_user', JSON.stringify(userData));
       } else {
-        console.error('无法解析用户数据');
+        console.warn('无法解析用户数据，保留缓存');
       }
     } catch (error) {
       console.error('获取用户信息失败:', error);
@@ -89,7 +125,6 @@ export default function MemberCenter() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      {/* 头部 */}
       <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6">
         <div className="flex items-center justify-between mb-4">
           <button 
@@ -165,9 +200,10 @@ export default function MemberCenter() {
         onClose={() => setShowPaymentModal(false)}
         userId={userInfo?.phone || ''}
         onSuccess={() => {
-          setShowPaymentModal(false);
-          fetchUserInfo();
-          alert('支付成功！');
+          setShowPaymentModal(false)
+          // ✅ 重新获取用户信息，刷新点币余额和会员状态
+          fetchUserInfo()
+          alert('支付成功！')
         }}
         plan={selectedPlan}
       />

@@ -4,6 +4,10 @@ import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
+import { Filesystem, Directory } from '@capacitor/filesystem';
+
+declare var Media: any;
+declare var cordova: any;
 
 // 动态导入 Three.js 背景组件（避免 SSR 问题）
 const ThreeBackground = dynamic(() => import('../components/ThreeBackground'), {
@@ -75,7 +79,7 @@ export default function Home() {
   
   // 预览弹窗
   const [previewCode, setPreviewCode] = useState<string | null>(null)
-  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  
   
   // 当前激活的功能标签
   const [activeTab, setActiveTab] = useState<'text' | 'image' | 'voice'>('text')
@@ -357,58 +361,36 @@ export default function Home() {
 
   // 开始录音
   const startRecording = async () => {
-    console.log('=== 开始录音 ===');
+    console.log('开始录音');
+    
     try {
-      console.log('请求麦克风权限...');
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      console.log('麦克风授权成功，track数量:', stream.getTracks().length);
+      if (typeof Media === 'undefined') {
+        alert('录音功能仅在 App 中可用');
+        return;
+      }
+
+      const fileName = `recording_${Date.now()}.m4a`;
+      const filePath = `${cordova.file.documentsDirectory}${fileName}`;
       
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        console.log('收到音频数据，大小:', e.data.size);
-        if (e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
+      const media = new Media(filePath, 
+        () => {
+          console.log('录音完成');
+          readRecordingFile(filePath);
+        },
+        (err: any) => {
+          console.error('录音错误:', err);
+          alert('录音错误: ' + JSON.stringify(err));
         }
-      };
+      );
 
-      mediaRecorder.onstop = async () => {
-        console.log('录音停止，总数据块数:', audioChunksRef.current.length);
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        console.log('音频Blob大小:', audioBlob.size);
-        
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          const base64 = (e.target?.result as string).split(',')[1];
-          console.log('Base64长度:', base64?.length);
-          await generateFromVoice(base64);
-        };
-        reader.onerror = (err) => {
-          console.error('FileReader错误:', err);
-        };
-        reader.readAsDataURL(audioBlob);
-        
-        // 停止所有轨道
-        stream.getTracks().forEach(track => {
-          console.log('停止track:', track.kind);
-          track.stop();
-        });
-      };
-
-      mediaRecorder.start();
-      console.log('MediaRecorder已启动');
+      media.startRecord();
+      mediaRecorderRef.current = media;
       setIsRecording(true);
       setRecordingTime(0);
 
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
       timerRef.current = setInterval(() => {
         setRecordingTime(t => {
           if (t >= 30) {
-            console.log('录音达到30秒，自动停止');
             stopRecording();
             return t;
           }
@@ -416,34 +398,58 @@ export default function Home() {
         });
       }, 1000);
     } catch (err) {
-      console.error('麦克风错误详情:', err);
-      console.error('错误名称:', err.name);
-      console.error('错误消息:', err.message);
-      
-      if (err.name === 'NotAllowedError') {
-        alert('请允许麦克风权限以使用语音功能');
-      } else if (err.name === 'NotFoundError') {
-        alert('未检测到麦克风设备');
-      } else if (err.name === 'NotReadableError') {
-        alert('麦克风被其他应用占用');
-      } else {
-        alert('麦克风初始化失败: ' + err.message);
-      }
+      console.error('录音启动失败:', err);
+      alert('录音启动失败: ' + (err as Error).message);
     }
   };
 
   // 停止录音
   const stopRecording = () => {
-    console.log('=== 停止录音 ===');
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
+    console.log('停止录音');
+    
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    const media = mediaRecorderRef.current as any;
+    if (media) {
+      try {
+        // 兼容多种停止方法
+        if (typeof media.stopRecord === 'function') {
+          media.stopRecord();
+        } else if (typeof media.release === 'function') {
+          media.release();
+        }
+        console.log('录音已停止');
+      } catch (err) {
+        console.error('停止录音失败:', err);
+        alert('停止录音失败: ' + (err as Error).message);
       }
-    } else {
-      console.log('无法停止录音：mediaRecorder不存在或未在录音');
+      mediaRecorderRef.current = null;
+      setIsRecording(false);
+    }
+  };
+
+  // 读取录音文件
+  const readRecordingFile = async (filePath: string) => {
+    console.log('读取录音文件:', filePath);
+    
+    try {
+      const result = await Filesystem.readFile({
+        path: filePath,
+        directory: Directory.Documents,
+      });
+      
+      const base64 = result.data as string;
+      console.log('文件读取成功，Base64 长度:', base64?.length);
+      
+      if (base64) {
+        await generateFromVoice(base64);
+      }
+    } catch (err) {
+      console.error('读取文件失败:', err);
+      alert('读取录音文件失败: ' + (err as Error).message);
     }
   };
 
@@ -850,31 +856,14 @@ export default function Home() {
             粤ICP备2026044431号
           </a>
           <button
-            onClick={() => setShowPrivacyModal(true)}
+            onClick={() => router.push('/privacy')}
             className="text-sm text-gray-400 hover:text-white transition cursor-pointer"
           >
             隐私政策
           </button>
         </div>
       </footer>
-
-        {/* 隐私政策模态框 */}
-        {showPrivacyModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setShowPrivacyModal(false)}>
-            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col relative" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">隐私政策</h3>
-                <button onClick={() => setShowPrivacyModal(false)} className="text-gray-400 hover:text-gray-600 transition text-2xl leading-none">
-                  ✕
-                </button>
-              </div>
-              <div className="flex-1 overflow-auto p-4">
-                <iframe src="/privacy" className="w-full h-full min-h-[400px] border-0" title="隐私政策" />
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+    </div>
 
       {/* 登录弹窗 */}
       <LoginModal
