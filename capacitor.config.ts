@@ -15,7 +15,7 @@ const config: CapacitorConfig = {
     allowMixedContent: true,
   },
 
-  // 👇 新增：开启 CapacitorHttp 插件，让 fetch 自动走原生请求
+  // ✅ 开启原生拦截，让标准 fetch 自动走原生网络通道
   plugins: {
     CapacitorHttp: {
       enabled: true,

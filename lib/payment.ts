@@ -2,7 +2,7 @@
 // 统一支付入口，根据平台自动选择支付方式
 
 import { Capacitor } from '@capacitor/core';
-import { CapacitorHttp } from '@capacitor/core';
+// ✅ 移除 CapacitorHttp 导入
 
 export type PaymentPlatform = 'ios' | 'android' | 'web';
 export type PaymentMethod = 'alipay' | 'iap';
@@ -79,7 +79,6 @@ export async function initIAP() {
   }
   
   try {
-    // 尝试不同的初始化方法
     if (typeof plugin.initialize === 'function') {
       await plugin.initialize({ productIds: Object.values(PRODUCT_IDS) });
     } else if (typeof plugin.setup === 'function') {
@@ -110,18 +109,18 @@ export async function initiatePayment(params: PaymentParams): Promise<PaymentRes
 // 支付宝支付
 async function initiateAlipayPayment(params: PaymentParams): Promise<PaymentResult> {
   try {
-    // ✅ 使用 CapacitorHttp.post 替代 fetch
-    const response = await CapacitorHttp.post({
-      url: 'https://suma.zeabur.app/api/create-payment',
+    // ✅ 使用标准 fetch
+    const response = await fetch('https://suma.zeabur.app/api/create-payment', {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      data: {
+      body: JSON.stringify({
         plan: params.plan,
         amount: params.amount,
         points: params.points,
-      },
+      }),
     });
     
-    const data = response.data;
+    const data = await response.json();
     
     if (data.code === 200 && data.qrCode) {
       if (typeof window !== 'undefined') {
@@ -137,7 +136,7 @@ async function initiateAlipayPayment(params: PaymentParams): Promise<PaymentResu
   }
 }
 
-// IAP 支付（保持不变，不涉及网络请求）
+// IAP 支付（不涉及网络请求）
 async function initiateIAPPayment(params: PaymentParams): Promise<PaymentResult> {
   try {
     const plugin = await getIAPPlugin();
@@ -152,7 +151,6 @@ async function initiateIAPPayment(params: PaymentParams): Promise<PaymentResult>
       return { success: false, message: '产品配置错误' };
     }
     
-    // 尝试不同的购买方法
     let purchaseResult: any = null;
     
     if (typeof plugin.purchase === 'function') {
@@ -165,7 +163,6 @@ async function initiateIAPPayment(params: PaymentParams): Promise<PaymentResult>
       return { success: false, message: 'IAP 购买方法不可用' };
     }
     
-    // 检查购买结果
     const isPurchased = purchaseResult?.purchaseState === 'PURCHASED' || 
                         purchaseResult?.state === 'approved' ||
                         purchaseResult?.success === true;
@@ -206,20 +203,21 @@ async function verifyReceiptOnServer(
   params: PaymentParams
 ): Promise<{ success: boolean; message?: string }> {
   try {
-    // ✅ 使用 CapacitorHttp.post 替代 fetch
-    const response = await CapacitorHttp.post({
-      url: 'https://suma.zeabur.app/api/verify-iap',
+    // ✅ 使用标准 fetch
+    const response = await fetch('https://suma.zeabur.app/api/verify-iap', {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      data: {
+      body: JSON.stringify({
         receipt,
         transactionId,
         plan: params.plan,
         amount: params.amount,
         points: params.points,
-      },
+      }),
     });
     
-    return { success: response.data.success, message: response.data.message };
+    const data = await response.json();
+    return { success: data.success, message: data.message };
   } catch (error) {
     console.error('收据验证请求失败:', error);
     return { success: false, message: '验证失败，请联系客服' };

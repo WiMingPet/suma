@@ -1,7 +1,7 @@
 // pages/member-center.tsx
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { CapacitorHttp } from '@capacitor/core';  // ✅ 添加导入
+// ✅ 移除 CapacitorHttp 导入
 import PaymentModal from '../components/PaymentModal';
 import { getPlatform } from '../lib/payment';
 
@@ -26,7 +26,7 @@ export default function MemberCenter() {
     year: { name: '年卡', price: 199, points: 5000, days: 365 },
   };
 
-  // 获取用户信息 - 修正版（使用 CapacitorHttp）
+  // 获取用户信息（使用标准 fetch）
   const fetchUserInfo = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -38,16 +38,14 @@ export default function MemberCenter() {
         return;
       }
       
-      // ✅ 使用 CapacitorHttp.get 替代 fetch
-      const res = await CapacitorHttp.get({
-        url: 'https://suma.zeabur.app/api/user-info',
+      // ✅ 使用标准 fetch
+      const res = await fetch('https://suma.zeabur.app/api/user-info', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      const data = res.data;  // CapacitorHttp 返回的数据在 data 字段
+      const data = await res.json();
       console.log('API 返回数据:', data);
       
-      // 根据实际返回结构解析
       if (data.success && data.user) {
         setUserInfo({
           phone: data.user.phone,
@@ -93,7 +91,6 @@ export default function MemberCenter() {
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* 头部 */}
       <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6">
-        {/* 返回按钮和标题行 */}
         <div className="flex items-center justify-between mb-4">
           <button 
             onClick={() => router.back()} 
@@ -105,10 +102,9 @@ export default function MemberCenter() {
             返回
           </button>
           <h1 className="text-xl font-bold">会员中心</h1>
-          <div className="w-16"></div> {/* 占位保持对称 */}
+          <div className="w-16"></div>
         </div>
         
-        {/* 用户信息 */}
         <div className="mt-4 flex justify-between items-end">
           <div>
             <p className="text-sm opacity-90">手机号</p>
@@ -126,7 +122,6 @@ export default function MemberCenter() {
         )}
       </div>
 
-      {/* 套餐列表 */}
       <div className="p-4 space-y-4">
         <h2 className="text-lg font-semibold text-gray-800">选择套餐</h2>
         <div className="space-y-3">
@@ -153,7 +148,6 @@ export default function MemberCenter() {
         </div>
       </div>
 
-      {/* 说明 */}
       <div className="px-4 py-6">
         <div className="bg-blue-50 rounded-lg p-4 text-sm text-gray-600">
           <p className="font-medium mb-2">💡 购买须知</p>
@@ -166,14 +160,13 @@ export default function MemberCenter() {
         </div>
       </div>
 
-      {/* 支付弹窗 */}
       <PaymentModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
         userId={userInfo?.phone || ''}
         onSuccess={() => {
           setShowPaymentModal(false);
-          fetchUserInfo(); // 刷新余额
+          fetchUserInfo();
           alert('支付成功！');
         }}
         plan={selectedPlan}

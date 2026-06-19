@@ -1,7 +1,7 @@
 // components/PaymentModal.tsx
 import { useState, useEffect } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
-import { CapacitorHttp } from '@capacitor/core';
+// ✅ 移除 CapacitorHttp 导入
 import { initiatePayment, getPaymentMethod, initIAP, getPlatform } from '../lib/payment';
 
 interface PaymentModalProps {
@@ -17,7 +17,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
   const [outTradeNo, setOutTradeNo] = useState('');
   const [loading, setLoading] = useState(false);
   const [method, setMethod] = useState<'qrcode' | 'h5'>('qrcode');
-  const [plan, setPlan] = useState<'month' | 'season' | 'year'>(initialPlan || 'month');  // ✅ 修正
+  const [plan, setPlan] = useState<'month' | 'season' | 'year'>(initialPlan || 'month');
 
   const planPrices = { month: 29.9, season: 69.9, year: 199 };
   const planPoints = { month: 500, season: 1500, year: 5000 };
@@ -72,14 +72,14 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
     setLoading(true);
     try {
       const amount = planPrices[plan];
-      // ✅ 使用 CapacitorHttp.post 替代 fetch
-      const res = await CapacitorHttp.post({
-        url: 'https://suma.zeabur.app/api/create-payment',
+      // ✅ 使用标准 fetch
+      const res = await fetch('https://suma.zeabur.app/api/create-payment', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        data: { type: method, amount, userId, plan },
+        body: JSON.stringify({ type: method, amount, userId, plan }),
       });
 
-      const data = res.data;
+      const data = await res.json();
 
       if (method === 'qrcode') {
         if (data.success) {
@@ -120,11 +120,9 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
 
     const interval = setInterval(async () => {
       try {
-        // ✅ 使用 CapacitorHttp.get 替代 fetch
-        const res = await CapacitorHttp.get({
-          url: `https://suma.zeabur.app/api/order-status?outTradeNo=${outTradeNo}`,
-        });
-        const data = res.data;
+        // ✅ 使用标准 fetch
+        const res = await fetch(`https://suma.zeabur.app/api/order-status?outTradeNo=${outTradeNo}`);
+        const data = await res.json();
         if (data.status === 'paid') {
           clearInterval(interval);
           alert(`支付成功！获得 ${planPoints[plan]} 点币`);

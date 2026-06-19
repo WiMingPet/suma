@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { logger } from '../lib/logger'  
-import { CapacitorHttp } from '@capacitor/core'; 
+// ✅ 移除 CapacitorHttp 导入，使用标准 fetch
 
 interface User {
   id: string
@@ -19,8 +19,6 @@ interface LoginModalProps {
 
 type LoginMode = 'code' | 'password' | 'register'
 
-
-
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps) {
   // UI 状态
   const [loginMode, setLoginMode] = useState<LoginMode>('code')
@@ -32,7 +30,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const [password, setPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
 
-  // 注册表单字段（添加这些）
+  // 注册表单字段
   const [registerPhone, setRegisterPhone] = useState('')
   const [registerPassword, setRegisterPassword] = useState('')
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('')
@@ -81,7 +79,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
   // ========== 发送验证码 ==========
   const handleSendCode = async () => {
-    // 🔹 记录开始发送验证码
     logger.info('开始发送验证码', { phone });
 
     if (!/^1[3-9]\d{9}$/.test(phone)) {
@@ -97,16 +94,16 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       const url = 'https://suma.zeabur.app/api/send-sms';
       logger.info('发起发送验证码请求', { url, phone });
 
-      // ✅ 使用 CapacitorHttp.post 替代 fetchWithTimeout
-      const res = await CapacitorHttp.post({
-        url: url,
+      // ✅ 使用标准 fetch
+      const res = await fetch(url, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        data: { phone },
+        body: JSON.stringify({ phone }),
       });
 
       logger.info('发送验证码响应', { status: res.status });
 
-      const data = res.data;
+      const data = await res.json();
       logger.info('发送验证码结果', { success: data.success });
 
       if (data.success) {
@@ -147,16 +144,16 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       const url = 'https://suma.zeabur.app/api/send-sms';
       logger.info('发起发送注册验证码请求', { url, registerPhone });
 
-      // ✅ 使用 CapacitorHttp.post 替代 fetchWithTimeout
-      const res = await CapacitorHttp.post({
-        url: url,
+      // ✅ 使用标准 fetch
+      const res = await fetch(url, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        data: { phone: registerPhone },
+        body: JSON.stringify({ phone: registerPhone }),
       });
 
       logger.info('发送注册验证码响应', { status: res.status });
 
-      const data = res.data;
+      const data = await res.json();
       logger.info('发送注册验证码结果', { success: data.success });
 
       if (data.success) {
@@ -181,7 +178,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
   // ========== 验证码登录 ==========
   const handleCodeLogin = async () => {
-    // 日志记录（保持你的 logger 代码不变）
     logger.info('开始验证码登录', { phone, hasCode: !!code });
 
     if (!phone || !code) {
@@ -197,15 +193,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       const url = 'https://suma.zeabur.app/api/login';
       logger.info('发起验证码登录请求', { url, phone });
 
-      // 👇 使用 CapacitorHttp.post 替代 fetch
-      const res = await CapacitorHttp.post({
-        url: url,
+      // ✅ 使用标准 fetch
+      const res = await fetch(url, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        data: { phone, code }, // 数据直接以对象形式传入，不需要 JSON.stringify
+        body: JSON.stringify({ phone, code }),
       });
 
-      // CapacitorHttp 的响应结构里，data 字段包含解析好的 JSON 数据
-      const data = res.data;
+      const data = await res.json();
 
       logger.info('验证码登录响应', { status: res.status });
       logger.info('验证码登录响应数据', { success: data.success, hasUser: !!data.user });
@@ -246,16 +241,16 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       const url = 'https://suma.zeabur.app/api/login-password';
       logger.info('发起密码登录请求', { url, phone });
 
-      // ✅ 使用 CapacitorHttp.post 替代 fetchWithTimeout
-      const res = await CapacitorHttp.post({
-        url: url,
+      // ✅ 使用标准 fetch
+      const res = await fetch(url, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        data: { phone, password },
+        body: JSON.stringify({ phone, password }),
       });
 
       logger.info('密码登录响应', { status: res.status });
 
-      const data = res.data;
+      const data = await res.json();
       logger.info('密码登录响应数据', { success: data.success });
 
       if (data.success) {
@@ -292,14 +287,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       const url = 'https://suma.zeabur.app/api/send-sms';
       logger.info('发起发送验证码请求（忘记密码）', { url, phone });
 
-      // ✅ 使用 CapacitorHttp.post 替代 fetchWithTimeout
-      const res = await CapacitorHttp.post({
-        url: url,
+      // ✅ 使用标准 fetch
+      const res = await fetch(url, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        data: { phone },
+        body: JSON.stringify({ phone }),
       });
 
-      const data = res.data;
+      const data = await res.json();
 
       if (data.success) {
         setCountdown(60);
@@ -337,14 +332,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       const url = 'https://suma.zeabur.app/api/reset-password';
       logger.info('发起重置密码请求', { url, phone });
 
-      // ✅ 使用 CapacitorHttp.post 替代 fetchWithTimeout
-      const res = await CapacitorHttp.post({
-        url: url,
+      // ✅ 使用标准 fetch
+      const res = await fetch(url, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        data: { phone, code, newPassword },
+        body: JSON.stringify({ phone, code, newPassword }),
       });
 
-      const data = res.data;
+      const data = await res.json();
 
       if (data.success) {
         alert('密码重置成功，请使用新密码登录');
@@ -366,25 +361,21 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
   // ========== 注册新账号 ==========
   const handleRegister = async () => {
-    // 验证手机号
     if (!/^1[3-9]\d{9}$/.test(registerPhone)) {
       setError('请输入正确的手机号')
       return
     }
     
-    // 验证密码
     if (!registerPassword || registerPassword.length < 6) {
       setError('密码长度不能少于6位')
       return
     }
     
-    // 验证确认密码
     if (registerPassword !== registerConfirmPassword) {
       setError('两次输入的密码不一致')
       return
     }
     
-    // 验证验证码
     if (!registerCode) {
       setError('请输入验证码')
       return
@@ -397,22 +388,21 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       const url = 'https://suma.zeabur.app/api/register';
       logger.info('发起注册请求', { url, registerPhone });
 
-      // ✅ 使用 CapacitorHttp.post 替代 fetchWithTimeout
-      const res = await CapacitorHttp.post({
-        url: url,
+      // ✅ 使用标准 fetch
+      const res = await fetch(url, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        data: {
+        body: JSON.stringify({
           phone: registerPhone,
           password: registerPassword,
           code: registerCode,
-        },
+        }),
       });
 
-      const data = res.data;
+      const data = await res.json();
       
       if (data.success) {
         alert('注册成功！请使用密码登录');
-        // 切换到密码登录Tab，并自动填充手机号
         setLoginMode('password');
         setPhone(registerPhone);
         setPassword('');
@@ -504,7 +494,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           </div>
 
           <div className="space-y-4">
-            {/* 手机号 */}
             <div>
               <input 
                 type="tel" 
@@ -515,7 +504,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
               />
             </div>
 
-            {/* 密码 */}
             <div>
               <input 
                 type="password" 
@@ -526,7 +514,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
               />
             </div>
 
-            {/* 确认密码 */}
             <div>
               <input 
                 type="password" 
@@ -537,7 +524,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
               />
             </div>
 
-            {/* 验证码 */}
             <div className="flex gap-3">
               <input 
                 type="text" 
@@ -557,7 +543,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
             {error && <p className="text-red-500 text-sm">{error}</p>}
 
-            {/* 注册按钮 */}
             <button 
               onClick={handleRegister}
               disabled={loading}
@@ -566,7 +551,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
               {loading ? '注册中...' : '立即注册'}
             </button>
 
-            {/* 返回登录 */}
             <button 
               onClick={() => { setLoginMode('password'); setError(''); }} 
               className="w-full text-center text-gray-400 text-sm hover:text-white transition"
@@ -604,13 +588,11 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         </div>
 
         <div className="space-y-4">
-          {/* 手机号输入 */}
           <div className="group">
             <label className="block text-gray-400 mb-2 text-sm">手机号</label>
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="请输入手机号" className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" maxLength={11} />
           </div>
 
-          {/* 验证码或密码输入 */}
           {loginMode === 'code' ? (
             <div>
               <label className="block text-gray-400 mb-2 text-sm">验证码</label>
@@ -628,7 +610,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
 
-          {/* 登录按钮 */}
           <button onClick={loginMode === 'code' ? handleCodeLogin : handlePasswordLogin} disabled={loading} className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold disabled:opacity-50 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] relative overflow-hidden group">
             <span className="relative z-10 flex items-center justify-center gap-2">
               {loading ? '登录中...' : '登录'}
@@ -638,7 +619,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             )}
           </button>
 
-          {/* 忘记密码链接 */}
           {loginMode === 'password' && (
             <button onClick={() => { setIsForgotMode(true); setError(''); setCode(''); }} className="w-full text-center text-gray-400 text-sm hover:text-white transition">忘记密码？</button>
           )}

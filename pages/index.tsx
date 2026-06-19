@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
-import { CapacitorHttp } from '@capacitor/core';
 
 // 动态导入 Three.js 背景组件（避免 SSR 问题）
 const ThreeBackground = dynamic(() => import('../components/ThreeBackground'), {
@@ -103,14 +102,12 @@ export default function Home() {
     
     if (token && savedUser) {
       // 从后端获取最新的用户信息（包括最新的 daily_count）
-
-      // ✅ 使用 CapacitorHttp.get 替代 fetch
-      CapacitorHttp.get({
-        url: 'https://suma.zeabur.app/api/user-info',
+      // ✅ 使用标准 fetch
+      fetch('https://suma.zeabur.app/api/user-info', {
         headers: { Authorization: `Bearer ${token}` }
       })
-        .then(res => {
-          const data = res.data;
+        .then(res => res.json())
+        .then(data => {
           if (data.success) {
             setUser({
               id: data.user.id,
@@ -119,7 +116,7 @@ export default function Home() {
               daily_count: data.user.daily_count,
               free_used: data.user.free_used ?? 0,
               points: data.user.points ?? 0,
-            });
+            })
             // 同步更新 localStorage
             localStorage.setItem('suma_user', JSON.stringify({
               id: data.user.id,
@@ -128,25 +125,23 @@ export default function Home() {
               daily_count: data.user.daily_count,
               free_used: data.user.free_used ?? 0,
               points: data.user.points ?? 0
-            }));
+            }))
           } else {
-            // token 无效，清除本地存储
-            localStorage.removeItem('token');
-            localStorage.removeItem('suma_user');
+            localStorage.removeItem('token')
+            localStorage.removeItem('suma_user')
           }
         })
         .catch(() => {
-          // 网络错误时，降级使用 localStorage 的数据
           try {
-            setUser(JSON.parse(savedUser));
+            setUser(JSON.parse(savedUser))
           } catch (e) {}
-        });
+        })
     } else if (savedUser) {
-      // 没有 token 时，直接使用 localStorage 的数据（兼容旧版本）
       try {
         setUser(JSON.parse(savedUser))
       } catch (e) {
         localStorage.removeItem('suma_user')
+        localStorage.removeItem('token')
       }
     }
   }, [])
@@ -224,18 +219,17 @@ export default function Home() {
     setIsGenerating(true)
 
     try {
-      // ✅ 使用 CapacitorHttp.post 替代 fetch
-     
-      const res = await CapacitorHttp.post({
-        url: 'https://suma.zeabur.app/api/generate-text',
+      // ✅ 使用标准 fetch
+      const res = await fetch('https://suma.zeabur.app/api/generate-text', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        data: {
+        body: JSON.stringify({
           userId: user.id,
           prompt: textPrompt
-        }
+        })
       })
 
-      const data = res.data  // CapacitorHttp 返回的数据在 data 字段
+      const data = await res.json()
 
       if (data.success) {
         setGeneratedCode(data.code)
@@ -314,18 +308,18 @@ export default function Home() {
       reader.onload = async (e) => {
         const base64 = (e.target?.result as string).split(',')[1]
         
-        // ✅ 使用 CapacitorHttp.post 替代 fetch
-        const res = await CapacitorHttp.post({
-          url: 'https://suma.zeabur.app/api/generate-image',
+        // ✅ 使用标准 fetch
+        const res = await fetch('https://suma.zeabur.app/api/generate-image', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          data: {
+          body: JSON.stringify({
             userId: user.id,
             imageBase64: base64,
             prompt: imagePrompt
-          }
+          })
         })
 
-        const data = res.data  // CapacitorHttp 返回的数据在 data 字段
+        const data = await res.json()
 
         if (data.success) {
           setGeneratedCode(data.code)
@@ -474,17 +468,17 @@ export default function Home() {
     setIsGeneratingVoice(true)
 
     try {
-      // ✅ 使用 CapacitorHttp.post 替代 fetch
-      const res = await CapacitorHttp.post({
-        url: 'https://suma.zeabur.app/api/generate-voice',
+      // ✅ 使用标准 fetch
+      const res = await fetch('https://suma.zeabur.app/api/generate-voice', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        data: {
+        body: JSON.stringify({
           userId: user.id,
           audioBase64
-        }
+        })
       })
 
-      const data = res.data  // CapacitorHttp 返回的数据在 data 字段
+      const data = await res.json()
 
       if (data.success) {
         setGeneratedCode(data.code)
@@ -805,16 +799,16 @@ export default function Home() {
                     onClick={async () => {
                       const reason = prompt('请描述举报原因（选填）：');
                       try {
-                        // ✅ 使用 CapacitorHttp.post 替代 fetch
-                        await CapacitorHttp.post({
-                          url: 'https://suma.zeabur.app/api/report',
+                        // ✅ 使用标准 fetch
+                        await fetch('https://suma.zeabur.app/api/report', {
+                          method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          data: {
+                          body: JSON.stringify({
                             content: generatedCode,
                             reason: reason || '用户举报',
                             userId: user?.id,
                             timestamp: new Date().toISOString()
-                          }
+                          })
                         });
                         alert('举报已提交，我们会尽快处理。感谢反馈！');
                       } catch (error) {
@@ -898,24 +892,24 @@ export default function Home() {
           setShowPayment(false)
           alert('支付成功！正在确认充值，请稍候...')
           
-          // ✅ 使用 CapacitorHttp.get 替代 fetch
-          
-          CapacitorHttp.get({
-            url: 'https://suma.zeabur.app/api/user-info',
+          // ✅ 使用标准 fetch
+          fetch('https://suma.zeabur.app/api/user-info', {
             headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-          }).then(res => {
-            const data = res.data;
-            if (data.success) {
-              console.log('支付后用户信息:', data.user);
-              setUser(data.user)
-              localStorage.setItem('suma_user', JSON.stringify(data.user))
-              alert(`充值成功！点币余额：${data.user.points}，感谢您的支持！`)
-            } else {
-              alert('充值已成功，但获取最新余额失败，请刷新页面查看')
-            }
-          }).catch(() => {
-            alert('充值已成功，但获取最新余额失败，请刷新页面查看')
           })
+            .then(res => res.json())
+            .then(data => {
+              if (data.success) {
+                console.log('支付后用户信息:', data.user);
+                setUser(data.user)
+                localStorage.setItem('suma_user', JSON.stringify(data.user))
+                alert(`充值成功！点币余额：${data.user.points}，感谢您的支持！`)
+              } else {
+                alert('充值已成功，但获取最新余额失败，请刷新页面查看')
+              }
+            })
+            .catch(() => {
+              alert('充值已成功，但获取最新余额失败，请刷新页面查看')
+            })
         }}
       />
 
