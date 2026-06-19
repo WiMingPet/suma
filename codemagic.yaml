@@ -34,8 +34,10 @@ workflows:
         script: npx cap sync ios
       - name: Fix Cordova plugin signing
         script: |
+          echo "Fixing Cordova plugin signing..."
           cd ios/App
           find Pods -name "*.pbxproj" -exec sed -i '' 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' {} \;
+          find Pods -name "*.pbxproj" -exec sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = .*;/PROVISIONING_PROFILE_SPECIFIER = "";/g' {} \;
           echo "Cordova plugin signing fixed"
       - name: Enable In-App Purchase capability
         script: |
@@ -51,7 +53,7 @@ workflows:
         script: |
           # 1. 清理旧构建
           xcodebuild clean -project ios/App/App.xcodeproj -scheme App
-          # 2. 归档 (Archive)
+          # 2. 归档 (Archive) - 添加 -allowProvisioningUpdates
           xcodebuild archive -project ios/App/App.xcodeproj -scheme App -archivePath $HOME/App.xcarchive CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="iPhone Distribution" PROVISIONING_PROFILE_SPECIFIER="SumaAppStore" DEVELOPMENT_TEAM=892N82TP6H -allowProvisioningUpdates
           # 3. 创建 exportOptions.plist 文件
           cat > $HOME/exportOptions.plist <<EOF
