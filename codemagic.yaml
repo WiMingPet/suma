@@ -34,11 +34,13 @@ workflows:
         script: npx cap sync ios
       - name: Fix Cordova plugin signing
         script: |
-          echo "Fixing Cordova plugin signing..."
+          echo "Fixing Cordova plugin signing by modifying App.xcodeproj..."
           cd ios/App
-          find Pods -name "*.pbxproj" -exec sed -i '' 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' {} \;
-          find Pods -name "*.pbxproj" -exec sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = .*;/PROVISIONING_PROFILE_SPECIFIER = "";/g' {} \;
-          echo "Cordova plugin signing fixed"
+          # 修改主项目的签名设置为自动
+          sed -i '' 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' App.xcodeproj/project.pbxproj
+          # 移除所有 PROVISIONING_PROFILE_SPECIFIER
+          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = .*;/PROVISIONING_PROFILE_SPECIFIER = "";/g' App.xcodeproj/project.pbxproj
+          echo "All targets set to automatic signing"
       - name: Enable In-App Purchase capability
         script: |
           echo "Enabling In-App Purchase capability..."
@@ -53,8 +55,8 @@ workflows:
         script: |
           # 1. 清理旧构建
           xcodebuild clean -project ios/App/App.xcodeproj -scheme App
-          # 2. 归档 (Archive) - 添加 -allowProvisioningUpdates
-          xcodebuild archive -project ios/App/App.xcodeproj -scheme App -archivePath $HOME/App.xcarchive CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="iPhone Distribution" PROVISIONING_PROFILE_SPECIFIER="SumaAppStore" DEVELOPMENT_TEAM=892N82TP6H -allowProvisioningUpdates
+          # 2. 归档 (Archive)
+          xcodebuild archive -project ios/App/App.xcodeproj -scheme App -archivePath $HOME/App.xcarchive -allowProvisioningUpdates
           # 3. 创建 exportOptions.plist 文件
           cat > $HOME/exportOptions.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
