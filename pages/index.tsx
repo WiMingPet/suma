@@ -225,8 +225,7 @@ export default function Home() {
 
     try {
       // ✅ 使用 CapacitorHttp.post 替代 fetch
-      import { CapacitorHttp } from '@capacitor/core';
-      
+     
       const res = await CapacitorHttp.post({
         url: 'https://suma.zeabur.app/api/generate-text',
         headers: { 'Content-Type': 'application/json' },
@@ -900,7 +899,6 @@ export default function Home() {
           alert('支付成功！正在确认充值，请稍候...')
           
           // ✅ 使用 CapacitorHttp.get 替代 fetch
-          import { CapacitorHttp } from '@capacitor/core';
           
           CapacitorHttp.get({
             url: 'https://suma.zeabur.app/api/user-info',
