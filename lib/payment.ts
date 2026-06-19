@@ -2,6 +2,7 @@
 // 统一支付入口，根据平台自动选择支付方式
 
 import { Capacitor } from '@capacitor/core';
+import { CapacitorHttp } from '@capacitor/core';
 
 export type PaymentPlatform = 'ios' | 'android' | 'web';
 export type PaymentMethod = 'alipay' | 'iap';
@@ -109,17 +110,18 @@ export async function initiatePayment(params: PaymentParams): Promise<PaymentRes
 // 支付宝支付
 async function initiateAlipayPayment(params: PaymentParams): Promise<PaymentResult> {
   try {
-    const response = await fetch('https://suma.zeabur.app/api/create-payment', {
-      method: 'POST',
+    // ✅ 使用 CapacitorHttp.post 替代 fetch
+    const response = await CapacitorHttp.post({
+      url: 'https://suma.zeabur.app/api/create-payment',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      data: {
         plan: params.plan,
         amount: params.amount,
         points: params.points,
-      }),
+      },
     });
     
-    const data = await response.json();
+    const data = response.data;
     
     if (data.code === 200 && data.qrCode) {
       if (typeof window !== 'undefined') {
@@ -135,7 +137,7 @@ async function initiateAlipayPayment(params: PaymentParams): Promise<PaymentResu
   }
 }
 
-// IAP 支付
+// IAP 支付（保持不变，不涉及网络请求）
 async function initiateIAPPayment(params: PaymentParams): Promise<PaymentResult> {
   try {
     const plugin = await getIAPPlugin();
@@ -204,20 +206,20 @@ async function verifyReceiptOnServer(
   params: PaymentParams
 ): Promise<{ success: boolean; message?: string }> {
   try {
-    const response = await fetch('https://suma.zeabur.app/api/verify-iap', {
-      method: 'POST',
+    // ✅ 使用 CapacitorHttp.post 替代 fetch
+    const response = await CapacitorHttp.post({
+      url: 'https://suma.zeabur.app/api/verify-iap',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      data: {
         receipt,
         transactionId,
         plan: params.plan,
         amount: params.amount,
         points: params.points,
-      }),
+      },
     });
     
-    const data = await response.json();
-    return { success: data.success, message: data.message };
+    return { success: response.data.success, message: response.data.message };
   } catch (error) {
     console.error('收据验证请求失败:', error);
     return { success: false, message: '验证失败，请联系客服' };

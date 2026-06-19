@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { logger } from '../lib/logger'  
+import { CapacitorHttp } from '@capacitor/core'; 
 
 interface User {
   id: string
@@ -18,34 +19,7 @@ interface LoginModalProps {
 
 type LoginMode = 'code' | 'password' | 'register'
 
-// ========== 带超时和重试的 fetch ==========
-const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 15000, retries = 2) => {
-  let lastError: Error | null = null;
-  
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-      
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      return response;
-    } catch (error) {
-      lastError = error as Error;
-      console.log(`请求失败，第 ${attempt + 1} 次尝试:`, error);
-      
-      if (attempt < retries) {
-        await new Promise(r => setTimeout(r, 1000));
-      }
-    }
-  }
-  
-  throw lastError || new Error('请求失败');
-};
+
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps) {
   // UI 状态
@@ -105,55 +79,56 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     onClose()
   }
 
-// ========== 发送验证码 ==========
-const handleSendCode = async () => {
-  // 🔹 记录开始发送验证码
-  logger.info('开始发送验证码', { phone });
+  // ========== 发送验证码 ==========
+  const handleSendCode = async () => {
+    // 🔹 记录开始发送验证码
+    logger.info('开始发送验证码', { phone });
 
-  if (!/^1[3-9]\d{9}$/.test(phone)) {
-    logger.warn('手机号格式错误', { phone });
-    setError('请输入有效的手机号');
-    return;
-  }
-
-  setSending(true);
-  setError('');
-
-  try {
-    const url = 'https://suma.zeabur.app/api/send-sms';
-    logger.info('发起发送验证码请求', { url, phone });
-
-    const res = await fetchWithTimeout(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone })
-    });
-
-    logger.info('发送验证码响应', { status: res.status });
-
-    const data = await res.json();
-    logger.info('发送验证码结果', { success: data.success });
-
-    if (data.success) {
-      setCountdown(60);
-      setError('');
-      if (data.devCode) {
-        console.log(`[DEV] 验证码: ${data.devCode}`);
-        alert(`开发环境验证码: ${data.devCode}`);
-      }
-    } else {
-      logger.warn('发送验证码失败', { error: data.error });
-      setError(data.error || '发送失败');
+    if (!/^1[3-9]\d{9}$/.test(phone)) {
+      logger.warn('手机号格式错误', { phone });
+      setError('请输入有效的手机号');
+      return;
     }
-  } catch (err) {
-    const error = err as Error;
-    logger.error('发送验证码请求异常', error, { phone });
-    console.error('发送注册验证码错误:', err);
-    setError('网络连接失败，请检查网络后重试');
-  } finally {
-    setSending(false);
-  }
-};
+
+    setSending(true);
+    setError('');
+
+    try {
+      const url = 'https://suma.zeabur.app/api/send-sms';
+      logger.info('发起发送验证码请求', { url, phone });
+
+      // ✅ 使用 CapacitorHttp.post 替代 fetchWithTimeout
+      const res = await CapacitorHttp.post({
+        url: url,
+        headers: { 'Content-Type': 'application/json' },
+        data: { phone },
+      });
+
+      logger.info('发送验证码响应', { status: res.status });
+
+      const data = res.data;
+      logger.info('发送验证码结果', { success: data.success });
+
+      if (data.success) {
+        setCountdown(60);
+        setError('');
+        if (data.devCode) {
+          console.log(`[DEV] 验证码: ${data.devCode}`);
+          alert(`开发环境验证码: ${data.devCode}`);
+        }
+      } else {
+        logger.warn('发送验证码失败', { error: data.error });
+        setError(data.error || '发送失败');
+      }
+    } catch (err) {
+      const error = err as Error;
+      logger.error('发送验证码请求异常', error, { phone });
+      console.error('发送注册验证码错误:', err);
+      setError('网络连接失败，请检查网络后重试');
+    } finally {
+      setSending(false);
+    }
+  };
 
   // ========== 发送注册验证码 ==========
   const handleRegisterSendCode = async () => {
@@ -172,15 +147,16 @@ const handleSendCode = async () => {
       const url = 'https://suma.zeabur.app/api/send-sms';
       logger.info('发起发送注册验证码请求', { url, registerPhone });
 
-      const res = await fetchWithTimeout(url, {
-        method: 'POST',
+      // ✅ 使用 CapacitorHttp.post 替代 fetchWithTimeout
+      const res = await CapacitorHttp.post({
+        url: url,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: registerPhone })
+        data: { phone: registerPhone },
       });
 
       logger.info('发送注册验证码响应', { status: res.status });
 
-      const data = await res.json();
+      const data = res.data;
       logger.info('发送注册验证码结果', { success: data.success });
 
       if (data.success) {
@@ -205,6 +181,7 @@ const handleSendCode = async () => {
 
   // ========== 验证码登录 ==========
   const handleCodeLogin = async () => {
+    // 日志记录（保持你的 logger 代码不变）
     logger.info('开始验证码登录', { phone, hasCode: !!code });
 
     if (!phone || !code) {
@@ -220,19 +197,20 @@ const handleSendCode = async () => {
       const url = 'https://suma.zeabur.app/api/login';
       logger.info('发起验证码登录请求', { url, phone });
 
-      const res = await fetchWithTimeout(url, {
-        method: 'POST',
+      // 👇 使用 CapacitorHttp.post 替代 fetch
+      const res = await CapacitorHttp.post({
+        url: url,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, code })
+        data: { phone, code }, // 数据直接以对象形式传入，不需要 JSON.stringify
       });
 
-      logger.info('验证码登录响应', { status: res.status });
+      // CapacitorHttp 的响应结构里，data 字段包含解析好的 JSON 数据
+      const data = res.data;
 
-      const data = await res.json();
+      logger.info('验证码登录响应', { status: res.status });
       logger.info('验证码登录响应数据', { success: data.success, hasUser: !!data.user });
 
       if (data.success) {
-        // 保存 token 和用户信息
         localStorage.setItem('token', data.token);
         localStorage.setItem('suma_user', JSON.stringify(data.user));
         logger.info('验证码登录成功', { phone });
@@ -245,7 +223,6 @@ const handleSendCode = async () => {
     } catch (err) {
       const error = err as Error;
       logger.error('验证码登录请求异常', error, { phone });
-      console.error('登录请求失败:', err);
       setError('网络连接失败，请检查网络后重试');
     } finally {
       setLoading(false);
@@ -269,15 +246,16 @@ const handleSendCode = async () => {
       const url = 'https://suma.zeabur.app/api/login-password';
       logger.info('发起密码登录请求', { url, phone });
 
-      const res = await fetchWithTimeout(url, {
-        method: 'POST',
+      // ✅ 使用 CapacitorHttp.post 替代 fetchWithTimeout
+      const res = await CapacitorHttp.post({
+        url: url,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, password })
+        data: { phone, password },
       });
 
       logger.info('密码登录响应', { status: res.status });
 
-      const data = await res.json();
+      const data = res.data;
       logger.info('密码登录响应数据', { success: data.success });
 
       if (data.success) {
@@ -311,31 +289,35 @@ const handleSendCode = async () => {
     setError('')
 
     try {
-      const res = await fetchWithTimeout('https://suma.zeabur.app/api/send-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone })
-      })
+      const url = 'https://suma.zeabur.app/api/send-sms';
+      logger.info('发起发送验证码请求（忘记密码）', { url, phone });
 
-      const data = await res.json()
+      // ✅ 使用 CapacitorHttp.post 替代 fetchWithTimeout
+      const res = await CapacitorHttp.post({
+        url: url,
+        headers: { 'Content-Type': 'application/json' },
+        data: { phone },
+      });
+
+      const data = res.data;
 
       if (data.success) {
-        setCountdown(60)
-        setError('')
+        setCountdown(60);
+        setError('');
         if (data.devCode) {
-          console.log(`[DEV] 重置验证码: ${data.devCode}`)
-          alert(`开发环境验证码: ${data.devCode}`)
+          console.log(`[DEV] 重置验证码: ${data.devCode}`);
+          alert(`开发环境验证码: ${data.devCode}`);
         }
       } else {
-        setError(data.error || '发送失败')
+        setError(data.error || '发送失败');
       }
     } catch (err) {
-      console.error('忘记密码发送验证码错误:', err)
-      setError('网络连接失败，请检查网络后重试')
+      console.error('忘记密码发送验证码错误:', err);
+      setError('网络连接失败，请检查网络后重试');
     } finally {
-      setSending(false)
+      setSending(false);
     }
-  }
+  };
 
   // ========== 重置密码 ==========
   const handleResetPassword = async () => {
@@ -352,31 +334,35 @@ const handleSendCode = async () => {
     setError('')
 
     try {
-      const res = await fetchWithTimeout('https://suma.zeabur.app/api/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, code, newPassword })
-      })
+      const url = 'https://suma.zeabur.app/api/reset-password';
+      logger.info('发起重置密码请求', { url, phone });
 
-      const data = await res.json()
+      // ✅ 使用 CapacitorHttp.post 替代 fetchWithTimeout
+      const res = await CapacitorHttp.post({
+        url: url,
+        headers: { 'Content-Type': 'application/json' },
+        data: { phone, code, newPassword },
+      });
+
+      const data = res.data;
 
       if (data.success) {
-        alert('密码重置成功，请使用新密码登录')
-        setIsForgotMode(false)
-        setLoginMode('password')
-        setCode('')
-        setNewPassword('')
-        setPassword('')
+        alert('密码重置成功，请使用新密码登录');
+        setIsForgotMode(false);
+        setLoginMode('password');
+        setCode('');
+        setNewPassword('');
+        setPassword('');
       } else {
-        setError(data.error || '重置失败')
+        setError(data.error || '重置失败');
       }
     } catch (err) {
-      console.error('重置密码请求失败:', err)
-      setError('网络连接失败，请检查网络后重试')
+      console.error('重置密码请求失败:', err);
+      setError('网络连接失败，请检查网络后重试');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // ========== 注册新账号 ==========
   const handleRegister = async () => {
@@ -408,39 +394,43 @@ const handleSendCode = async () => {
     setError('')
 
     try {
-      const res = await fetchWithTimeout('https://suma.zeabur.app/api/register', {
-        method: 'POST',
+      const url = 'https://suma.zeabur.app/api/register';
+      logger.info('发起注册请求', { url, registerPhone });
+
+      // ✅ 使用 CapacitorHttp.post 替代 fetchWithTimeout
+      const res = await CapacitorHttp.post({
+        url: url,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        data: {
           phone: registerPhone,
           password: registerPassword,
-          code: registerCode
-        })
-      })
-      
-      const data = await res.json()
+          code: registerCode,
+        },
+      });
+
+      const data = res.data;
       
       if (data.success) {
-        alert('注册成功！请使用密码登录')
+        alert('注册成功！请使用密码登录');
         // 切换到密码登录Tab，并自动填充手机号
-        setLoginMode('password')
-        setPhone(registerPhone)
-        setPassword('')
-        setRegisterPhone('')
-        setRegisterPassword('')
-        setRegisterConfirmPassword('')
-        setRegisterCode('')
-        setError('')
+        setLoginMode('password');
+        setPhone(registerPhone);
+        setPassword('');
+        setRegisterPhone('');
+        setRegisterPassword('');
+        setRegisterConfirmPassword('');
+        setRegisterCode('');
+        setError('');
       } else {
-        setError(data.error || '注册失败')
+        setError(data.error || '注册失败');
       }
     } catch (err) {
-      console.error('注册请求失败:', err)
-      setError('网络连接失败，请稍后重试')
+      console.error('注册请求失败:', err);
+      setError('网络连接失败，请稍后重试');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   if (!isOpen) return null
   

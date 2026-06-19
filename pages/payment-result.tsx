@@ -1,6 +1,7 @@
 // pages/payment-result.tsx
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import { CapacitorHttp } from '@capacitor/core';  // ✅ 添加导入
 
 export default function PaymentResult() {
   const router = useRouter();
@@ -11,14 +12,14 @@ export default function PaymentResult() {
     const { out_trade_no, trade_no, total_amount } = router.query;
 
     if (out_trade_no) {
-      // 调用后端验证支付状态
-      fetch('https://suma.zeabur.app/api/payment/verify', {
-        method: 'POST',
+      // ✅ 使用 CapacitorHttp.post 替代 fetch
+      CapacitorHttp.post({
+        url: 'https://suma.zeabur.app/api/payment/verify',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ out_trade_no, trade_no, total_amount }),
+        data: { out_trade_no, trade_no, total_amount },
       })
-        .then(res => res.json())
-        .then(data => {
+        .then(res => {
+          const data = res.data;
           if (data.success) {
             setStatus('success');
           } else {

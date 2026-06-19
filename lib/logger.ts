@@ -1,4 +1,6 @@
 // lib/logger.ts
+import { CapacitorHttp } from '@capacitor/core';
+
 const LOG_API_URL = 'https://suma.zeabur.app/api/log';
 
 interface LogEntry {
@@ -11,19 +13,17 @@ interface LogEntry {
 
 export async function sendLog(entry: LogEntry) {
   try {
-    // 使用 fetch 发送日志，但不等待响应
-    fetch(LOG_API_URL, {
-      method: 'POST',
+    // ✅ 使用 CapacitorHttp.post 替代 fetch
+    await CapacitorHttp.post({
+      url: LOG_API_URL,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      data: {
         ...entry,
         timestamp: new Date().toISOString(),
-      }),
-    }).catch(() => {
-      // 静默失败，避免日志本身影响 App 功能
+      },
     });
   } catch {
-    // 完全静默
+    // 静默失败，避免日志本身影响 App 功能
   }
 }
 

@@ -1,6 +1,7 @@
 // components/PaymentModal.tsx
 import { useState, useEffect } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
+import { CapacitorHttp } from '@capacitor/core';
 import { initiatePayment, getPaymentMethod, initIAP, getPlatform } from '../lib/payment';
 
 interface PaymentModalProps {
@@ -71,14 +72,16 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
     setLoading(true);
     try {
       const amount = planPrices[plan];
-      const res = await fetch('https://suma.zeabur.app/api/create-payment', {
-        method: 'POST',
+      // ✅ 使用 CapacitorHttp.post 替代 fetch
+      const res = await CapacitorHttp.post({
+        url: 'https://suma.zeabur.app/api/create-payment',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: method, amount, userId, plan }),
+        data: { type: method, amount, userId, plan },
       });
 
+      const data = res.data;
+
       if (method === 'qrcode') {
-        const data = await res.json();
         if (data.success) {
           setQrCode(data.qrCode);
           setOutTradeNo(data.outTradeNo);
@@ -86,7 +89,6 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
           alert(data.error || '创建订单失败');
         }
       } else {
-        const data = await res.json();
         if (data.success && data.payUrl) {
           window.location.href = data.payUrl;
         } else {
@@ -118,8 +120,11 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`https://suma.zeabur.app/api/order-status?outTradeNo=${outTradeNo}`);
-        const data = await res.json();
+        // ✅ 使用 CapacitorHttp.get 替代 fetch
+        const res = await CapacitorHttp.get({
+          url: `https://suma.zeabur.app/api/order-status?outTradeNo=${outTradeNo}`,
+        });
+        const data = res.data;
         if (data.status === 'paid') {
           clearInterval(interval);
           alert(`支付成功！获得 ${planPoints[plan]} 点币`);
