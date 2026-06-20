@@ -12,7 +12,7 @@ export default function PaymentResult() {
 
     if (out_trade_no) {
       // ✅ 使用标准 fetch
-      fetch('https://suma.zeabur.app/api/payment/verify', {
+      fetch('https://sumaai.cn/api/payment/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ out_trade_no, trade_no, total_amount }),

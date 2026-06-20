@@ -52,7 +52,7 @@ export default function MemberCenter() {
       }
       
       // 从 API 获取最新数据
-      const res = await fetch('https://suma.zeabur.app/api/user-info', {
+      const res = await fetch('https://sumaai.cn/api/user-info', {
         headers: { Authorization: `Bearer ${token}` }
       });
       

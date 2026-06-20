@@ -1,7 +1,7 @@
 // lib/logger.ts
 // ✅ 移除 CapacitorHttp 导入，使用标准 fetch
 
-const LOG_API_URL = 'https://suma.zeabur.app/api/log';
+const LOG_API_URL = 'https://sumaai.cn/api/log';
 
 interface LogEntry {
   level: 'info' | 'warn' | 'error';

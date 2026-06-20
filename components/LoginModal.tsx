@@ -91,7 +91,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('');
 
     try {
-      const url = 'https://suma.zeabur.app/api/send-sms';
+      const url = 'https://sumaai.cn/api/send-sms';
       logger.info('发起发送验证码请求', { url, phone });
 
       // ✅ 使用标准 fetch
@@ -141,7 +141,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('');
 
     try {
-      const url = 'https://suma.zeabur.app/api/send-sms';
+      const url = 'https://sumaai.cn/api/send-sms';
       logger.info('发起发送注册验证码请求', { url, registerPhone });
 
       // ✅ 使用标准 fetch
@@ -190,7 +190,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('');
 
     try {
-      const url = 'https://suma.zeabur.app/api/login';
+      const url = 'https://sumaai.cn/api/login';
       logger.info('发起验证码登录请求', { url, phone });
 
       // ✅ 使用标准 fetch
@@ -238,7 +238,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('');
 
     try {
-      const url = 'https://suma.zeabur.app/api/login-password';
+      const url = 'https://sumaai.cn/api/login-password';
       logger.info('发起密码登录请求', { url, phone });
 
       // ✅ 使用标准 fetch
@@ -284,7 +284,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const url = 'https://suma.zeabur.app/api/send-sms';
+      const url = 'https://sumaai.cn/api/send-sms';
       logger.info('发起发送验证码请求（忘记密码）', { url, phone });
 
       // ✅ 使用标准 fetch
@@ -329,7 +329,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const url = 'https://suma.zeabur.app/api/reset-password';
+      const url = 'https://sumaai.cn/api/reset-password';
       logger.info('发起重置密码请求', { url, phone });
 
       // ✅ 使用标准 fetch
@@ -385,7 +385,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setError('')
 
     try {
-      const url = 'https://suma.zeabur.app/api/register';
+      const url = 'https://sumaai.cn/api/register';
       logger.info('发起注册请求', { url, registerPhone });
 
       // ✅ 使用标准 fetch

@@ -197,7 +197,7 @@ export async function initiatePayment(params: PaymentParams): Promise<PaymentRes
 // 支付宝支付
 async function initiateAlipayPayment(params: PaymentParams): Promise<PaymentResult> {
   try {
-    const response = await fetch('https://suma.zeabur.app/api/create-payment', {
+    const response = await fetch('https://sumaai.cn/api/create-payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -300,7 +300,7 @@ async function verifyReceiptOnServer(
   params: PaymentParams
 ): Promise<{ success: boolean; message?: string }> {
   try {
-    const response = await fetch('https://suma.zeabur.app/api/verify-iap', {
+    const response = await fetch('https://sumaai.cn/api/verify-iap', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -74,11 +74,11 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
   }
 
   useEffect(() => {
-    if (isOpen && user) {
-      loadApps()
-      loadFavorites()
+    if (isOpen) {
+      loadApps();
+      loadFavorites();
     }
-  }, [isOpen, user])
+  }, [isOpen]);
 
   const handleDelete = (appId: string) => {
     if (!user) return

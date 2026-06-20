@@ -106,7 +106,7 @@ export default function Home() {
     if (token && savedUser) {
       // 从后端获取最新的用户信息（包括最新的 daily_count）
       // ✅ 使用标准 fetch
-      fetch('https://suma.zeabur.app/api/user-info', {
+      fetch('https://sumaai.cn/api/user-info', {
         headers: { Authorization: `Bearer ${token}` }
       })
         .then(res => res.json())
@@ -223,7 +223,7 @@ export default function Home() {
 
     try {
       // ✅ 使用标准 fetch
-      const res = await fetch('https://suma.zeabur.app/api/generate-text', {
+      const res = await fetch('https://sumaai.cn/api/generate-text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -312,7 +312,7 @@ export default function Home() {
         const base64 = (e.target?.result as string).split(',')[1]
         
         // ✅ 使用标准 fetch
-        const res = await fetch('https://suma.zeabur.app/api/generate-image', {
+        const res = await fetch('https://sumaai.cn/api/generate-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -470,7 +470,7 @@ export default function Home() {
 
     try {
       // ✅ 使用标准 fetch
-      const res = await fetch('https://suma.zeabur.app/api/generate-voice', {
+      const res = await fetch('https://sumaai.cn/api/generate-voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -801,7 +801,7 @@ export default function Home() {
                       const reason = prompt('请描述举报原因（选填）：');
                       try {
                         // ✅ 使用标准 fetch
-                        await fetch('https://suma.zeabur.app/api/report', {
+                        await fetch('https://sumaai.cn/api/report', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
@@ -882,7 +882,7 @@ export default function Home() {
             return
           }
 
-          fetch('https://suma.zeabur.app/api/user-info', {
+          fetch('https://sumaai.cn/api/user-info', {
             headers: { Authorization: `Bearer ${token}` }
           })
             .then(res => {
