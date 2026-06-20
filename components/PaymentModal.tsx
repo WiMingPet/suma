@@ -282,6 +282,29 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
             <p className="text-xs text-gray-500 mt-1">订单号: {outTradeNo}</p>
           </div>
         )}
+        {/* 手动确认按钮（仅支付宝支付时显示） */}
+        {!isIAP && outTradeNo && (
+          <button
+            onClick={async () => {
+              try {
+                const res = await fetch(`https://sumaai.cn/api/order-status?outTradeNo=${outTradeNo}`);
+                const data = await res.json();
+                if (data.status === 'paid') {
+                  alert('支付已确认！');
+                  onSuccess();
+                  onClose();
+                } else {
+                  alert('未检测到支付，请稍后再试');
+                }
+              } catch (err) {
+                alert('查询失败，请稍后重试');
+              }
+            }}
+            className="w-full mt-2 py-2 bg-blue-500 text-white rounded-lg"
+          >
+            我已支付，手动确认
+          </button>
+        )}
 
         <button onClick={onClose} className="w-full mt-3 text-gray-500">
           取消
