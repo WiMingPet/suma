@@ -4,10 +4,10 @@ import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
+import { AudioInput } from 'cordova-plugin-audioinput';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 
-declare var Media: any;
-declare var cordova: any;
+
 
 // 动态导入 Three.js 背景组件（避免 SSR 问题）
 const ThreeBackground = dynamic(() => import('../components/ThreeBackground'), {
@@ -73,8 +73,7 @@ export default function Home() {
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
   const [isGeneratingVoice, setIsGeneratingVoice] = useState(false)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioChunksRef = useRef<Blob[]>([])
+
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   
   // 预览弹窗
@@ -364,30 +363,46 @@ export default function Home() {
     console.log('开始录音');
     
     try {
-      if (typeof Media === 'undefined') {
+      // 1. 检查 AudioInput 是否可用
+      if (typeof AudioInput === 'undefined') {
         alert('录音功能仅在 App 中可用');
         return;
       }
 
-      const fileName = `recording_${Date.now()}.m4a`;
-      const filePath = `${cordova.file.documentsDirectory}${fileName}`;
-      
-      const media = new Media(filePath, 
-        () => {
-          console.log('录音完成');
-          readRecordingFile(filePath);
-        },
-        (err: any) => {
-          console.error('录音错误:', err);
-          alert('录音错误: ' + JSON.stringify(err));
-        }
-      );
+      // 2. 检查权限状态
+      const permission = await AudioInput.checkMicrophonePermission();
+      console.log('权限状态:', permission);
 
-      media.startRecord();
-      mediaRecorderRef.current = media;
+      // 3. 如果没权限，请求权限
+      if (!permission.granted) {
+        const requested = await AudioInput.getMicrophonePermission();
+        if (!requested.granted) {
+          alert('需要麦克风权限才能录音');
+          return;
+        }
+      }
+
+      // 4. 初始化录音配置
+      await AudioInput.initialize({
+        sampleRate: 16000,
+        channels: 1,
+        format: 'PCM_16BIT',
+        normalize: true,
+        bufferSize: 16384,
+      });
+      console.log('AudioInput 初始化成功');
+
+      // 5. 开始录音
+      await AudioInput.start();
+      console.log('录音已开始');
+      
       setIsRecording(true);
       setRecordingTime(0);
 
+      // 6. 计时器（30秒自动停止）
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
       timerRef.current = setInterval(() => {
         setRecordingTime(t => {
           if (t >= 30) {
@@ -404,7 +419,7 @@ export default function Home() {
   };
 
   // 停止录音
-  const stopRecording = () => {
+  const stopRecording = async () => {
     console.log('停止录音');
     
     if (timerRef.current) {
@@ -412,44 +427,38 @@ export default function Home() {
       timerRef.current = null;
     }
 
-    const media = mediaRecorderRef.current as any;
-    if (media) {
-      try {
-        // 兼容多种停止方法
-        if (typeof media.stopRecord === 'function') {
-          media.stopRecord();
-        } else if (typeof media.release === 'function') {
-          media.release();
-        }
-        console.log('录音已停止');
-      } catch (err) {
-        console.error('停止录音失败:', err);
-        alert('停止录音失败: ' + (err as Error).message);
-      }
-      mediaRecorderRef.current = null;
-      setIsRecording(false);
-    }
-  };
-
-  // 读取录音文件
-  const readRecordingFile = async (filePath: string) => {
-    console.log('读取录音文件:', filePath);
-    
     try {
-      const result = await Filesystem.readFile({
-        path: filePath,
-        directory: Directory.Documents,
-      });
+      const result = await AudioInput.stop();
+      console.log('录音已停止，结果:', result);
       
-      const base64 = result.data as string;
-      console.log('文件读取成功，Base64 长度:', base64?.length);
-      
-      if (base64) {
-        await generateFromVoice(base64);
+      setIsRecording(false);
+      setRecordingTime(0);
+
+      // 如果有文件路径，读取并发送
+      if (result && result.fileUrl) {
+        try {
+          // 使用 Capacitor Filesystem 读取文件
+          const { Filesystem, Directory } = await import('@capacitor/filesystem');
+          const fileResult = await Filesystem.readFile({
+            path: result.fileUrl,
+            directory: Directory.Documents,
+          });
+          const base64 = fileResult.data as string;
+          console.log('录音文件读取成功，Base64 长度:', base64?.length);
+          if (base64) {
+            await generateFromVoice(base64);
+          }
+        } catch (err) {
+          console.error('读取录音文件失败:', err);
+          alert('读取录音文件失败: ' + (err as Error).message);
+        }
+      } else {
+        // 如果没有文件路径，提示用户
+        alert('录音已停止，但未生成文件，请检查权限');
       }
     } catch (err) {
-      console.error('读取文件失败:', err);
-      alert('读取录音文件失败: ' + (err as Error).message);
+      console.error('停止录音失败:', err);
+      alert('停止录音失败: ' + (err as Error).message);
     }
   };
 
