@@ -96,14 +96,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (trade_status === 'TRADE_SUCCESS') {
-      // 检查订单状态，避免重复处理
       if (order.status !== 'paid') {
-        // 更新数据库中的订单状态
         await updateOrderStatus(out_trade_no, 'paid');
-        // 升级数据库中的用户会员状态
         await upgradeUserToPro(order.user_id);
         
-        // 根据套餐增加点币
         const planPoints: Record<string, number> = { month: 500, season: 1500, year: 5000 };
         const plan = order.plan;
         if (plan && planPoints[plan]) {
@@ -111,7 +107,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           console.log(`✅ 用户 ${order.user_id} 购买 ${plan} 套餐，获得 ${planPoints[plan]} 点币`);
         }
         
-        console.log(`✅ 订单 ${out_trade_no} 支付成功，用户 ${order.user_id} 已升级为 Pro`);
+        console.log(`✅ 订单 ${out_trade_no} 支付成功`);
       } else {
         console.log(`订单 ${out_trade_no} 已处理过`);
       }
