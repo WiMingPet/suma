@@ -5,8 +5,7 @@ import Head from 'next/head'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
 import { Filesystem, Directory } from '@capacitor/filesystem';
-// pages/index.tsx
-declare var AudioInput: any;
+
 
 
 // 动态导入 Three.js 背景组件（避免 SSR 问题）
@@ -73,7 +72,7 @@ export default function Home() {
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
   const [isGeneratingVoice, setIsGeneratingVoice] = useState(false)
-
+  const audioInputRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   
   // 预览弹窗
@@ -358,25 +357,29 @@ export default function Home() {
     }
   }
 
-  // 开始录音
+  // 开始录音（完全运行时加载，规避构建错误）
   const startRecording = async () => {
     console.log('开始录音');
-    
+
     try {
-      // 动态导入 AudioInput（仅在客户端执行）
-      const { AudioInput } = await import('cordova-plugin-audioinput');
-      
-      // 检查 AudioInput 是否可用
-      if (typeof AudioInput === 'undefined') {
-        alert('录音功能仅在 App 中可用');
+      if (typeof window === 'undefined') {
+        console.warn('非浏览器环境，跳过录音功能');
         return;
       }
 
-      // 检查权限状态
-      const permission = await AudioInput.checkMicrophonePermission();
-      console.log('权限状态:', permission);
+      const audioInputModule = await import('cordova-plugin-audioinput');
+      const AudioInput = audioInputModule.AudioInput;
 
-      // 如果没权限，请求权限
+      if (!AudioInput) {
+        alert('录音功能初始化失败，请检查应用环境');
+        return;
+      }
+
+      // ✅ 保存 AudioInput 到 ref，供 stopRecording 使用
+      audioInputRef.current = AudioInput;
+
+      // ... 权限检查、初始化、开始录音等代码保持不变
+      const permission = await AudioInput.checkMicrophonePermission();
       if (!permission.granted) {
         const requested = await AudioInput.getMicrophonePermission();
         if (!requested.granted) {
@@ -385,7 +388,6 @@ export default function Home() {
         }
       }
 
-      // 初始化录音配置
       await AudioInput.initialize({
         sampleRate: 16000,
         channels: 1,
@@ -395,14 +397,12 @@ export default function Home() {
       });
       console.log('AudioInput 初始化成功');
 
-      // 开始录音
       await AudioInput.start();
       console.log('录音已开始');
-      
+
       setIsRecording(true);
       setRecordingTime(0);
 
-      // 计时器（30秒自动停止）
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
@@ -430,6 +430,13 @@ export default function Home() {
       timerRef.current = null;
     }
 
+    // ✅ 从 ref 中获取 AudioInput
+    const AudioInput = audioInputRef.current;
+    if (!AudioInput) {
+      alert('录音未初始化，请先开始录音');
+      return;
+    }
+
     try {
       const result = await AudioInput.stop();
       console.log('录音已停止，结果:', result);
@@ -437,10 +444,8 @@ export default function Home() {
       setIsRecording(false);
       setRecordingTime(0);
 
-      // 如果有文件路径，读取并发送
       if (result && result.fileUrl) {
         try {
-          // 使用 Capacitor Filesystem 读取文件
           const { Filesystem, Directory } = await import('@capacitor/filesystem');
           const fileResult = await Filesystem.readFile({
             path: result.fileUrl,
@@ -456,7 +461,6 @@ export default function Home() {
           alert('读取录音文件失败: ' + (err as Error).message);
         }
       } else {
-        // 如果没有文件路径，提示用户
         alert('录音已停止，但未生成文件，请检查权限');
       }
     } catch (err) {
