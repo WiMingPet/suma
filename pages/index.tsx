@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
-import { Filesystem, Directory } from '@capacitor/filesystem';
+
 
 
 
@@ -72,7 +72,8 @@ export default function Home() {
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
   const [isGeneratingVoice, setIsGeneratingVoice] = useState(false)
-  const audioInputRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   
   // 预览弹窗
@@ -357,49 +358,58 @@ export default function Home() {
     }
   }
 
-  // 开始录音（完全运行时加载，规避构建错误）
+  // 开始录音
   const startRecording = async () => {
     console.log('开始录音');
-
+    
     try {
-      if (typeof window === 'undefined') {
-        console.warn('非浏览器环境，跳过录音功能');
-        return;
-      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('麦克风权限已获取');
 
-      const audioInputModule = await import('cordova-plugin-audioinput');
-      const AudioInput = audioInputModule.AudioInput;
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
 
-      if (!AudioInput) {
-        alert('录音功能初始化失败，请检查应用环境');
-        return;
-      }
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+          console.log('收到音频数据块:', event.data.size);
+        }
+      };
 
-      // ✅ 保存 AudioInput 到 ref，供 stopRecording 使用
-      audioInputRef.current = AudioInput;
-
-      // ... 权限检查、初始化、开始录音等代码保持不变
-      const permission = await AudioInput.checkMicrophonePermission();
-      if (!permission.granted) {
-        const requested = await AudioInput.getMicrophonePermission();
-        if (!requested.granted) {
-          alert('需要麦克风权限才能录音');
+      mediaRecorder.onstop = async () => {
+        console.log('录音停止，数据块数:', audioChunksRef.current.length);
+        
+        if (audioChunksRef.current.length === 0) {
+          alert('录音数据为空，请重试');
+          setIsRecording(false);
+          setRecordingTime(0);
           return;
         }
-      }
 
-      await AudioInput.initialize({
-        sampleRate: 16000,
-        channels: 1,
-        format: 'PCM_16BIT',
-        normalize: true,
-        bufferSize: 16384,
-      });
-      console.log('AudioInput 初始化成功');
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        console.log('音频 Blob 大小:', audioBlob.size);
 
-      await AudioInput.start();
-      console.log('录音已开始');
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64 = (e.target?.result as string).split(',')[1];
+          console.log('Base64 长度:', base64?.length);
+          if (base64) {
+            generateFromVoice(base64);
+          }
+        };
+        reader.onerror = (err) => {
+          console.error('读取音频数据失败:', err);
+          alert('读取录音数据失败，请重试');
+        };
+        reader.readAsDataURL(audioBlob);
 
+        stream.getTracks().forEach(track => track.stop());
+        setIsRecording(false);
+        setRecordingTime(0);
+      };
+
+      mediaRecorder.start();
       setIsRecording(true);
       setRecordingTime(0);
 
@@ -417,12 +427,12 @@ export default function Home() {
       }, 1000);
     } catch (err) {
       console.error('录音启动失败:', err);
-      alert('录音启动失败: ' + (err as Error).message);
+      alert('无法访问麦克风，请检查权限设置');
     }
   };
 
   // 停止录音
-  const stopRecording = async () => {
+  const stopRecording = () => {
     console.log('停止录音');
     
     if (timerRef.current) {
@@ -430,42 +440,11 @@ export default function Home() {
       timerRef.current = null;
     }
 
-    // ✅ 从 ref 中获取 AudioInput
-    const AudioInput = audioInputRef.current;
-    if (!AudioInput) {
-      alert('录音未初始化，请先开始录音');
-      return;
-    }
-
-    try {
-      const result = await AudioInput.stop();
-      console.log('录音已停止，结果:', result);
-      
-      setIsRecording(false);
-      setRecordingTime(0);
-
-      if (result && result.fileUrl) {
-        try {
-          const { Filesystem, Directory } = await import('@capacitor/filesystem');
-          const fileResult = await Filesystem.readFile({
-            path: result.fileUrl,
-            directory: Directory.Documents,
-          });
-          const base64 = fileResult.data as string;
-          console.log('录音文件读取成功，Base64 长度:', base64?.length);
-          if (base64) {
-            await generateFromVoice(base64);
-          }
-        } catch (err) {
-          console.error('读取录音文件失败:', err);
-          alert('读取录音文件失败: ' + (err as Error).message);
-        }
-      } else {
-        alert('录音已停止，但未生成文件，请检查权限');
-      }
-    } catch (err) {
-      console.error('停止录音失败:', err);
-      alert('停止录音失败: ' + (err as Error).message);
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      console.log('录音停止请求已发送');
+    } else {
+      console.log('没有正在进行的录音');
     }
   };
 
