@@ -577,7 +577,7 @@ export default function Home() {
                   </button>
                 )}
                 <button
-                  onClick={() => setShowLogin(true)}
+                  onClick={goToMemberCenter}
                   className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full text-white font-bold"
                 >
                   {user.phone.slice(-2)}
@@ -876,22 +876,42 @@ export default function Home() {
           setShowPayment(false)
           alert('支付成功！正在确认充值，请稍候...')
           
-          // ✅ 使用标准 fetch
+          const token = localStorage.getItem('token')
+          if (!token) {
+            alert('登录已过期，请重新登录')
+            return
+          }
+
           fetch('https://suma.zeabur.app/api/user-info', {
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+            headers: { Authorization: `Bearer ${token}` }
           })
-            .then(res => res.json())
+            .then(res => {
+              if (!res.ok) throw new Error(`HTTP ${res.status}`)
+              return res.json()
+            })
             .then(data => {
-              if (data.success) {
-                console.log('支付后用户信息:', data.user);
-                setUser(data.user)
-                localStorage.setItem('suma_user', JSON.stringify(data.user))
-                alert(`充值成功！点币余额：${data.user.points}，感谢您的支持！`)
+              if (data.success && data.user) {
+                console.log('支付后用户信息:', data.user)
+                
+                // ✅ 确保所有字段完整
+                const updatedUser = {
+                  id: data.user.id || user?.id || '',
+                  phone: data.user.phone || user?.phone || '',
+                  is_pro: data.user.is_pro ?? false,
+                  daily_count: data.user.daily_count ?? 0,
+                  free_used: data.user.free_used ?? 0,
+                  points: data.user.points ?? 0,
+                }
+                
+                setUser(updatedUser)
+                localStorage.setItem('suma_user', JSON.stringify(updatedUser))
+                alert(`充值成功！点币余额：${updatedUser.points}`)
               } else {
                 alert('充值已成功，但获取最新余额失败，请刷新页面查看')
               }
             })
-            .catch(() => {
+            .catch((err) => {
+              console.error('获取用户信息失败:', err)
               alert('充值已成功，但获取最新余额失败，请刷新页面查看')
             })
         }}
