@@ -32,6 +32,17 @@ workflows:
           echo "out folder verification passed"
       - name: Sync Capacitor
         script: npx cap sync ios
+      - name: Clean Cordova plugin remnants
+        script: |
+          echo "Cleaning Cordova plugin remnants..."
+          cd ios/App
+          # 检查并清理 Podfile 中的 Cordova 引用
+          if [ -f Podfile ]; then
+            sed -i '' '/pod.*CordovaPlugin/d' Podfile
+          fi
+          # 删除残留的 Pods
+          rm -rf Pods/CordovaPlugin* 2>/dev/null || true
+          echo "Cleanup complete"
       - name: Enable In-App Purchase capability
         script: |
           echo "Enabling In-App Purchase capability..."
@@ -47,7 +58,7 @@ workflows:
           # 1. 清理旧构建
           xcodebuild clean -project ios/App/App.xcodeproj -scheme App
           # 2. 归档 (Archive)
-          xcodebuild archive -project ios/App/App.xcodeproj -scheme App -archivePath $HOME/App.xcarchive CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="iPhone Distribution" PROVISIONING_PROFILE_SPECIFIER="SumaAppStore" DEVELOPMENT_TEAM=892N82TP6H
+          xcodebuild archive -project ios/App/App.xcodeproj -scheme App -archivePath $HOME/App.xcarchive CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="iPhone Distribution" PROVISIONING_PROFILE_SPECIFIER="SumaAppStore" DEVELOPMENT_TEAM=892N82TP6H -allowProvisioningUpdates
           # 3. 创建 exportOptions.plist 文件
           cat > $HOME/exportOptions.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>

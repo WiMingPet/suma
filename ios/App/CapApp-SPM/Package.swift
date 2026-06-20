@@ -11,11 +11,9 @@ let package = Package(
             targets: ["CapApp-SPM"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.4.0"),
+        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.4.1"),
         .package(name: "CapacitorFilesystem", path: "..\..\..\node_modules\@capacitor\filesystem"),
-        .package(name: "CapgoNativePurchases", path: "..\..\..\node_modules\@capgo\native-purchases"),
-        .package(name: "CordovaPluginFile", path: "../../capacitor-cordova-ios-plugins/sources/CordovaPluginFile"),
-        .package(name: "CordovaPluginMedia", path: "../../capacitor-cordova-ios-plugins/sources/CordovaPluginMedia")
+        .package(name: "CapgoNativePurchases", path: "..\..\..\node_modules\@capgo\native-purchases")
     ],
     targets: [
         .target(
@@ -24,9 +22,7 @@ let package = Package(
                 .product(name: "Capacitor", package: "capacitor-swift-pm"),
                 .product(name: "Cordova", package: "capacitor-swift-pm"),
                 .product(name: "CapacitorFilesystem", package: "CapacitorFilesystem"),
-                .product(name: "CapgoNativePurchases", package: "CapgoNativePurchases"),
-                .product(name: "CordovaPluginFile", package: "CordovaPluginFile"),
-                .product(name: "CordovaPluginMedia", package: "CordovaPluginMedia")
+                .product(name: "CapgoNativePurchases", package: "CapgoNativePurchases")
             ]
         )
     ]
