@@ -4,9 +4,9 @@ import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
-import { AudioInput } from 'cordova-plugin-audioinput';
 import { Filesystem, Directory } from '@capacitor/filesystem';
-
+// pages/index.tsx
+declare var AudioInput: any;
 
 
 // 动态导入 Three.js 背景组件（避免 SSR 问题）
@@ -363,17 +363,20 @@ export default function Home() {
     console.log('开始录音');
     
     try {
-      // 1. 检查 AudioInput 是否可用
+      // 动态导入 AudioInput（仅在客户端执行）
+      const { AudioInput } = await import('cordova-plugin-audioinput');
+      
+      // 检查 AudioInput 是否可用
       if (typeof AudioInput === 'undefined') {
         alert('录音功能仅在 App 中可用');
         return;
       }
 
-      // 2. 检查权限状态
+      // 检查权限状态
       const permission = await AudioInput.checkMicrophonePermission();
       console.log('权限状态:', permission);
 
-      // 3. 如果没权限，请求权限
+      // 如果没权限，请求权限
       if (!permission.granted) {
         const requested = await AudioInput.getMicrophonePermission();
         if (!requested.granted) {
@@ -382,7 +385,7 @@ export default function Home() {
         }
       }
 
-      // 4. 初始化录音配置
+      // 初始化录音配置
       await AudioInput.initialize({
         sampleRate: 16000,
         channels: 1,
@@ -392,14 +395,14 @@ export default function Home() {
       });
       console.log('AudioInput 初始化成功');
 
-      // 5. 开始录音
+      // 开始录音
       await AudioInput.start();
       console.log('录音已开始');
       
       setIsRecording(true);
       setRecordingTime(0);
 
-      // 6. 计时器（30秒自动停止）
+      // 计时器（30秒自动停止）
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
