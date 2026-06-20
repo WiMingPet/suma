@@ -55,8 +55,8 @@ workflows:
         script: |
           # 1. 清理旧构建
           xcodebuild clean -project ios/App/App.xcodeproj -scheme App
-          # 2. 归档 (Archive)
-          xcodebuild archive -project ios/App/App.xcodeproj -scheme App -archivePath $HOME/App.xcarchive -allowProvisioningUpdates
+          # 2. 归档 (Archive) - 指定团队 ID
+          xcodebuild archive -project ios/App/App.xcodeproj -scheme App -archivePath $HOME/App.xcarchive DEVELOPMENT_TEAM=892N82TP6H -allowProvisioningUpdates
           # 3. 创建 exportOptions.plist 文件
           cat > $HOME/exportOptions.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
