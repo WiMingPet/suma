@@ -1,9 +1,9 @@
 // pages/api/chat.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-const MODEL = process.env.CHAT_MODEL || 'deepseek-chat';
+const MODEL = process.env.CHAT_MODEL || 'deepseek-v4-flash';
 const API_KEY = process.env.CHAT_API_KEY || '';
-const API_BASE = process.env.CHAT_API_BASE || 'https://api.deepseek.com/v1';
+const API_BASE = process.env.CHAT_API_BASE || 'https://api.deepseek.com';
 
 const SYSTEM_PROMPT = `你是速码方舟AI软件的智能助手，同时具备AI编程助手和应用生成能力。
 
@@ -54,12 +54,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { messages } = req.body;
+  const { messages, stream: useStream } = req.body;
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: '缺少 messages 参数' });
   }
 
-  // 检查最后一条用户消息
+  // 内容过滤
   const lastUserMsg = [...messages].reverse().find((m: any) => m.role === 'user');
   if (lastUserMsg) {
     const content = typeof lastUserMsg.content === 'string'
@@ -67,12 +67,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       : lastUserMsg.content?.map((p: any) => p.text || '').join(' ');
 
     if (containsBlockedContent(content)) {
+      // 流式也返回拒绝内容
+      if (useStream) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.write(`data: ${JSON.stringify({ content: '抱歉，您的问题涉及不当内容，我是AI编程助手，请提出编程相关问题。' })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        return res.end();
+      }
       return res.status(200).json({
         success: true,
         reply: '抱歉，您的问题涉及不当内容，我是AI编程助手，请提出编程相关问题。',
       });
     }
   }
+
+  const apiMessages = [{ role: 'system', content: SYSTEM_PROMPT }, ...messages];
 
   try {
     const response = await fetch(`${API_BASE}/chat/completions`, {
@@ -83,10 +93,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
       body: JSON.stringify({
         model: MODEL,
-        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
-        stream: false,
+        messages: apiMessages,
+        stream: useStream ?? false,
         temperature: 0.7,
-        max_tokens: 2048,
+        max_tokens: 4096,
       }),
     });
 
@@ -96,10 +106,64 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: errData.error?.message || 'AI服务暂不可用' });
     }
 
+    // 流式输出
+    if (useStream) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        return res.status(500).json({ error: '无法获取响应流' });
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('data: ')) continue;
+            
+            const data = trimmed.slice(6);
+            if (data === '[DONE]') {
+              res.write('data: [DONE]\n\n');
+              continue;
+            }
+
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                res.write(`data: ${JSON.stringify({ content })}\n\n`);
+              }
+            } catch {
+              // 忽略解析失败的行
+            }
+          }
+        }
+      } catch (err) {
+        console.error('流式读取错误:', err);
+      } finally {
+        reader.releaseLock();
+        res.end();
+      }
+      return;
+    }
+
+    // 非流式输出（兼容）
     const data = await response.json();
     const reply = data.choices?.[0]?.message?.content || '抱歉，我暂时无法回答。';
-
     return res.status(200).json({ success: true, reply });
+
   } catch (error) {
     console.error('聊天请求失败:', error);
     return res.status(500).json({ error: '请求失败，请稍后重试' });
