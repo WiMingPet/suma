@@ -155,7 +155,7 @@ export default function GameSnake({ onClose }: GameSnakeProps) {
 
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
-      gameLoopRef.current = setInterval(moveSnake, 150)
+      gameLoopRef.current = setInterval(moveSnake, 200)
     }
     return () => {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current)

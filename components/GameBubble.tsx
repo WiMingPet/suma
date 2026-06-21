@@ -213,28 +213,19 @@ const applyGravity = (grid: GridType): GridType => {
   return newGrid;
 };
 
-const fillNewBubbles = (grid: GridType): GridType => {
+const fillNewBubbles = (grid: GridType, oldGrid: GridType): GridType => {
   const newGrid: GridType = grid.map(row => [...row]);
-  let emptyCount = 0;
-
-  // 先统计空位数量
-  for (let x = 0; x < GRID_SIZE; x++) {
-    for (let y = 0; y < GRID_SIZE; y++) {
-      if (newGrid[y][x] === null || newGrid[y][x] === undefined) {
-        emptyCount++;
-      }
-    }
-  }
-
-  // 只填充因下落而产生的顶部空位（每列独立处理）
-  for (let x = 0; x < GRID_SIZE; x++) {
-    for (let y = 0; y < GRID_SIZE; y++) {
+  
+  // 只填充因消除变空的位置（旧网格有、新网格为空的）
+  // 下落产生的空位不填充
+  for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < GRID_SIZE; x++) {
       if (newGrid[y][x] === null || newGrid[y][x] === undefined) {
         newGrid[y][x] = Math.floor(Math.random() * BUBBLE_COUNT);
       }
     }
   }
-
+  
   return newGrid;
 };
 
@@ -367,8 +358,7 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
     updateRemainingBubbles(nextGrid);
 
     soundManager.playCascade();
-    nextGrid = applyGravity(nextGrid);
-    setGrid(nextGrid);
+
 
     await new Promise(resolve => setTimeout(resolve, 300));
 
@@ -385,7 +375,27 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
       return newG;
     };
 
-    nextGrid = fillEmptySpots(nextGrid);
+    // 不下落，直接填充消除后的空位
+    const fillOnlyEliminated = (g: GridType, eliminated: Array<{x: number; y: number}>): GridType => {
+      const newG = g.map(row => [...row]);
+      // 对消除位置从下往上冒泡填充
+      for (const { x, y } of eliminated) {
+        // 从消除位置往上找非空泡泡
+        let sourceY = y;
+        while (sourceY > 0 && (newG[sourceY][x] === null || newG[sourceY][x] === undefined)) {
+          sourceY--;
+        }
+        if (sourceY >= 0 && (newG[sourceY][x] !== null && newG[sourceY][x] !== undefined)) {
+          newG[y][x] = newG[sourceY][x];
+          newG[sourceY][x] = Math.floor(Math.random() * BUBBLE_COUNT);
+        } else {
+          newG[y][x] = Math.floor(Math.random() * BUBBLE_COUNT);
+        }
+      }
+      return newG;
+    };
+
+    nextGrid = fillOnlyEliminated(nextGrid, matches);
     setGrid(nextGrid);
     updateRemainingBubbles(nextGrid);
 
