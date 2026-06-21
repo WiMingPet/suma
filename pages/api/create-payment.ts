@@ -3,7 +3,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
 import fs from 'fs';
 import { createOrder } from '../../lib/orderService';
-
+import { generateSign } from '../../lib/alipay';
 
 // 检测是否为移动设备
 function isMobileClient(userAgent: string | undefined): boolean {
@@ -28,37 +28,6 @@ function getPrivateKey(): string {
     console.error('[私钥] 私钥未找到');
     return '';
   }
-}
-
-// 生成签名（与 alipay-notify.ts 的验证逻辑对应）
-function generateSign(params: Record<string, any>, privateKey: string): string {
-  // 过滤参数：排除 sign，排除空值，按 key 排序
-  const filteredParams: Record<string, string> = {};
-  Object.keys(params)
-    .sort()
-    .forEach(key => {
-      const value = params[key];
-      if (key !== 'sign' && value !== undefined && value !== null && value !== '') {
-        filteredParams[key] = String(value);
-      }
-    });
-  
-  // 构建待签名字符串
-  const signContent = Object.entries(filteredParams)
-    .map(([key, value]) => `${key}=${value}`)
-    .join('&');
-  
-  console.log('[生成签名] 待签名字符串:', signContent);
-  console.log('[生成签名] 字符串长度:', signContent.length);
-  
-  // 签名
-  const sign = crypto.createSign('RSA-SHA256');
-  sign.update(signContent);
-  sign.end();
-  const signature = sign.sign(privateKey, 'base64');
-  
-  console.log('[生成签名] 签名结果:', signature.substring(0, 50) + '...');
-  return signature;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -91,7 +60,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const isMobile = isMobileClient(userAgent);
   const type = frontendType || (isMobile ? 'h5' : 'qrcode');
 
-  // ========== 添加调试日志 ==========
   console.log('[请求] frontendType:', frontendType);
   console.log('[请求] isMobile:', isMobile);
   console.log('[请求] 最终 type:', type);
@@ -100,23 +68,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const notifyUrl = `${baseUrl}/api/alipay-notify`;
   const returnUrl = `${baseUrl}/payment-result`;
 
-  // 保存订单到数据库
-  await createOrder(outTradeNo, userId, amount, plan);
-
-  try {
   // 套餐名称映射
   const planNames: Record<string, string> = { month: '月卡', season: '季卡', year: '年卡' };
   const planName = plan && planNames[plan] ? planNames[plan] : 'Pro会员';
-  
-  const bizContent = {
-    out_trade_no: outTradeNo,
-    total_amount: amount,
-    subject: `速码方舟AI软件 ${planName}`,
-  };
 
+  // 保存订单到数据库
+  try {
+    await createOrder(outTradeNo, userId, amount, plan);
+    console.log('[订单] 数据库订单已创建:', outTradeNo);
+  } catch (error) {
+    console.error('[订单] 创建数据库订单失败:', error);
+    return res.status(500).json({ error: '创建订单失败' });
+  }
+
+  try {
     if (type === 'qrcode') {
-      // 电脑扫码支付
-      const params: any = {
+      // ========== 电脑扫码支付 ==========
+      const bizContent = {
+        out_trade_no: outTradeNo,
+        total_amount: amount,
+        subject: `速码方舟AI软件 ${planName}`,
+        product_code: 'FACE_TO_FACE_PAYMENT',
+      };
+
+      const params: Record<string, string> = {
         app_id: appId,
         method: 'alipay.trade.precreate',
         charset: 'utf-8',
@@ -124,12 +99,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
         version: '1.0',
         notify_url: notifyUrl,
-        biz_content: JSON.stringify({
-          ...bizContent,
-          product_code: 'FACE_TO_FACE_PAYMENT',
-        }),
+        biz_content: JSON.stringify(bizContent),
       };
       
+      // 使用统一的签名函数
       params.sign = generateSign(params, privateKey);
       
       const formBody = new URLSearchParams(params).toString();
@@ -140,28 +113,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
       
       const result = await response.json();
+      console.log('[扫码支付] 支付宝响应:', JSON.stringify(result).substring(0, 300));
+      
       const aliResponse = result.alipay_trade_precreate_response;
       
       if (aliResponse?.code === '10000') {
+        console.log('[扫码支付] 订单创建成功:', outTradeNo);
         return res.status(200).json({ 
           success: true, 
           qrCode: aliResponse.qr_code, 
           outTradeNo,
         });
       } else {
+        console.error('[扫码支付] 创建失败:', aliResponse?.sub_msg || aliResponse?.msg);
         throw new Error(aliResponse?.sub_msg || aliResponse?.msg || '创建订单失败');
       }
     } else {
+      // ========== 手机 H5 支付 ==========
       console.log('[手机支付] 进入手机支付分支');
       
       const bizContent = {
         out_trade_no: outTradeNo,
         total_amount: amount,
-        subject: '速码方舟AI软件 Pro会员',
+        subject: `速码方舟AI软件 ${planName}`,
         product_code: 'QUICK_WAP_WAY',
       };
 
-      const params: any = {
+      const params: Record<string, string> = {
         app_id: appId,
         method: 'alipay.trade.wap.pay',
         charset: 'utf-8',
@@ -169,36 +147,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
         version: '1.0',
         notify_url: notifyUrl,
-        return_url: 'https://sumaai.cn/payment/result',
+        return_url: returnUrl,
         biz_content: JSON.stringify(bizContent),
       };
       
-      // 生成签名
-      const sortedParams = Object.keys(params).sort().reduce((obj: any, key) => {
-        if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
-          obj[key] = params[key];
-        }
-        return obj;
-      }, {});
-      const signContent = Object.entries(sortedParams)
-        .map(([k, v]) => `${k}=${v}`)
-        .join('&');
-      const sign = crypto.createSign('RSA-SHA256');
-      sign.update(signContent);
-      sign.end();
-      const signature = sign.sign(privateKey, 'base64');
-      params.sign = signature;
+      // 使用统一的签名函数
+      params.sign = generateSign(params, privateKey);
       
       // 构建完整支付 URL
       const payUrl = `${gateway}?${new URLSearchParams(params).toString()}`;
       console.log('[手机支付] 支付 URL 长度:', payUrl.length);
       
-      // 返回 JSON，让前端跳转
       return res.status(200).json({ success: true, payUrl });
     }
   } catch (error) {
-    console.error('创建订单失败:', error);
+    console.error('[支付] 创建订单失败:', error);
     res.status(500).json({ error: '创建订单失败: ' + (error as Error).message });
   }
 }
-

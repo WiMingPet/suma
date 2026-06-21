@@ -205,8 +205,13 @@ export async function queryAlipayOrder(outTradeNo: string): Promise<string | nul
     const data = await response.json();
     console.log('查询响应:', JSON.stringify(data).substring(0, 200));
 
+    // lib/alipay.ts 第 204 行附近
     if (data.alipay_trade_query_response?.code === '10000') {
       return data.alipay_trade_query_response.trade_status;
+    } else if (data.alipay_trade_query_response?.sub_code === 'ACQ.TRADE_NOT_EXIST') {
+      // 交易不存在（还没支付），正常情况，不打ERROR日志
+      console.log('⏳ 等待支付中...');
+      return null;
     } else {
       console.error('查询失败:', data.alipay_trade_query_response?.msg);
       return null;
