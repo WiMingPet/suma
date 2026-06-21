@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { query } from '../../lib/db'
 import { getUserPoints, deductPoints, incrementFreeUsed, getFreeUsed, getOrCreateUserInDB } from '../../lib/orderService'
 
 const MAX_FREE = 3
@@ -8,11 +9,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { prompt, userId } = req.body
+  const { prompt, userId, background } = req.body
 
   console.log('========== generate-text ==========')
   console.log('userId:', userId)
   console.log('prompt:', prompt)
+  console.log('background:', background)
 
   if (!prompt) {
     return res.status(400).json({ error: '请输入应用描述' })
@@ -26,16 +28,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const userRecord = await getOrCreateUserInDB(userId)
   const isPro = userRecord.is_pro
 
-  // 从数据库获取已使用的免费次数
+  // 检查次数
   const freeUsed = await getFreeUsed(userId)
   const remainingCount = Math.max(0, MAX_FREE - freeUsed)
 
-  // 检查次数（免费用户）
   if (!isPro && remainingCount <= 0) {
     return res.status(403).json({ error: `免费次数已用完（共${MAX_FREE}次），请升级Pro会员或购买点币` })
   }
 
-  // 只有 Pro 用户才检查点币余额
   if (isPro) {
     const points = await getUserPoints(userId)
     if (points <= 0) {
@@ -43,9 +43,80 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
-  // 调用阿里云百炼 API
-  let generatedCode = ''
-  let errorMsg = ''
+  // ========== 后台模式：立即返回，异步执行 ==========
+  if (background) {
+    const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // 创建任务记录
+    await query(
+      `INSERT INTO tasks (task_id, user_id, type, status, prompt, name) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [taskId, userId, 'text', 'processing', prompt, prompt.slice(0, 30) + '...']
+    );
+
+    // 立即返回
+    res.status(200).json({ success: true, taskId, message: '后台生成中，可关闭页面' });
+
+    // 异步执行生成
+    executeTextTask(taskId, userId, prompt, isPro).catch(err => {
+      console.error('后台生成失败:', err);
+      query('UPDATE tasks SET status = $1 WHERE task_id = $2', ['failed', taskId]);
+    });
+    return;
+  }
+
+  // ========== 前台模式：等待完成 ==========
+  const result = await executeTextGeneration(userId, prompt, isPro);
+
+  if (!result.success) {
+    return res.status(500).json({ error: '生成失败' });
+  }
+
+  // 保存到 saved_apps
+  const appId = `app_${Date.now()}`;
+  await query(
+    `INSERT INTO saved_apps (app_id, user_id, name, code, type) VALUES ($1, $2, $3, $4, $5)`,
+    [appId, userId, prompt.slice(0, 30) + '...', result.code, 'text']
+  );
+
+  // 获取最新状态
+  const newFreeUsed = await getFreeUsed(userId);
+  const finalPoints = await getUserPoints(userId);
+
+  return res.status(200).json({
+    success: true,
+    code: result.code,
+    free_used: newFreeUsed,
+    points: finalPoints
+  });
+}
+
+// ========== 后台异步执行 ==========
+async function executeTextTask(taskId: string, userId: string, prompt: string, isPro: boolean) {
+  const result = await executeTextGeneration(userId, prompt, isPro);
+
+  if (result.success) {
+    const appId = `app_${Date.now()}`;
+
+    // 更新任务状态
+    await query(
+      `UPDATE tasks SET status = $1, code = $2, updated_at = NOW() WHERE task_id = $3`,
+      ['completed', result.code, taskId]
+    );
+
+    // 自动保存到我的应用
+    await query(
+      `INSERT INTO saved_apps (app_id, user_id, name, code, type) VALUES ($1, $2, $3, $4, $5)`,
+      [appId, userId, prompt.slice(0, 30) + '...', result.code, 'text']
+    );
+  } else {
+    await query('UPDATE tasks SET status = $1 WHERE task_id = $2', ['failed', taskId]);
+  }
+}
+
+// ========== 核心生成逻辑 ==========
+async function executeTextGeneration(userId: string, prompt: string, isPro: boolean) {
+  let generatedCode = '';
+  let errorMsg = '';
 
   try {
     const response = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
@@ -66,70 +137,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 4. 使用中文界面
 5. 代码必须完整，不要省略任何部分，不要截断`
           },
-          {
-            role: 'user',
-            content: prompt
-          }
+          { role: 'user', content: prompt }
         ],
         temperature: 0.7,
         max_tokens: 8192
       })
-    })
+    });
 
-    const data = await response.json()
-    
+    const data = await response.json();
+
     if (data.error) {
-      errorMsg = data.error.message || 'API调用失败'
-      console.error('API错误:', data.error)
-    } else if (data.choices && data.choices[0] && data.choices[0].message) {
-      generatedCode = data.choices[0].message.content
-      console.log('生成成功，代码长度:', generatedCode.length)
+      errorMsg = data.error.message || 'API调用失败';
+    } else if (data.choices?.[0]?.message) {
+      generatedCode = data.choices[0].message.content;
     } else {
-      errorMsg = '返回数据格式错误'
-      console.error('返回数据:', data)
+      errorMsg = '返回数据格式错误';
     }
   } catch (err: any) {
-    errorMsg = err.message || '网络请求失败'
-    console.error('请求错误:', err)
+    errorMsg = err.message || '网络请求失败';
   }
 
-  // 降级代码
-  if (!generatedCode && errorMsg) {
-    console.log('使用降级模拟代码')
-    generatedCode = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>AI生成应用</title><style>body{font-family:sans-serif;padding:20px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;min-height:100vh;}</style></head><body><div style="max-width:600px;margin:0 auto;background:rgba(255,255,255,0.1);border-radius:16px;padding:24px"><h1>${prompt.substring(0, 30)}</h1><p>⚠️ ${errorMsg}</p><p>这是降级模拟代码</p><button onclick="alert('Hello!')">点击测试</button></div></body></html>`
+  if (!generatedCode) {
+    generatedCode = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>AI生成应用</title><style>body{font-family:sans-serif;padding:20px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;min-height:100vh;}</style></head><body><div style="max-width:600px;margin:0 auto;background:rgba(255,255,255,0.1);border-radius:16px;padding:24px"><h1>${prompt.substring(0, 30)}</h1><p>⚠️ ${errorMsg}</p></div></body></html>`;
   }
 
-  // 更新使用次数和扣点币（仅当生成成功时）
-  if (generatedCode) {
-    // 计算实际字数
-    let contentLength = generatedCode.length
-    const chineseChars = generatedCode.match(/[\u4e00-\u9fa5]/g) || []
-    contentLength = chineseChars.length || generatedCode.length
-    
-    // 每100字2点币，向上取整
-    const costPerHundred = 2
-    const cost = Math.max(1, Math.ceil(contentLength / 100) * costPerHundred)
-    
-    console.log(`生成内容长度: ${contentLength}字，消耗点币: ${cost}`)
-
-    // Pro用户扣点币，免费用户扣免费次数
-    if (isPro) {
-      await deductPoints(userId, cost)
-    } else {
-      await incrementFreeUsed(userId)
-    }
+  // 扣除点币/次数
+  if (isPro) {
+    const contentLength = generatedCode.length;
+    const cost = Math.max(1, Math.ceil(contentLength / 100) * 2);
+    await deductPoints(userId, cost);
+  } else {
+    await incrementFreeUsed(userId);
   }
 
-  // 获取最新的剩余次数和点币余额
-  const newFreeUsed = await getFreeUsed(userId)
-  const remaining = isPro ? -1 : Math.max(0, MAX_FREE - newFreeUsed)
-  const finalPoints = await getUserPoints(userId)
-
-  return res.status(200).json({
-    success: true,
-    code: generatedCode,
-    remaining: remaining,
-    points: finalPoints,
-    free_used: newFreeUsed
-  })
+  return { success: true, code: generatedCode };
 }

@@ -317,6 +317,69 @@ export default function Home() {
     }
   }
 
+  // 后台生成 - 文字
+  const handleBackgroundText = async () => {
+    if (!(await checkAIConsent())) {
+      alert('您需要同意AI服务协议才能使用此功能');
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const res = await fetch('https://sumaai.cn/api/generate-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user!.id, prompt: textPrompt, background: true })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('✅ 后台生成中！完成后自动保存到"我的应用"，可关闭页面');
+        setTextPrompt('');
+      } else {
+        alert(data.error || '创建失败');
+      }
+    } catch (err) {
+      alert('创建失败，请稍后重试');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // 后台生成 - 图片
+  const handleBackgroundImage = async () => {
+    if (!(await checkAIConsent())) {
+      alert('您需要同意AI服务协议才能使用此功能');
+      return;
+    }
+
+    setIsGeneratingImage(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = (e.target?.result as string).split(',')[1];
+        const res = await fetch('https://sumaai.cn/api/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user!.id, imageBase64: base64, prompt: imagePrompt, background: true })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ 后台生成中！完成后自动保存到"我的应用"，可关闭页面');
+          setImagePreview(null);
+          setImageFile(null);
+          setImagePrompt('');
+        } else {
+          alert(data.error || '创建失败');
+        }
+        setIsGeneratingImage(false);
+      };
+      reader.readAsDataURL(imageFile!);
+    } catch (err) {
+      alert('创建失败，请稍后重试');
+      setIsGeneratingImage(false);
+    }
+  };
+
   // 下载代码
   const handleDownload = () => {
     if (!generatedCode) return
@@ -447,19 +510,36 @@ export default function Home() {
                   <p className="text-sm text-gray-400">
                     {user ? (user.is_pro ? `点币余额: ${user.points || 0}` : `剩余免费次数: ${getRemaining()}`) : '登录后可使用'}
                   </p>
-                  <button
-                    onClick={() => {
-                      if (!user.is_pro && getRemaining() <= 0) {
-                        alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
-                        return
-                      }
-                      handleGenerateText()
-                    }}
-                    disabled={isGenerating}
-                    className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium disabled:opacity-50"
-                  >
-                    {isGenerating ? '生成中...' : '生成应用'}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        if (!user.is_pro && getRemaining() <= 0) {
+                          alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
+                          return
+                        }
+                        handleGenerateText()
+                      }}
+                      disabled={isGenerating}
+                      className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                    >
+                      {isGenerating ? '生成中...' : '等待生成'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!user) { setShowLogin(true); return }
+                        if (!user.is_pro && getRemaining() <= 0) {
+                          alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
+                          return
+                        }
+                        if (!textPrompt.trim()) { alert('请输入应用描述'); return }
+                        handleBackgroundText()
+                      }}
+                      disabled={isGenerating}
+                      className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium disabled:opacity-50"
+                    >
+                      后台生成
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -479,7 +559,7 @@ export default function Home() {
                   
                   {imagePreview && (
                     <div className="relative">
-                      <img src={imagePreview} alt="预览" className="max-h-40 rounded-lg" />
+                      <img src={imagePreview} alt="预览" className="max-h-40 max-w-full rounded-lg object-contain" />
                       <button onClick={() => { setImagePreview(null); setImageFile(null) }} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -495,19 +575,36 @@ export default function Home() {
                     className="w-full h-20 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none"
                   />
 
-                  <button
-                    onClick={() => {
-                      if (!user.is_pro && getRemaining() <= 0) {
-                        alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
-                        return
-                      }
-                      handleGenerateImage()
-                    }}
-                    disabled={isGeneratingImage}
-                    className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium disabled:opacity-50"
-                  >
-                    {isGeneratingImage ? '生成中...' : '生成应用'}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        if (!user.is_pro && getRemaining() <= 0) {
+                          alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
+                          return
+                        }
+                        handleGenerateImage()
+                      }}
+                      disabled={isGeneratingImage}
+                      className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                    >
+                      {isGeneratingImage ? '生成中...' : '等待生成'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!user) { setShowLogin(true); return }
+                        if (!user.is_pro && getRemaining() <= 0) {
+                          alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
+                          return
+                        }
+                        if (!imageFile) { alert('请上传图片'); return }
+                        handleBackgroundImage()
+                      }}
+                      disabled={isGeneratingImage}
+                      className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium disabled:opacity-50"
+                    >
+                      后台生成
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

@@ -359,35 +359,42 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
 
     soundManager.playCascade();
 
-    // ✅ 消除后不补新泡泡，只把剩余泡泡向上靠拢
+    // ✅ 消除后只压实，不补新泡泡
     const removeAndCompact = (g: GridType, eliminated: Array<{x: number; y: number}>): GridType => {
       const newG = g.map(row => [...row]);
-      
-      // 先标记消除位置为 null
+      let eliminatedCount = 0;
+
+      // 标记消除位置为 null
       for (const { x, y } of eliminated) {
-        newG[y][x] = null;
-        // 每消除一个，剩余减一
-        setRemainingBubbles(prev => prev - 1);
+        if (newG[y][x] !== null && newG[y][x] !== undefined) {
+          newG[y][x] = null;
+          eliminatedCount++;
+        }
       }
 
-      // 每列从上往下压实（消除 null 空隙）
+      // 每列：收集剩余泡泡，从底部重新排列，顶部留空
       for (let x = 0; x < GRID_SIZE; x++) {
-        const column: BubbleType[] = [];
-        // 收集该列所有非空泡泡（从上往下）
-        for (let y = 0; y < GRID_SIZE; y++) {
-          if (newG[y][x] !== null && newG[y][x] !== undefined) {
-            column.push(newG[y][x]);
-          }
-        }
-        // 从底部往上填充
+        const remaining: BubbleType[] = [];
         for (let y = GRID_SIZE - 1; y >= 0; y--) {
-          if (column.length > 0) {
-            newG[y][x] = column.pop()!;
-          } else {
-            newG[y][x] = null;
+          if (newG[y][x] !== null && newG[y][x] !== undefined) {
+            remaining.push(newG[y][x]);
           }
         }
+        // 清空整列
+        for (let y = 0; y < GRID_SIZE; y++) {
+          newG[y][x] = null;
+        }
+        // 从底部填回剩余泡泡
+        let writeY = GRID_SIZE - 1;
+        for (const bubble of remaining) {
+          newG[writeY][x] = bubble;
+          writeY--;
+        }
+        // 顶部留空，不补新泡泡
       }
+
+      // 更新剩余数量
+      setRemainingBubbles(prev => prev - eliminatedCount);
 
       return newG;
     };

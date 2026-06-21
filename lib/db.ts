@@ -96,7 +96,33 @@ export async function initDatabase() {
     console.log('迁移 password_hash 字段失败:', err);
   }
 
-  console.log('数据库表初始化完成');
+  // 迁移：给 saved_apps 添加唯一约束
+  try {
+    await query(`ALTER TABLE saved_apps ADD CONSTRAINT IF NOT EXISTS unique_app_id UNIQUE (app_id)`);
+    console.log('迁移完成：saved_apps 添加唯一约束');
+  } catch (err) {
+    console.log('迁移 unique_app_id 失败:', err);
+  }
+
+  // 异步任务表
+  const createTasksTable = `
+    CREATE TABLE IF NOT EXISTS tasks (
+      id SERIAL PRIMARY KEY,
+      task_id VARCHAR(50) UNIQUE NOT NULL,
+      user_id VARCHAR(50) NOT NULL,
+      type VARCHAR(20) NOT NULL,
+      status VARCHAR(20) DEFAULT 'processing',
+      prompt TEXT,
+      code TEXT,
+      name VARCHAR(200),
+      plan VARCHAR(20),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+  await query(createTasksTable);
+  await query(`CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id)`);
+  console.log('数据库表 tasks 初始化完成');
 }
 
 // 初始化数据库

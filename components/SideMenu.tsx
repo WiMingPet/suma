@@ -28,11 +28,21 @@ interface SavedApp {
   created_at: string
 }
 
+interface TaskItem {
+  id: string
+  type: string
+  status: string
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
 export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuProps) {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'apps' | 'favorites'>('apps')
+  const [activeTab, setActiveTab] = useState<'apps' | 'favorites' | 'tasks'>('apps')
   const [apps, setApps] = useState<SavedApp[]>([])
   const [favorites, setFavorites] = useState<SavedApp[]>([])
+  const [tasks, setTasks] = useState<TaskItem[]>([])
   const [loading, setLoading] = useState(false)
   const [previewCode, setPreviewCode] = useState<string | null>(null)
 
@@ -52,32 +62,41 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
       const data = await res.json()
       if (data.success) {
         setApps(data.apps || [])
-        // 同步到本地缓存（离线兜底）
         localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(data.apps || []))
-        console.log('从服务器加载应用:', data.apps?.length || 0)
       } else {
-        // 服务器失败，降级到本地缓存
-        console.warn('服务器加载失败，使用本地缓存')
         loadAppsFromLocal()
       }
     } catch (err) {
-      console.error('加载应用失败，使用本地缓存:', err)
+      console.error('加载应用失败:', err)
       loadAppsFromLocal()
     } finally {
       setLoading(false)
     }
   }
 
-  // ========== 本地缓存兜底 ==========
   const loadAppsFromLocal = () => {
     if (!user) return
     try {
       const storedApps = localStorage.getItem(`suma_apps_${user.id}`)
-      const appsList = storedApps ? JSON.parse(storedApps) : []
-      setApps(appsList)
+      setApps(storedApps ? JSON.parse(storedApps) : [])
     } catch (err) {
-      console.error('本地缓存加载失败', err)
       setApps([])
+    }
+  }
+
+  // ========== 加载任务列表 ==========
+  const loadTasks = async () => {
+    if (!user) return
+    try {
+      const res = await fetch(`https://sumaai.cn/api/tasks?userId=${user.id}`, {
+        headers: { 'x-user-id': user.id }
+      })
+      const data = await res.json()
+      if (data.success) {
+        setTasks(data.tasks || [])
+      }
+    } catch (err) {
+      console.error('加载任务失败:', err)
     }
   }
 
@@ -87,7 +106,6 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
     try {
       const storedFavorites = localStorage.getItem(`suma_favorites_${user.id}`)
       const favoriteIds = storedFavorites ? JSON.parse(storedFavorites) : []
-      // 从当前 apps 中筛选收藏的
       const favoriteApps = apps.filter(app => favoriteIds.includes(app.id))
       setFavorites(favoriteApps)
     } catch (err) {
@@ -98,72 +116,58 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
   useEffect(() => {
     if (isOpen && user) {
       loadApps()
+      loadTasks()
     }
   }, [isOpen, user])
 
-  // apps 更新后刷新收藏列表
   useEffect(() => {
     loadFavorites()
   }, [apps])
 
-  // ========== 删除应用（服务器 + 本地） ==========
+  // ========== 删除应用 ==========
   const handleDelete = async (appId: string) => {
     if (!user) return
     try {
-      // 从服务器删除
       await fetch('https://sumaai.cn/api/saved-apps', {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': user.id
-        },
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
         body: JSON.stringify({ id: appId })
       })
 
-      // 更新本地缓存
       const storedApps = localStorage.getItem(`suma_apps_${user.id}`)
       let appsList = storedApps ? JSON.parse(storedApps) : []
       appsList = appsList.filter((app: SavedApp) => app.id !== appId)
       localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(appsList))
 
-      // 同时移除收藏
       const storedFavorites = localStorage.getItem(`suma_favorites_${user.id}`)
       let favoritesList = storedFavorites ? JSON.parse(storedFavorites) : []
       favoritesList = favoritesList.filter((id: string) => id !== appId)
       localStorage.setItem(`suma_favorites_${user.id}`, JSON.stringify(favoritesList))
 
-      // 刷新界面
       setApps(prev => prev.filter(app => app.id !== appId))
       setFavorites(prev => prev.filter(app => app.id !== appId))
     } catch (err) {
-      console.error('删除失败:', err)
       alert('删除失败，请稍后重试')
     }
   }
 
-  // ========== 切换收藏状态 ==========
   const handleToggleFavorite = (appId: string, isFavorite: boolean) => {
     if (!user) return
     try {
       const storedFavorites = localStorage.getItem(`suma_favorites_${user.id}`)
       let favoritesList = storedFavorites ? JSON.parse(storedFavorites) : []
-      
       if (isFavorite) {
-        if (!favoritesList.includes(appId)) {
-          favoritesList.push(appId)
-        }
+        if (!favoritesList.includes(appId)) favoritesList.push(appId)
       } else {
         favoritesList = favoritesList.filter((id: string) => id !== appId)
       }
       localStorage.setItem(`suma_favorites_${user.id}`, JSON.stringify(favoritesList))
-      
       loadFavorites()
     } catch (err) {
       alert('操作失败')
     }
   }
 
-  // ========== 下载应用 ==========
   const handleDownload = (code: string, name: string) => {
     const blob = new Blob([code], { type: 'text/html' })
     const url = URL.createObjectURL(blob)
@@ -176,15 +180,24 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
 
   if (!isOpen) return null
 
-  const currentItems = activeTab === 'apps' ? apps : favorites
-  const emptyMessage = activeTab === 'apps' ? '暂无应用，快去生成一个吧' : '暂无收藏，去我的应用中收藏喜欢的应用吧'
+  const getCurrentItems = () => {
+    if (activeTab === 'apps') return apps
+    if (activeTab === 'favorites') return favorites
+    return tasks
+  }
+
+  const getEmptyMessage = () => {
+    if (activeTab === 'apps') return '暂无应用，快去生成一个吧'
+    if (activeTab === 'favorites') return '暂无收藏'
+    return '暂无生成任务'
+  }
+
+  const currentItems = getCurrentItems()
+  const emptyMessage = getEmptyMessage()
 
   return (
     <>
-      <div
-        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
 
       <div className="fixed top-0 left-0 bottom-0 z-50 w-80 bg-gray-900 shadow-2xl flex flex-col">
         <div className="p-5 border-b border-gray-800 flex-shrink-0">
@@ -199,41 +212,26 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
           {user && (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div
-                  onClick={goToMemberCenter}
-                  className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold cursor-pointer hover:opacity-80 transition"
-                >
+                <div onClick={goToMemberCenter} className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold cursor-pointer hover:opacity-80 transition">
                   {user.phone.slice(-2)}
                 </div>
-                <div 
-                  onClick={goToMemberCenter}
-                  className="cursor-pointer hover:bg-white/5 transition rounded-lg p-2 -m-2"
-                >
+                <div onClick={goToMemberCenter} className="cursor-pointer hover:bg-white/5 transition rounded-lg p-2 -m-2">
                   <p className="text-white font-medium">{user.phone.slice(0, 3)}****{user.phone.slice(-4)}</p>
                   <p className="text-xs text-gray-400">
                     {user.is_pro ? `点币余额: ${user.points || 0}` : `剩余免费次数: ${Math.max(0, 3 - (user.free_used || 0))}`}
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  onLogout()
-                  onClose()
-                }}
-                className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition"
-              >
+              <button onClick={() => { onLogout(); onClose() }} className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition">
                 退出
               </button>
             </div>
           )}
         </div>
 
-        <button
-          onClick={() => {
-            alert('📞 客服联系方式：\n\n邮箱：3060302415@qq.com\n电话：15920978058\n工作时间：9:00-18:00\n\n我们会尽快回复您的问题。')
-          }}
-          className="flex items-center justify-between px-4 py-3 mx-3 my-2 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl transition border border-blue-500/20"
-        >
+        <button onClick={() => {
+          alert('📞 客服联系方式：\n\n邮箱：3060302415@qq.com\n电话：15920978058\n工作时间：9:00-18:00\n\n我们会尽快回复您的问题。')
+        }} className="flex items-center justify-between px-4 py-3 mx-3 my-2 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl transition border border-blue-500/20">
           <div className="flex items-center gap-3">
             <span className="text-xl">💬</span>
             <div className="text-left">
@@ -246,35 +244,29 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
           </svg>
         </button>
 
+        {/* 三个 Tab */}
         <div className="flex border-b border-gray-800 flex-shrink-0">
-          <button
-            onClick={() => setActiveTab('apps')}
-            className={`flex-1 py-3 text-center transition ${
-              activeTab === 'apps'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-gray-400 hover:text-gray-300'
-            }`}
-          >
+          <button onClick={() => setActiveTab('apps')} className={`flex-1 py-3 text-center transition ${activeTab === 'apps' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-300'}`}>
             <span className="flex items-center justify-center gap-2">
               📱 我的应用
               <span className="text-xs bg-gray-800 px-1.5 py-0.5 rounded-full">{apps.length}</span>
             </span>
           </button>
-          <button
-            onClick={() => setActiveTab('favorites')}
-            className={`flex-1 py-3 text-center transition ${
-              activeTab === 'favorites'
-                ? 'text-pink-400 border-b-2 border-pink-400'
-                : 'text-gray-400 hover:text-gray-300'
-            }`}
-          >
+          <button onClick={() => setActiveTab('favorites')} className={`flex-1 py-3 text-center transition ${activeTab === 'favorites' ? 'text-pink-400 border-b-2 border-pink-400' : 'text-gray-400 hover:text-gray-300'}`}>
             <span className="flex items-center justify-center gap-2">
               ❤️ 我的收藏
               <span className="text-xs bg-gray-800 px-1.5 py-0.5 rounded-full">{favorites.length}</span>
             </span>
           </button>
+          <button onClick={() => setActiveTab('tasks')} className={`flex-1 py-3 text-center transition ${activeTab === 'tasks' ? 'text-yellow-400 border-b-2 border-yellow-400' : 'text-gray-400 hover:text-gray-300'}`}>
+            <span className="flex items-center justify-center gap-2">
+              ⏳ 任务
+              <span className="text-xs bg-gray-800 px-1.5 py-0.5 rounded-full">{tasks.length}</span>
+            </span>
+          </button>
         </div>
 
+        {/* 内容区 */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {loading ? (
             <div className="flex justify-center py-8">
@@ -285,8 +277,28 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
               <div className="text-5xl mb-3">📭</div>
               <p className="text-gray-500 text-sm">{emptyMessage}</p>
             </div>
+          ) : activeTab === 'tasks' ? (
+            currentItems.map((task: any) => (
+              <div key={task.id} className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+                <div className="flex items-center justify-between">
+                  <p className="text-white text-sm truncate flex-1">{task.name}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ml-2 ${
+                    task.status === 'completed' ? 'bg-green-600 text-white' :
+                    task.status === 'processing' ? 'bg-yellow-600 text-white animate-pulse' :
+                    'bg-red-600 text-white'
+                  }`}>
+                    {task.status === 'completed' ? '✅ 完成' :
+                     task.status === 'processing' ? '⏳ 生成中' :
+                     '❌ 失败'}
+                  </span>
+                </div>
+                <p className="text-gray-500 text-xs mt-1">
+                  {new Date(task.createdAt).toLocaleString()}
+                </p>
+              </div>
+            ))
           ) : (
-            currentItems.map(app => (
+            currentItems.map((app: any) => (
               <AppCard
                 key={app.id}
                 app={app}
