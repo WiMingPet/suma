@@ -41,65 +41,107 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
     router.push('/member-center')
   }
 
-  const loadApps = () => {
+  // ========== 从服务器加载应用列表 ==========
+  const loadApps = async () => {
     if (!user) return
     setLoading(true)
+    try {
+      const res = await fetch(`https://sumaai.cn/api/saved-apps?userId=${user.id}`, {
+        headers: { 'x-user-id': user.id }
+      })
+      const data = await res.json()
+      if (data.success) {
+        setApps(data.apps || [])
+        // 同步到本地缓存（离线兜底）
+        localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(data.apps || []))
+        console.log('从服务器加载应用:', data.apps?.length || 0)
+      } else {
+        // 服务器失败，降级到本地缓存
+        console.warn('服务器加载失败，使用本地缓存')
+        loadAppsFromLocal()
+      }
+    } catch (err) {
+      console.error('加载应用失败，使用本地缓存:', err)
+      loadAppsFromLocal()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ========== 本地缓存兜底 ==========
+  const loadAppsFromLocal = () => {
+    if (!user) return
     try {
       const storedApps = localStorage.getItem(`suma_apps_${user.id}`)
       const appsList = storedApps ? JSON.parse(storedApps) : []
       setApps(appsList)
-      console.log('加载应用:', appsList.length)
     } catch (err) {
-      console.error('加载应用失败', err)
-    } finally {
-      setLoading(false)
+      console.error('本地缓存加载失败', err)
+      setApps([])
     }
   }
 
+  // ========== 加载收藏列表 ==========
   const loadFavorites = () => {
     if (!user) return
-    setLoading(true)
     try {
       const storedFavorites = localStorage.getItem(`suma_favorites_${user.id}`)
       const favoriteIds = storedFavorites ? JSON.parse(storedFavorites) : []
-      const storedApps = localStorage.getItem(`suma_apps_${user.id}`)
-      const allApps = storedApps ? JSON.parse(storedApps) : []
-      const favoriteApps = allApps.filter(app => favoriteIds.includes(app.id))
+      // 从当前 apps 中筛选收藏的
+      const favoriteApps = apps.filter(app => favoriteIds.includes(app.id))
       setFavorites(favoriteApps)
     } catch (err) {
       console.error('加载收藏失败', err)
-    } finally {
-      setLoading(false)
     }
   }
 
   useEffect(() => {
-    if (isOpen) {
-      loadApps();
-      loadFavorites();
+    if (isOpen && user) {
+      loadApps()
     }
-  }, [isOpen]);
+  }, [isOpen, user])
 
-  const handleDelete = (appId: string) => {
+  // apps 更新后刷新收藏列表
+  useEffect(() => {
+    loadFavorites()
+  }, [apps])
+
+  // ========== 删除应用（服务器 + 本地） ==========
+  const handleDelete = async (appId: string) => {
     if (!user) return
     try {
+      // 从服务器删除
+      await fetch('https://sumaai.cn/api/saved-apps', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.id
+        },
+        body: JSON.stringify({ id: appId })
+      })
+
+      // 更新本地缓存
       const storedApps = localStorage.getItem(`suma_apps_${user.id}`)
       let appsList = storedApps ? JSON.parse(storedApps) : []
       appsList = appsList.filter((app: SavedApp) => app.id !== appId)
       localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(appsList))
-      
+
+      // 同时移除收藏
       const storedFavorites = localStorage.getItem(`suma_favorites_${user.id}`)
       let favoritesList = storedFavorites ? JSON.parse(storedFavorites) : []
       favoritesList = favoritesList.filter((id: string) => id !== appId)
       localStorage.setItem(`suma_favorites_${user.id}`, JSON.stringify(favoritesList))
-      
-      loadApps()
-      loadFavorites()
+
+      // 刷新界面
+      setApps(prev => prev.filter(app => app.id !== appId))
+      setFavorites(prev => prev.filter(app => app.id !== appId))
     } catch (err) {
-      alert('删除失败')
+      console.error('删除失败:', err)
+      alert('删除失败，请稍后重试')
     }
   }
 
+  // ========== 切换收藏状态 ==========
   const handleToggleFavorite = (appId: string, isFavorite: boolean) => {
     if (!user) return
     try {
@@ -115,13 +157,13 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
       }
       localStorage.setItem(`suma_favorites_${user.id}`, JSON.stringify(favoritesList))
       
-      loadApps()
       loadFavorites()
     } catch (err) {
       alert('操作失败')
     }
   }
 
+  // ========== 下载应用 ==========
   const handleDownload = (code: string, name: string) => {
     const blob = new Blob([code], { type: 'text/html' })
     const url = URL.createObjectURL(blob)

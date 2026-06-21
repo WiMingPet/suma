@@ -1,5 +1,6 @@
 // pages/privacy.tsx
 import Head from 'next/head';
+import Link from 'next/link';
 
 export default function Privacy() {
   return (
@@ -9,14 +10,26 @@ export default function Privacy() {
         <meta name="description" content="速码方舟AI软件隐私政策" />
       </Head>
       <div className="min-h-screen bg-gray-50 py-12 px-4">
-        <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg p-8">
+        <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg p-8 relative">
+          
+          {/* 返回按钮 */}
+          <Link
+            href="/"
+            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800 transition-colors"
+            aria-label="关闭"
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </Link>
+
           <h1 className="text-3xl font-bold text-center mb-8">隐私政策</h1>
           <p className="text-center text-gray-500 mb-8">更新日期：2026年5月25日</p>
 
           <div className="space-y-6 text-gray-700">
             <section>
               <h2 className="text-xl font-semibold mb-3">1. 信息收集</h2>
-              <p>速码方舟AI软件 App（以下简称“本App”）由广州速码智能信息有限公司（以下简称“我们”）运营。为了向您提供AI代码生成服务，我们可能会收集以下信息：</p>
+              <p>速码方舟AI软件 App（以下简称"本App"）由广州速码智能信息有限公司（以下简称"我们"）运营。为了向您提供AI代码生成服务，我们可能会收集以下信息：</p>
               <ul className="list-disc pl-6 mt-2 space-y-1">
                 <li><strong>手机号</strong>：用于用户注册、登录及账户识别。</li>
                 <li><strong>提示词/问题描述</strong>：您在使用文字生成、图片识别、语音对话功能时输入的文本内容。</li>
@@ -58,9 +71,9 @@ export default function Privacy() {
               <p className="mb-2"><strong>3.4 用户同意机制</strong><br />
               在您首次使用AI生成功能前，App会通过弹窗明确告知您上述数据处理方式，并需获得您的主动同意后，才会开始处理您的请求。</p>
               <p className="mb-2"><strong>3.5 AI生成内容标识</strong><br />
-              由AI生成的内容会在App界面中明确标注“🤖 AI生成”标识，以便您区分人工创作与AI生成内容。</p>
+              由AI生成的内容会在App界面中明确标注"🤖 AI生成"标识，以便您区分人工创作与AI生成内容。</p>
               <p className="mb-2"><strong>3.6 内容举报机制</strong><br />
-              如您发现AI生成的内容存在违法违规或其他不当情形，您可以通过App内的“举报”按钮向我们反馈，我们将在收到举报后及时处理。</p>
+              如您发现AI生成的内容存在违法违规或其他不当情形，您可以通过App内的"举报"按钮向我们反馈，我们将在收到举报后及时处理。</p>
               <p><strong>3.7 第三方服务商信息</strong><br />
               服务商名称：阿里云计算有限公司<br />
               服务名称：阿里云百炼大模型服务<br />

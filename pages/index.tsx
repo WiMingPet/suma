@@ -246,16 +246,29 @@ export default function Home() {
         }
         setUser(updatedUser)
 
-        // 保存到本地存储
-        const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
-        apps.unshift({
+        // 构建新应用对象
+        const newApp = {
           id: Date.now().toString(),
           name: textPrompt.slice(0, 30) + '...',
           code: data.code,
-          type: 'text',
+          type: 'text' as const,
           created_at: new Date().toISOString()
-        })
+        }
+
+        // 保存到本地缓存
+        const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
+        apps.unshift(newApp)
         localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
+
+        // 同步到服务器（后台静默，不阻塞界面）
+        fetch('https://sumaai.cn/api/saved-apps', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-id': user.id
+          },
+          body: JSON.stringify(newApp)
+        }).catch(err => console.warn('服务器同步失败，已保存到本地', err))
       } else {
         alert(data.error || '生成失败')
       }
@@ -336,16 +349,29 @@ export default function Home() {
           }
           setUser(updatedUser)
           
-          // 保存到本地存储
-          const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
-          apps.unshift({
+          // 构建新应用对象
+          const newApp = {
             id: Date.now().toString(),
             name: `图片应用-${Date.now()}`,
             code: data.code,
-            type: 'image',
+            type: 'image' as const,
             created_at: new Date().toISOString()
-          })
+          }
+
+          // 保存到本地缓存
+          const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
+          apps.unshift(newApp)
           localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
+
+          // 同步到服务器（后台静默，不阻塞界面）
+          fetch('https://sumaai.cn/api/saved-apps', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': user.id
+            },
+            body: JSON.stringify(newApp)
+          }).catch(err => console.warn('服务器同步失败，已保存到本地', err))
         } else {
           alert(data.error || '生成失败')
         }
@@ -493,16 +519,29 @@ export default function Home() {
         }
         setUser(updatedUser)
         
-        // 保存到本地存储
-        const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
-        apps.unshift({
+        // 构建新应用对象
+        const newApp = {
           id: Date.now().toString(),
           name: `语音应用-${Date.now()}`,
           code: data.code,
-          type: 'voice',
+          type: 'voice' as const,
           created_at: new Date().toISOString()
-        })
+        }
+
+        // 保存到本地缓存
+        const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
+        apps.unshift(newApp)
         localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
+
+        // 同步到服务器（后台静默，不阻塞界面）
+        fetch('https://sumaai.cn/api/saved-apps', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-id': user.id
+          },
+          body: JSON.stringify(newApp)
+        }).catch(err => console.warn('服务器同步失败，已保存到本地', err))
       } else {
         alert(data.error || '生成失败')
       }

@@ -50,9 +50,27 @@ export async function initDatabase() {
     );
   `;
 
+  // 新增：保存用户生成的应用
+  const createAppsTable = `
+    CREATE TABLE IF NOT EXISTS saved_apps (
+      id SERIAL PRIMARY KEY,
+      app_id VARCHAR(50) NOT NULL,
+      user_id VARCHAR(50) NOT NULL,
+      name VARCHAR(200) NOT NULL,
+      code TEXT NOT NULL,
+      type VARCHAR(20) DEFAULT 'text',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
   await query(createOrdersTable);
   await query(createUserProTable);
   await query(createPointsTable);
+  await query(createAppsTable);
+
+  // 添加索引加速查询
+  await query(`CREATE INDEX IF NOT EXISTS idx_saved_apps_user_id ON saved_apps(user_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_saved_apps_app_id ON saved_apps(app_id)`);
   
   // 迁移：添加 plan 字段（如果不存在）
   try {
