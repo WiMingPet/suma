@@ -352,74 +352,91 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
     await new Promise(resolve => setTimeout(resolve, 300));
 
     let nextGrid = currentGrid.map(row => [...row]);
+    let eliminatedCount = 0;
+
     for (const match of matches) {
-      nextGrid[match.y][match.x] = null;
+      if (nextGrid[match.y][match.x] !== null && nextGrid[match.y][match.x] !== undefined) {
+        nextGrid[match.y][match.x] = null;
+        eliminatedCount++;
+      }
     }
     setEliminatingBubbles([]);
 
+    // ✅ 更新剩余数量
+    setRemainingBubbles(prev => prev - eliminatedCount);
+
     soundManager.playCascade();
 
-    // ✅ 消除后只压实，不补新泡泡
-    const removeAndCompact = (g: GridType, eliminated: Array<{x: number; y: number}>): GridType => {
-      const newG = g.map(row => [...row]);
-      let eliminatedCount = 0;
-
-      // 标记消除位置为 null
-      for (const { x, y } of eliminated) {
-        if (newG[y][x] !== null && newG[y][x] !== undefined) {
-          newG[y][x] = null;
-          eliminatedCount++;
-        }
-      }
-
-      // 每列：收集剩余泡泡，从底部重新排列，顶部留空
-      for (let x = 0; x < GRID_SIZE; x++) {
-        const remaining: BubbleType[] = [];
-        for (let y = GRID_SIZE - 1; y >= 0; y--) {
-          if (newG[y][x] !== null && newG[y][x] !== undefined) {
-            remaining.push(newG[y][x]);
+    // ✅ 消除后重新填充整个网格
+    const remaining = countRemainingBubbles(nextGrid);
+    
+    if (remaining > 0) {
+      // 保留剩余泡泡，随机重新排列
+      const allBubbles: number[] = [];
+      for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+          if (nextGrid[y][x] !== null && nextGrid[y][x] !== undefined) {
+            allBubbles.push(nextGrid[y][x]!);
           }
         }
-        // 清空整列
-        for (let y = 0; y < GRID_SIZE; y++) {
-          newG[y][x] = null;
-        }
-        // 从底部填回剩余泡泡
-        let writeY = GRID_SIZE - 1;
-        for (const bubble of remaining) {
-          newG[writeY][x] = bubble;
-          writeY--;
-        }
-        // 顶部留空，不补新泡泡
       }
+      
+      // 洗牌
+      for (let i = allBubbles.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [allBubbles[i], allBubbles[j]] = [allBubbles[j], allBubbles[i]];
+      }
+      
+      // 重新填充
+      let idx = 0;
+      for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+          if (idx < allBubbles.length) {
+            nextGrid[y][x] = allBubbles[idx++];
+          } else {
+            nextGrid[y][x] = null;
+          }
+        }
+      }
+      
+      // 检查是否有可消除组合，没有就再洗
+      let newMatches = findMatches(nextGrid);
+      let shuffleCount = 0;
+      while (newMatches.length === 0 && shuffleCount < 10) {
+        for (let i = allBubbles.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [allBubbles[i], allBubbles[j]] = [allBubbles[j], allBubbles[i]];
+        }
+        idx = 0;
+        for (let y = 0; y < GRID_SIZE; y++) {
+          for (let x = 0; x < GRID_SIZE; x++) {
+            if (idx < allBubbles.length) {
+              nextGrid[y][x] = allBubbles[idx++];
+            } else {
+              nextGrid[y][x] = null;
+            }
+          }
+        }
+        newMatches = findMatches(nextGrid);
+        shuffleCount++;
+      }
+    }
 
-      // 更新剩余数量
-      setRemainingBubbles(prev => prev - eliminatedCount);
-
-      return newG;
-    };
-
-    nextGrid = removeAndCompact(nextGrid, matches);
     setGrid(nextGrid);
-    // 不再调用 updateRemainingBubbles，因为 removeAndCompact 里已经逐个减了
 
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    // 检查是否无法继续
     const newMatches = findMatches(nextGrid);
-    const remaining = countRemainingBubbles(nextGrid);
 
     if (remaining === 0) {
       setGameWon(true);
       setMessage('🎉 恭喜通关！🎉');
       soundManager.playWin();
-    } else if (newMatches.length === 0 && remaining > 0) {
-      // 无法继续消除
-      setGameOver(true);
+    } else if (newMatches.length === 0) {
       setMessage(`😞 无法继续消除，剩余 ${remaining} 个泡泡`);
     } else if (newMatches.length > 0) {
       setCombo(prev => prev + 1);
-      setMessage(`连击！消除了 ${newMatches.length} 个泡泡`);
+      setMessage(`消除了 ${eliminatedCount} 个泡泡，剩余 ${remaining} 个`);
       await eliminateMatches(nextGrid, newMatches);
     } else {
       setCombo(0);
