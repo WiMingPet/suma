@@ -19,6 +19,7 @@ const GRID_SIZE = 8;
 const BUBBLE_COUNT = 6;
 const INITIAL_BUBBLES = GRID_SIZE * GRID_SIZE;
 
+
 // 音效管理器
 class SoundManager {
   private audioContext: AudioContext | null = null;
@@ -252,6 +253,7 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
   const [eliminatingBubbles, setEliminatingBubbles] = useState<Array<{x: number; y: number}>>([]);
   const [scorePopups, setScorePopups] = useState<ScorePopup[]>([]);
   const scorePopupIdRef = useRef(0);
+  const [gameOver, setGameOver] = useState(false);
 
   // ✅ 关闭时清理音效
   const handleClose = () => {
@@ -357,47 +359,64 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
 
     soundManager.playCascade();
 
-    // ✅ 只填充消除位置，从上方拉泡泡下来
-    const fillOnlyEliminated = (g: GridType, eliminated: Array<{x: number; y: number}>): GridType => {
+    // ✅ 消除后不补新泡泡，只把剩余泡泡向上靠拢
+    const removeAndCompact = (g: GridType, eliminated: Array<{x: number; y: number}>): GridType => {
       const newG = g.map(row => [...row]);
+      
+      // 先标记消除位置为 null
       for (const { x, y } of eliminated) {
-        let sourceY = y;
-        while (sourceY > 0 && (newG[sourceY][x] === null || newG[sourceY][x] === undefined)) {
-          sourceY--;
-        }
-        if (sourceY >= 0 && newG[sourceY][x] !== null && newG[sourceY][x] !== undefined) {
-          newG[y][x] = newG[sourceY][x];
-          newG[sourceY][x] = Math.floor(Math.random() * BUBBLE_COUNT);
-        } else {
-          newG[y][x] = Math.floor(Math.random() * BUBBLE_COUNT);
-        }
-        // ✅ 每消除一个，剩余减一
+        newG[y][x] = null;
+        // 每消除一个，剩余减一
         setRemainingBubbles(prev => prev - 1);
       }
+
+      // 每列从上往下压实（消除 null 空隙）
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const column: BubbleType[] = [];
+        // 收集该列所有非空泡泡（从上往下）
+        for (let y = 0; y < GRID_SIZE; y++) {
+          if (newG[y][x] !== null && newG[y][x] !== undefined) {
+            column.push(newG[y][x]);
+          }
+        }
+        // 从底部往上填充
+        for (let y = GRID_SIZE - 1; y >= 0; y--) {
+          if (column.length > 0) {
+            newG[y][x] = column.pop()!;
+          } else {
+            newG[y][x] = null;
+          }
+        }
+      }
+
       return newG;
     };
 
-    nextGrid = fillOnlyEliminated(nextGrid, matches);
+    nextGrid = removeAndCompact(nextGrid, matches);
     setGrid(nextGrid);
-    
+    // 不再调用 updateRemainingBubbles，因为 removeAndCompact 里已经逐个减了
 
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 300));
 
+    // 检查是否无法继续
     const newMatches = findMatches(nextGrid);
-    if (newMatches.length > 0) {
+    const remaining = countRemainingBubbles(nextGrid);
+
+    if (remaining === 0) {
+      setGameWon(true);
+      setMessage('🎉 恭喜通关！🎉');
+      soundManager.playWin();
+    } else if (newMatches.length === 0 && remaining > 0) {
+      // 无法继续消除
+      setGameOver(true);
+      setMessage(`😞 无法继续消除，剩余 ${remaining} 个泡泡`);
+    } else if (newMatches.length > 0) {
       setCombo(prev => prev + 1);
       setMessage(`连击！消除了 ${newMatches.length} 个泡泡`);
       await eliminateMatches(nextGrid, newMatches);
     } else {
-      const finalRemaining = countRemainingBubbles(nextGrid);
-      if (finalRemaining === 0) {
-        setGameWon(true);
-        setMessage('🎉 恭喜通关！🎉');
-        soundManager.playWin();
-      } else {
-        setCombo(0);
-        setMessage('请继续消除泡泡');
-      }
+      setCombo(0);
+      setMessage('请继续消除泡泡');
     }
   }, [combo, updateRemainingBubbles]);
 
