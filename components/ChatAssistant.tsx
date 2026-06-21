@@ -160,16 +160,21 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
           <div className="flex items-center gap-2">
             <input
               type="text"
-              className="flex-1 border border-gray-300 dark:border-gray-600 bg-transparent rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 border border-gray-300 dark:border-gray-600 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               placeholder="请输入编程相关问题..."
               value={input}
               onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
             />
             <button
               onClick={sendMessage}
               disabled={loading || !input.trim()}
-              className="p-2 bg-blue-600 text-white rounded-full disabled:opacity-50 hover:bg-blue-700"
+              className="p-2 bg-blue-600 text-white rounded-full disabled:opacity-50 hover:bg-blue-700 flex-shrink-0"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
