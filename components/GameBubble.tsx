@@ -355,49 +355,31 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
     }
     setEliminatingBubbles([]);
 
-    updateRemainingBubbles(nextGrid);
-
     soundManager.playCascade();
 
-
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    // 只填充消除后留下的空位，不填充整个网格
-    const fillEmptySpots = (g: GridType): GridType => {
-      const newG = g.map(row => [...row]);
-      for (let x = 0; x < GRID_SIZE; x++) {
-        for (let y = 0; y < GRID_SIZE; y++) {
-          if (newG[y][x] === null || newG[y][x] === undefined) {
-            newG[y][x] = Math.floor(Math.random() * BUBBLE_COUNT);
-          }
-        }
-      }
-      return newG;
-    };
-
-    // 不下落，直接填充消除后的空位
+    // ✅ 只填充消除位置，从上方拉泡泡下来
     const fillOnlyEliminated = (g: GridType, eliminated: Array<{x: number; y: number}>): GridType => {
       const newG = g.map(row => [...row]);
-      // 对消除位置从下往上冒泡填充
       for (const { x, y } of eliminated) {
-        // 从消除位置往上找非空泡泡
         let sourceY = y;
         while (sourceY > 0 && (newG[sourceY][x] === null || newG[sourceY][x] === undefined)) {
           sourceY--;
         }
-        if (sourceY >= 0 && (newG[sourceY][x] !== null && newG[sourceY][x] !== undefined)) {
+        if (sourceY >= 0 && newG[sourceY][x] !== null && newG[sourceY][x] !== undefined) {
           newG[y][x] = newG[sourceY][x];
           newG[sourceY][x] = Math.floor(Math.random() * BUBBLE_COUNT);
         } else {
           newG[y][x] = Math.floor(Math.random() * BUBBLE_COUNT);
         }
+        // ✅ 每消除一个，剩余减一
+        setRemainingBubbles(prev => prev - 1);
       }
       return newG;
     };
 
     nextGrid = fillOnlyEliminated(nextGrid, matches);
     setGrid(nextGrid);
-    updateRemainingBubbles(nextGrid);
+    
 
     await new Promise(resolve => setTimeout(resolve, 200));
 
