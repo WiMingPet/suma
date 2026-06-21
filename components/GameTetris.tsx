@@ -120,17 +120,60 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
   }, [piece, board, isPlaying, gameOver, isPaused, checkCollision])
 
   const hardDrop = useCallback(() => {
-    if (!piece || !isPlaying || gameOver || isPaused) return
+    if (!piece || !isPlaying || gameOver || isPaused) return;
     
-    let finalY = piece.y
+    // 直接计算，不依赖 state
+    let finalY = piece.y;
     while (!checkCollision(piece.shape, piece.x, finalY + 1, board)) {
-      finalY++
+      finalY++;
     }
     
-    setPiece({ ...piece, y: finalY })
-    soundManager.hardDrop()
-    mergePiece()
-  }, [piece, board, isPlaying, gameOver, isPaused, checkCollision, mergePiece])
+    // 用最终位置创建新方块
+    const droppedPiece = { ...piece, y: finalY };
+    
+    // 立即合并到棋盘
+    const newBoard = board.map(row => [...row]);
+    for (let r = 0; r < droppedPiece.shape.length; r++) {
+      for (let c = 0; c < droppedPiece.shape[0].length; c++) {
+        if (droppedPiece.shape[r][c]) {
+          const cy = droppedPiece.y + r;
+          const cx = droppedPiece.x + c;
+          if (cy >= 0 && cy < BOARD_HEIGHT) {
+            newBoard[cy][cx] = droppedPiece.colorIdx + 1;
+          }
+        }
+      }
+    }
+
+    // 消除满行
+    let rowsCleared = 0;
+    const finalBoard = newBoard.filter(row => {
+      if (row.every(cell => cell !== 0)) { rowsCleared++; return false; }
+      return true;
+    });
+    for (let i = 0; i < rowsCleared; i++) finalBoard.unshift(Array(BOARD_WIDTH).fill(0));
+
+    if (rowsCleared > 0) soundManager.clearLine(rowsCleared);
+    
+    const newScore = score + [0, 40, 100, 300, 1200][rowsCleared] * (level + 1);
+    setScore(newScore);
+    setLevel(Math.floor(newScore / 500));
+    setBoard(finalBoard);
+    
+    soundManager.hardDrop();
+
+    // 生成新方块
+    const newPiece = getRandomPiece();
+    if (checkCollision(newPiece.shape, newPiece.x, newPiece.y, finalBoard)) {
+      soundManager.gameOver();
+      soundManager.stopBGM();
+      setGameOver(true);
+      setIsPlaying(false);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    } else {
+      setPiece(newPiece);
+    }
+  }, [piece, board, score, level, isPlaying, gameOver, isPaused, checkCollision, getRandomPiece]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

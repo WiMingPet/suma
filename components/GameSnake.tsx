@@ -16,6 +16,41 @@ const INITIAL_SNAKE = [
 ]
 const INITIAL_DIRECTION = 'RIGHT'
 
+// ✅ 贪吃蛇音效
+class SnakeSound {
+  private ctx: AudioContext | null = null;
+  
+  private init() {
+    if (!this.ctx) this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  }
+
+  private play(freq: number, dur: number) {
+    try {
+      this.init();
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'square';
+      gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + dur);
+      osc.start();
+      osc.stop(this.ctx.currentTime + dur);
+    } catch {}
+  }
+
+  eat() { this.play(523, 0.08); setTimeout(() => this.play(659, 0.08), 80); }
+  die() { this.play(200, 0.2); setTimeout(() => this.play(150, 0.3), 200); }
+  
+  destroy() {
+    if (this.ctx) { this.ctx.close(); this.ctx = null; }
+  }
+}
+
+const snakeSound = new SnakeSound();
+
 export default function GameSnake({ onClose }: GameSnakeProps) {
   const [snake, setSnake] = useState(INITIAL_SNAKE)
   const [direction, setDirection] = useState(INITIAL_DIRECTION)
@@ -26,15 +61,15 @@ export default function GameSnake({ onClose }: GameSnakeProps) {
   const [isPaused, setIsPaused] = useState(false)
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null)
 
-  // ✅ 关闭时清理定时器
   const handleClose = () => {
+    snakeSound.destroy();
     if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     onClose();
   };
 
-  // ✅ 组件卸载时清理
   useEffect(() => {
     return () => {
+      snakeSound.destroy();
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     };
   }, []);
@@ -70,6 +105,7 @@ export default function GameSnake({ onClose }: GameSnakeProps) {
       const isEating = newHead[0] === food[0] && newHead[1] === food[1]
 
       if (isEating) {
+        snakeSound.eat();
         setScore(s => s + 10)
         generateFood()
         return [newHead, ...newSnake]
@@ -82,6 +118,7 @@ export default function GameSnake({ onClose }: GameSnakeProps) {
       const hitSelf = newSnake.slice(1).some(segment => segment[0] === newHead[0] && segment[1] === newHead[1])
 
       if (hitWall || hitSelf) {
+        snakeSound.die();
         setGameOver(true)
         setIsPlaying(false)
         if (gameLoopRef.current) clearInterval(gameLoopRef.current)

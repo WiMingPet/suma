@@ -215,6 +215,18 @@ const applyGravity = (grid: GridType): GridType => {
 
 const fillNewBubbles = (grid: GridType): GridType => {
   const newGrid: GridType = grid.map(row => [...row]);
+  let emptyCount = 0;
+
+  // 先统计空位数量
+  for (let x = 0; x < GRID_SIZE; x++) {
+    for (let y = 0; y < GRID_SIZE; y++) {
+      if (newGrid[y][x] === null || newGrid[y][x] === undefined) {
+        emptyCount++;
+      }
+    }
+  }
+
+  // 只填充因下落而产生的顶部空位（每列独立处理）
   for (let x = 0; x < GRID_SIZE; x++) {
     for (let y = 0; y < GRID_SIZE; y++) {
       if (newGrid[y][x] === null || newGrid[y][x] === undefined) {
@@ -222,6 +234,7 @@ const fillNewBubbles = (grid: GridType): GridType => {
       }
     }
   }
+
   return newGrid;
 };
 
@@ -359,9 +372,21 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
 
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    nextGrid = fillNewBubbles(nextGrid);
-    setGrid(nextGrid);
+    // 只填充消除后留下的空位，不填充整个网格
+    const fillEmptySpots = (g: GridType): GridType => {
+      const newG = g.map(row => [...row]);
+      for (let x = 0; x < GRID_SIZE; x++) {
+        for (let y = 0; y < GRID_SIZE; y++) {
+          if (newG[y][x] === null || newG[y][x] === undefined) {
+            newG[y][x] = Math.floor(Math.random() * BUBBLE_COUNT);
+          }
+        }
+      }
+      return newG;
+    };
 
+    nextGrid = fillEmptySpots(nextGrid);
+    setGrid(nextGrid);
     updateRemainingBubbles(nextGrid);
 
     await new Promise(resolve => setTimeout(resolve, 200));
