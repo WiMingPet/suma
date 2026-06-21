@@ -27,6 +27,21 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
   const [isPaused, setIsPaused] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
+  // ✅ 关闭时停止所有声音
+  const handleClose = () => {
+    soundManager.stopBGM();
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    onClose();
+  };
+
+  // ✅ 组件卸载时清理
+  useEffect(() => {
+    return () => {
+      soundManager.stopBGM();
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
   const getRandomPiece = useCallback(() => {
     const idx = Math.floor(Math.random() * SHAPES.length)
     const { shape, color } = SHAPES[idx]
@@ -54,7 +69,6 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
           if (y >= 0 && y < BOARD_HEIGHT) newBoard[y][x] = piece.colorIdx + 1
         }
 
-    // 消除满行
     let rowsCleared = 0
     const finalBoard = newBoard.filter(row => {
       if (row.every(cell => cell !== 0)) { rowsCleared++; return false }
@@ -62,7 +76,6 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
     })
     for (let i = 0; i < rowsCleared; i++) finalBoard.unshift(Array(BOARD_WIDTH).fill(0))
 
-    // 播放消除行音效（传入消除行数，行数越多音效越震撼）
     if (rowsCleared > 0) {
       soundManager.clearLine(rowsCleared)
     }
@@ -74,8 +87,8 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
 
     const newPiece = getRandomPiece()
     if (checkCollision(newPiece.shape, newPiece.x, newPiece.y, finalBoard)) {
-      soundManager.gameOver()  // 游戏结束音效
-      soundManager.stopBGM()   // 停止背景音乐
+      soundManager.gameOver()
+      soundManager.stopBGM()
       setGameOver(true)
       setIsPlaying(false)
       if (intervalRef.current) clearInterval(intervalRef.current)
@@ -89,10 +102,10 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
     const newX = piece.x + dx, newY = piece.y + dy
     if (!checkCollision(piece.shape, newX, newY, board)) {
       setPiece({ ...piece, x: newX, y: newY })
-      if (dx !== 0) soundManager.move()  // 左右移动音效
-      else if (dy === 1) soundManager.softDrop()  // 向下移动音效
+      if (dx !== 0) soundManager.move()
+      else if (dy === 1) soundManager.softDrop()
     } else if (dy === 1) {
-      soundManager.drop()  // 下落音效
+      soundManager.drop()
       mergePiece()
     }
   }, [piece, board, isPlaying, gameOver, isPaused, checkCollision, mergePiece])
@@ -102,24 +115,20 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
     const rotated = piece.shape[0].map((_, idx) => piece.shape.map(row => row[idx]).reverse())
     if (!checkCollision(rotated, piece.x, piece.y, board)) {
       setPiece({ ...piece, shape: rotated })
-      soundManager.rotate()  // 旋转音效
+      soundManager.rotate()
     }
   }, [piece, board, isPlaying, gameOver, isPaused, checkCollision])
 
   const hardDrop = useCallback(() => {
     if (!piece || !isPlaying || gameOver || isPaused) return
     
-    // 计算最终 Y 位置（不触发渲染）
     let finalY = piece.y
     while (!checkCollision(piece.shape, piece.x, finalY + 1, board)) {
       finalY++
     }
     
-    // 一次性更新位置
     setPiece({ ...piece, y: finalY })
-    soundManager.hardDrop()   // 改为强效硬降音效
-    
-    // 立即固定方块
+    soundManager.hardDrop()
     mergePiece()
   }, [piece, board, isPlaying, gameOver, isPaused, checkCollision, mergePiece])
 
@@ -146,9 +155,9 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
   }, [isPlaying, gameOver, isPaused, move, level])
 
   const startGame = () => {
-    soundManager.init()  // 用户点击时初始化音效
-    soundManager.startGame()   // 播放开始音效
-    soundManager.startBGM()    // 启动背景音乐
+    soundManager.init()
+    soundManager.startGame()
+    soundManager.startBGM()
     setBoard(Array(BOARD_HEIGHT).fill(0).map(() => Array(BOARD_WIDTH).fill(0)))
     setScore(0); setLevel(0); setGameOver(false); setIsPaused(false); setIsPlaying(true)
     setPiece(getRandomPiece())
@@ -157,8 +166,13 @@ export default function GameTetris({ onClose }: GameTetrisProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
       <div className="bg-gray-900 rounded-2xl p-6 max-w-lg w-full">
-        <div className="flex justify-between items-center mb-4"><h2 className="text-2xl font-bold text-white">俄罗斯方块</h2><button onClick={onClose} className="text-gray-400 hover:text-white">✕</button></div>
-        <div className="flex justify-between mb-4"><span className="text-white">得分: {score}</span><span className="text-white">等级: {level}</span>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-white">俄罗斯方块</h2>
+          <button onClick={handleClose} className="text-gray-400 hover:text-white text-xl font-bold p-1">✕</button>
+        </div>
+        <div className="flex justify-between mb-4">
+          <span className="text-white">得分: {score}</span>
+          <span className="text-white">等级: {level}</span>
           <div className="flex gap-2">
             {isPlaying && !gameOver && <button onClick={() => setIsPaused(p => !p)} className="px-3 py-1 bg-gray-700 rounded-lg text-white text-sm">{isPaused ? '继续' : '暂停'}</button>}
             {(!isPlaying || gameOver) && <button onClick={startGame} className="px-4 py-2 bg-green-600 rounded-lg text-white">{gameOver ? '重新开始' : '开始游戏'}</button>}

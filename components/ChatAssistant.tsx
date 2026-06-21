@@ -102,7 +102,7 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
     setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetch('https://sumaai.cn/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: updatedMessages, stream: true }),
@@ -211,7 +211,7 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
         <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-        <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl h-[90vh] flex flex-col overflow-hidden">
+        <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl h-[90vh] flex flex-col overflow-y-auto">
           {/* 头部 */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">🤖 AI编程助手</h3>

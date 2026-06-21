@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import PaymentModal from '../components/PaymentModal';
-import { getPlatform } from '../lib/payment';
 
 interface UserInfo {
   phone?: string;
@@ -29,75 +28,65 @@ export default function MemberCenter() {
       const token = localStorage.getItem('token');
       const savedUser = localStorage.getItem('suma_user');
       
-      // 先使用 localStorage 中的缓存数据（如果有）
+      // 优先从 localStorage 加载缓存数据
+      let cachedUser: UserInfo | null = null;
       if (savedUser) {
         try {
           const cached = JSON.parse(savedUser);
-          setUserInfo({
+          cachedUser = {
             phone: cached.phone || '',
             points: cached.points ?? 0,
             is_pro: cached.is_pro ?? false,
             pro_expire_at: cached.pro_expire_at || null,
-          });
+          };
+          setUserInfo(cachedUser);
+          setLoading(false);
         } catch (e) {
-          console.error('解析缓存用户数据失败:', e);
+          console.error('解析缓存失败:', e);
         }
       }
 
-      // 如果没有 token，直接使用缓存数据
+      // 如果没有 token，使用缓存
       if (!token) {
-        console.log('未找到 token，使用缓存数据');
-        setLoading(false);
+        if (!cachedUser) {
+          setUserInfo(null);
+          setLoading(false);
+        }
         return;
       }
       
-      // 从 API 获取最新数据
-      const res = await fetch('https://sumaai.cn/api/user-info', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      // 如果 token 无效，保留缓存数据
-      if (res.status === 401 || res.status === 403) {
-        console.log('Token 无效，使用缓存数据');
-        setLoading(false);
-        return;
-      }
+      // 从服务器获取最新数据
+      try {
+        const res = await fetch('https://sumaai.cn/api/user-info', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
 
-      // 如果响应不是 JSON（比如 404），直接返回
-      const contentType = res.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.warn('API 返回非 JSON 数据，使用缓存数据');
-        setLoading(false);
-        return;
-      }
+        if (!res.ok) {
+          // token 无效，清除登录状态
+          if (res.status === 401 || res.status === 403) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('suma_user');
+            setUserInfo(null);
+          }
+          return;
+        }
 
-      const data = await res.json();
-      console.log('API 返回数据:', data);
-      
-      // 解析 API 返回的用户数据
-      let userData = null;
-      if (data.success && data.user) {
-        userData = {
-          phone: data.user.phone || '',
-          points: data.user.points ?? 0,
-          is_pro: data.user.is_pro ?? false,
-          pro_expire_at: data.user.pro_expire_at || null,
-        };
-      } else if (data.phone) {
-        userData = {
-          phone: data.phone || '',
-          points: data.points ?? 0,
-          is_pro: data.is_pro ?? false,
-          pro_expire_at: data.pro_expire_at || null,
-        };
-      }
-
-      // 如果成功获取到用户数据，更新状态和缓存
-      if (userData) {
-        setUserInfo(userData);
-        localStorage.setItem('suma_user', JSON.stringify(userData));
-      } else {
-        console.warn('无法解析用户数据，保留缓存');
+        const data = await res.json();
+        
+        if (data.success && data.user) {
+          const serverUser = {
+            phone: data.user.phone || '',
+            points: data.user.points ?? 0,
+            is_pro: data.user.is_pro ?? false,
+            pro_expire_at: data.user.pro_expire_at || null,
+          };
+          setUserInfo(serverUser);
+          // 更新缓存
+          localStorage.setItem('suma_user', JSON.stringify(serverUser));
+        }
+      } catch (err) {
+        console.warn('获取服务器数据失败，使用缓存:', err);
+        // 网络错误时保留缓存数据
       }
     } catch (error) {
       console.error('获取用户信息失败:', error);
@@ -115,10 +104,28 @@ export default function MemberCenter() {
     setShowPaymentModal(true);
   };
 
+  const handleBack = () => {
+    router.push('/');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-gray-500">加载中...</div>
+      </div>
+    );
+  }
+
+  if (!userInfo || !userInfo.phone) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
+        <p className="text-gray-500">未登录，请返回首页登录</p>
+        <button
+          onClick={() => router.push('/')}
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg"
+        >
+          返回首页
+        </button>
       </div>
     );
   }
@@ -128,7 +135,7 @@ export default function MemberCenter() {
       <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6">
         <div className="flex items-center justify-between mb-4">
           <button 
-            onClick={() => router.back()} 
+            onClick={handleBack} 
             className="p-2 hover:bg-white/20 rounded-lg transition flex items-center gap-1"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,14 +150,14 @@ export default function MemberCenter() {
         <div className="mt-4 flex justify-between items-end">
           <div>
             <p className="text-sm opacity-90">手机号</p>
-            <p className="text-lg font-semibold">{userInfo?.phone || '未登录'}</p>
+            <p className="text-lg font-semibold">{userInfo.phone}</p>
           </div>
           <div className="text-right">
             <p className="text-sm opacity-90">点币余额</p>
-            <p className="text-2xl font-bold">{userInfo?.points || 0}</p>
+            <p className="text-2xl font-bold">{userInfo.points || 0}</p>
           </div>
         </div>
-        {userInfo?.is_pro && userInfo?.pro_expire_at && (
+        {userInfo.is_pro && userInfo.pro_expire_at && (
           <div className="mt-3 text-sm bg-white/20 rounded-lg p-2 text-center">
             会员有效期至：{new Date(userInfo.pro_expire_at).toLocaleDateString()}
           </div>
@@ -198,12 +205,11 @@ export default function MemberCenter() {
       <PaymentModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
-        userId={userInfo?.phone || ''}
+        userId={userInfo.phone || ''}
         onSuccess={() => {
-          setShowPaymentModal(false)
-          // ✅ 重新获取用户信息，刷新点币余额和会员状态
-          fetchUserInfo()
-          alert('支付成功！')
+          setShowPaymentModal(false);
+          fetchUserInfo();
+          alert('支付成功！');
         }}
         plan={selectedPlan}
       />

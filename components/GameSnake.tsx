@@ -26,7 +26,19 @@ export default function GameSnake({ onClose }: GameSnakeProps) {
   const [isPaused, setIsPaused] = useState(false)
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null)
 
-  // 生成新食物
+  // ✅ 关闭时清理定时器
+  const handleClose = () => {
+    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+    onClose();
+  };
+
+  // ✅ 组件卸载时清理
+  useEffect(() => {
+    return () => {
+      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+    };
+  }, []);
+
   const generateFood = useCallback(() => {
     const newFood: [number, number] = [
       Math.floor(Math.random() * GRID_SIZE),
@@ -39,7 +51,6 @@ export default function GameSnake({ onClose }: GameSnakeProps) {
     }
   }, [snake])
 
-  // 移动蛇
   const moveSnake = useCallback(() => {
     if (gameOver || !isPlaying || isPaused) return
 
@@ -67,7 +78,6 @@ export default function GameSnake({ onClose }: GameSnakeProps) {
         newSnake.pop()
       }
 
-      // 碰撞检测
       const hitWall = newHead[0] < 0 || newHead[0] >= GRID_SIZE || newHead[1] < 0 || newHead[1] >= GRID_SIZE
       const hitSelf = newSnake.slice(1).some(segment => segment[0] === newHead[0] && segment[1] === newHead[1])
 
@@ -82,7 +92,6 @@ export default function GameSnake({ onClose }: GameSnakeProps) {
     })
   }, [direction, food, gameOver, isPlaying, isPaused, generateFood])
 
-  // 键盘控制
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isPlaying || gameOver) return
@@ -107,7 +116,6 @@ export default function GameSnake({ onClose }: GameSnakeProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [direction, isPlaying, gameOver])
 
-  // 游戏循环
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
       gameLoopRef.current = setInterval(moveSnake, 150)
@@ -144,7 +152,7 @@ export default function GameSnake({ onClose }: GameSnakeProps) {
       <div className="bg-gray-900 rounded-2xl p-6 max-w-lg w-full">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-white">贪吃蛇</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
+          <button onClick={handleClose} className="text-gray-400 hover:text-white text-xl font-bold p-1">✕</button>
         </div>
 
         <div className="flex justify-between items-center mb-4">
@@ -163,7 +171,6 @@ export default function GameSnake({ onClose }: GameSnakeProps) {
           </div>
         </div>
 
-        {/* 画布 */}
         <div className="bg-gray-800 rounded-lg p-2 flex justify-center">
           <div className="relative" style={{ width: GRID_SIZE * CELL_SIZE, height: GRID_SIZE * CELL_SIZE, backgroundColor: '#1f2937' }}>
             {snake.map((seg, i) => (
@@ -173,7 +180,6 @@ export default function GameSnake({ onClose }: GameSnakeProps) {
           </div>
         </div>
 
-        {/* 触屏方向键 */}
         {isPlaying && !gameOver && (
           <div className="grid grid-cols-3 gap-2 mt-6 max-w-[200px] mx-auto">
             <div></div>

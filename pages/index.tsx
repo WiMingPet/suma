@@ -334,7 +334,7 @@ export default function Home() {
       <Head>
         <title>速码方舟AI软件 - AI 应用生成器</title>
         <meta name="description" content="使用 AI 生成 Web 应用" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
       </Head>
 
       <ThreeBackground />

@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 // 类型定义
-type BubbleType = number | null; // 0-5 代表6种颜色, null 代表空
+type BubbleType = number | null;
 type GridType = BubbleType[][];
 
 // 颜色映射
 const COLORS = [
-  'bg-red-500',    // 0: 🔴
-  'bg-blue-500',   // 1: 🔵
-  'bg-green-500',  // 2: 🟢
-  'bg-yellow-400', // 3: 🟡
-  'bg-purple-500', // 4: 🟣
-  'bg-orange-500', // 5: 🟠
+  'bg-red-500',
+  'bg-blue-500',
+  'bg-green-500',
+  'bg-yellow-400',
+  'bg-purple-500',
+  'bg-orange-500',
 ];
 
 // 游戏配置
@@ -61,6 +61,14 @@ class SoundManager {
     this.playTone(523, 0.3);
     setTimeout(() => this.playTone(659, 0.3), 100);
     setTimeout(() => this.playTone(784, 0.4), 200);
+  }
+
+  // ✅ 销毁音效管理器
+  destroy() {
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
   }
 }
 
@@ -126,45 +134,24 @@ interface ScorePopup {
   id: number;
 }
 
-// 辅助函数：检查坐标是否有效
+// 辅助函数
 const isValidPosition = (x: number, y: number): boolean => {
   return x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE;
 };
 
-// 辅助函数：获取相邻泡泡
-const getAdjacentBubbles = (x: number, y: number): Array<{x: number; y: number}> => {
-  const adjacent = [];
-  const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-
-  for (const [dx, dy] of directions) {
-    const nx = x + dx;
-    const ny = y + dy;
-    if (isValidPosition(nx, ny)) {
-      adjacent.push({ x: nx, y: ny });
-    }
-  }
-
-  return adjacent;
-};
-
-// 辅助函数：查找可消除的泡泡
 const findMatches = (grid: GridType): Array<{x: number; y: number}> => {
   const matches: Set<string> = new Set();
 
-  // 检查水平方向
   for (let y = 0; y < GRID_SIZE; y++) {
     for (let x = 0; x < GRID_SIZE - 2; x++) {
       const bubble = grid[y][x];
       if (bubble === null || bubble === undefined) continue;
-
       let count = 1;
       let currentX = x;
-
       while (currentX < GRID_SIZE - 1 && grid[y][currentX + 1] === bubble) {
         count++;
         currentX++;
       }
-
       if (count >= 3) {
         for (let i = 0; i < count; i++) {
           matches.add(`${x + i},${y}`);
@@ -173,20 +160,16 @@ const findMatches = (grid: GridType): Array<{x: number; y: number}> => {
     }
   }
 
-  // 检查垂直方向
   for (let x = 0; x < GRID_SIZE; x++) {
     for (let y = 0; y < GRID_SIZE - 2; y++) {
       const bubble = grid[y][x];
       if (bubble === null || bubble === undefined) continue;
-
       let count = 1;
       let currentY = y;
-
       while (currentY < GRID_SIZE - 1 && grid[currentY + 1][x] === bubble) {
         count++;
         currentY++;
       }
-
       if (count >= 3) {
         for (let i = 0; i < count; i++) {
           matches.add(`${x},${y + i}`);
@@ -201,7 +184,6 @@ const findMatches = (grid: GridType): Array<{x: number; y: number}> => {
   });
 };
 
-// 辅助函数：计算剩余泡泡数量（只统计非空单元格）
 const countRemainingBubbles = (grid: GridType): number => {
   let count = 0;
   for (let y = 0; y < GRID_SIZE; y++) {
@@ -214,15 +196,10 @@ const countRemainingBubbles = (grid: GridType): number => {
   return count;
 };
 
-// 辅助函数：下落泡泡
 const applyGravity = (grid: GridType): GridType => {
   const newGrid: GridType = grid.map(row => [...row]);
-
-  // 从下往上逐列处理
   for (let x = 0; x < GRID_SIZE; x++) {
     let writeY = GRID_SIZE - 1;
-
-    // 将非空泡泡向下移动
     for (let y = GRID_SIZE - 1; y >= 0; y--) {
       if (newGrid[y][x] !== null && newGrid[y][x] !== undefined) {
         if (y !== writeY) {
@@ -233,14 +210,11 @@ const applyGravity = (grid: GridType): GridType => {
       }
     }
   }
-
   return newGrid;
 };
 
-// 辅助函数：填充新泡泡
 const fillNewBubbles = (grid: GridType): GridType => {
   const newGrid: GridType = grid.map(row => [...row]);
-
   for (let x = 0; x < GRID_SIZE; x++) {
     for (let y = 0; y < GRID_SIZE; y++) {
       if (newGrid[y][x] === null || newGrid[y][x] === undefined) {
@@ -248,14 +222,11 @@ const fillNewBubbles = (grid: GridType): GridType => {
       }
     }
   }
-
   return newGrid;
 };
 
-// 辅助函数：初始化网格
 const initializeGrid = (): GridType => {
   const grid: GridType = [];
-
   for (let y = 0; y < GRID_SIZE; y++) {
     const row: BubbleType[] = [];
     for (let x = 0; x < GRID_SIZE; x++) {
@@ -263,44 +234,44 @@ const initializeGrid = (): GridType => {
     }
     grid.push(row);
   }
-
   return grid;
 };
 
 const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
-  // 游戏状态
   const [grid, setGrid] = useState<GridType>(initializeGrid);
   const [selectedBubble, setSelectedBubble] = useState<{x: number; y: number} | null>(null);
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
   const [message, setMessage] = useState('');
   const [gameWon, setGameWon] = useState(false);
-
-  // 进度条状态
   const [remainingBubbles, setRemainingBubbles] = useState(INITIAL_BUBBLES);
-
-  // 视觉特效状态
   const [eliminatingBubbles, setEliminatingBubbles] = useState<Array<{x: number; y: number}>>([]);
   const [scorePopups, setScorePopups] = useState<ScorePopup[]>([]);
   const scorePopupIdRef = useRef(0);
 
-  // 更新剩余泡泡数量的函数
+  // ✅ 关闭时清理音效
+  const handleClose = () => {
+    soundManager.destroy();
+    onClose?.();
+  };
+
+  // ✅ 组件卸载时清理
+  useEffect(() => {
+    return () => {
+      soundManager.destroy();
+    };
+  }, []);
+
   const updateRemainingBubbles = useCallback((newGrid: GridType) => {
     const count = countRemainingBubbles(newGrid);
     setRemainingBubbles(count);
     return count;
   }, []);
 
-  // 处理泡泡点击
   const handleBubbleClick = useCallback((x: number, y: number) => {
     if (gameWon || eliminatingBubbles.length > 0) return;
+    if (grid[y][x] === null || grid[y][x] === undefined) return;
 
-    // 点击空泡泡，忽略
-    if (grid[y][x] === null || grid[y][x] === undefined) {
-      return;
-    }
-
-    // 如果没有选中的泡泡，则选中当前泡泡
     if (!selectedBubble) {
       setSelectedBubble({ x, y });
       setMessage('已选中泡泡，点击相邻泡泡交换');
@@ -308,34 +279,28 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
       return;
     }
 
-    // 如果点击的是已选中的泡泡，取消选中
     if (selectedBubble.x === x && selectedBubble.y === y) {
       setSelectedBubble(null);
       setMessage('已取消选中');
       return;
     }
 
-    // 检查是否相邻
     const dx = Math.abs(x - selectedBubble.x);
     const dy = Math.abs(y - selectedBubble.y);
 
     if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
-      // 相邻泡泡，执行交换
       performSwap(selectedBubble.x, selectedBubble.y, x, y);
     } else {
-      // 不相邻，重新选中
       setSelectedBubble({ x, y });
       setMessage('已选中泡泡，点击相邻泡泡交换');
       soundManager.playSelect();
     }
   }, [selectedBubble, grid, gameWon, eliminatingBubbles]);
 
-  // 执行交换
   const performSwap = useCallback(async (x1: number, y1: number, x2: number, y2: number) => {
     setMessage('交换中...');
     soundManager.playSwap();
 
-    // 交换泡泡
     const newGrid = grid.map(row => [...row]);
     const temp = newGrid[y1][x1];
     newGrid[y1][x1] = newGrid[y2][x2];
@@ -344,11 +309,9 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
     setGrid(newGrid);
     setSelectedBubble(null);
 
-    // 检查是否有消除
     const matches = findMatches(newGrid);
 
     if (matches.length === 0) {
-      // 没有消除，交换回来
       setMessage('没有可消除的泡泡，交换回原位');
       setTimeout(() => {
         const revertGrid = newGrid.map(row => [...row]);
@@ -360,22 +323,18 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
       return;
     }
 
-    // 有消除，开始消除流程
     setMessage(`消除了 ${matches.length} 个泡泡！`);
     setCombo(1);
     await eliminateMatches(newGrid, matches);
   }, [grid]);
 
-  // 消除泡泡
   const eliminateMatches = useCallback(async (currentGrid: GridType, matches: Array<{x: number; y: number}>) => {
     setEliminatingBubbles(matches);
     soundManager.playMatch();
 
-    // 计算分数
     const matchScore = matches.length * 10 * (combo || 1);
     setScore(prev => prev + matchScore);
 
-    // 显示飘字特效
     const newPopups: ScorePopup[] = matches.map(match => ({
       x: match.x,
       y: match.y,
@@ -384,44 +343,35 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
     }));
     setScorePopups(prev => [...prev, ...newPopups]);
 
-    // 等待消除动画
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    // 执行消除
     let nextGrid = currentGrid.map(row => [...row]);
     for (const match of matches) {
       nextGrid[match.y][match.x] = null;
     }
     setEliminatingBubbles([]);
 
-    // 更新剩余泡泡数量
-    const remaining = updateRemainingBubbles(nextGrid);
+    updateRemainingBubbles(nextGrid);
 
-    // 下落泡泡
     soundManager.playCascade();
     nextGrid = applyGravity(nextGrid);
     setGrid(nextGrid);
 
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    // 填充新泡泡
     nextGrid = fillNewBubbles(nextGrid);
     setGrid(nextGrid);
 
-    // 再次更新剩余泡泡数量
     updateRemainingBubbles(nextGrid);
 
     await new Promise(resolve => setTimeout(resolve, 200));
 
-    // 检查是否有新的消除
     const newMatches = findMatches(nextGrid);
     if (newMatches.length > 0) {
-      // 连续消除
       setCombo(prev => prev + 1);
       setMessage(`连击！消除了 ${newMatches.length} 个泡泡`);
       await eliminateMatches(nextGrid, newMatches);
     } else {
-      // 没有新的消除，检查是否通关
       const finalRemaining = countRemainingBubbles(nextGrid);
       if (finalRemaining === 0) {
         setGameWon(true);
@@ -434,7 +384,6 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
     }
   }, [combo, updateRemainingBubbles]);
 
-  // 新游戏
   const handleNewGame = useCallback(() => {
     const newGrid = initializeGrid();
     setGrid(newGrid);
@@ -445,38 +394,27 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
     setGameWon(false);
     setEliminatingBubbles([]);
     setScorePopups([]);
-
-    // 初始化剩余泡泡数量
     updateRemainingBubbles(newGrid);
   }, [updateRemainingBubbles]);
 
-  // 取消选中
   const handleCancelSelection = useCallback(() => {
     setSelectedBubble(null);
     setMessage('已取消选中');
   }, []);
 
-  // 计算进度百分比
   const progressPercent = ((INITIAL_BUBBLES - remainingBubbles) / INITIAL_BUBBLES) * 100;
 
-  // 清理飘字特效
   useEffect(() => {
     const timer = setInterval(() => {
-      setScorePopups(prev => prev.filter(popup => {
-        // 通过检查是否还存在来过滤
-        return true;
-      }));
+      setScorePopups(prev => prev.filter(() => true));
     }, 800);
-
     return () => clearInterval(timer);
   }, []);
 
-  // 注入样式
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = styleSheet;
     document.head.appendChild(style);
-    return () => document.head.removeChild(style);
     return () => {
       document.head.removeChild(style);
     };
@@ -485,18 +423,16 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-gradient-to-br from-purple-600 to-blue-600 rounded-3xl p-6 shadow-2xl max-w-lg w-full">
-        {/* 标题栏 */}
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-white">🫧 泡泡消消乐</h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors"
           >
             ✕
           </button>
         </div>
 
-        {/* 游戏信息 */}
         <div className="bg-white/10 rounded-xl p-4 mb-4 backdrop-blur-sm">
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
@@ -515,7 +451,6 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
             </div>
           </div>
 
-          {/* 进度条 */}
           <div className="mt-3">
             <div className="flex justify-between text-xs text-white/70 mb-1">
               <span>消除进度</span>
@@ -530,14 +465,12 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
           </div>
         </div>
 
-        {/* 游戏消息 */}
         {message && (
           <div className="text-center text-white mb-4 font-medium">
             {message}
           </div>
         )}
 
-        {/* 游戏网格 */}
         <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm mb-4">
           <div
             className="grid gap-1.5"
@@ -565,7 +498,6 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
             )}
           </div>
 
-          {/* 飘字特效层 */}
           <div className="absolute inset-0 pointer-events-none">
             {scorePopups.map(popup => (
               <div
@@ -582,7 +514,6 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
           </div>
         </div>
 
-        {/* 按钮组 */}
         <div className="flex gap-3">
           <button
             onClick={handleCancelSelection}
@@ -599,7 +530,6 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
           </button>
         </div>
 
-        {/* 通关提示 */}
         {gameWon && (
           <div className="mt-4 bg-green-500/80 rounded-xl p-4 text-center animate-scale-in">
             <div className="text-2xl mb-2">🎉</div>
