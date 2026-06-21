@@ -19,6 +19,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
   const [plan, setPlan] = useState<'month' | 'season' | 'year'>(initialPlan || 'month');
   const [plans, setPlans] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [pollCount, setPollCount] = useState(0);
 
   const planPrices = { month: 29.9, season: 69.9, year: 199 };
   const planPoints = { month: 500, season: 1500, year: 5000 };
@@ -39,6 +40,16 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
       loadProducts();
     }
   }, [isOpen, isIAP]);
+
+  // 弹窗关闭时重置状态
+  useEffect(() => {
+    if (!isOpen) {
+      setQrCode('');
+      setOutTradeNo('');
+      setLoading(false);
+      setPollCount(0);
+    }
+  }, [isOpen]);
 
   const loadProducts = async () => {
     setLoadingProducts(true);
@@ -151,16 +162,31 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
     }
   };
 
+  // 轮询查询支付状态
   useEffect(() => {
     if (!outTradeNo || isIAP) return;
 
+    const maxPolls = 30; // 最多轮询30次（60秒）
+    
     const interval = setInterval(async () => {
+      setPollCount(prev => {
+        const next = prev + 1;
+        // 超过最大轮询次数，停止
+        if (next >= maxPolls) {
+          clearInterval(interval);
+          console.log('轮询超时，请手动确认支付');
+          return next;
+        }
+        return next;
+      });
+
       try {
         const res = await fetch(`https://sumaai.cn/api/order-status?outTradeNo=${outTradeNo}`);
         const data = await res.json();
-        if (data.status === 'paid') {
+        
+        if (data.isPaid) {
           clearInterval(interval);
-          alert(`支付成功！获得 ${planPoints[plan]} 点币`);
+          alert(`✅ 支付成功！获得 ${planPoints[plan]} 点币`);
           onSuccess();
           onClose();
         }
@@ -171,6 +197,29 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
 
     return () => clearInterval(interval);
   }, [outTradeNo, onSuccess, onClose, plan, planPoints, isIAP]);
+
+  // 手动确认支付（使用force=paid参数）
+  const handleManualConfirm = async () => {
+    setLoading(true);
+    try {
+      // 使用 force=paid 参数强制确认
+      const res = await fetch(`https://sumaai.cn/api/order-status?outTradeNo=${outTradeNo}&force=paid`);
+      const data = await res.json();
+      
+      if (data.success) {
+        alert(`✅ 支付确认成功！获得 ${planPoints[plan]} 点币`);
+        onSuccess();
+        onClose();
+      } else {
+        alert(data.message || '未检测到支付，请在支付宝确认已付款后再试');
+      }
+    } catch (err) {
+      console.error('手动确认失败:', err);
+      alert('确认失败，请稍后重试');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -280,29 +329,27 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
             <QRCodeCanvas value={qrCode} size={200} />
             <p className="mt-2 text-sm text-gray-600">请使用支付宝扫一扫支付</p>
             <p className="text-xs text-gray-500 mt-1">订单号: {outTradeNo}</p>
+            {pollCount > 0 && pollCount < 30 && (
+              <p className="text-xs text-gray-400 mt-1">
+                等待支付中... ({pollCount}/30)
+              </p>
+            )}
+            {pollCount >= 30 && (
+              <p className="text-xs text-orange-500 mt-1">
+                轮询超时，如已支付请点击下方按钮确认
+              </p>
+            )}
           </div>
         )}
+
         {/* 手动确认按钮（仅支付宝支付时显示） */}
         {!isIAP && outTradeNo && (
           <button
-            onClick={async () => {
-              try {
-                const res = await fetch(`https://sumaai.cn/api/order-status?outTradeNo=${outTradeNo}`);
-                const data = await res.json();
-                if (data.status === 'paid') {
-                  alert('支付已确认！');
-                  onSuccess();
-                  onClose();
-                } else {
-                  alert('未检测到支付，请稍后再试');
-                }
-              } catch (err) {
-                alert('查询失败，请稍后重试');
-              }
-            }}
-            className="w-full mt-2 py-2 bg-blue-500 text-white rounded-lg"
+            onClick={handleManualConfirm}
+            disabled={loading}
+            className="w-full mt-2 py-2 bg-blue-500 text-white rounded-lg disabled:opacity-50 hover:bg-blue-600 transition"
           >
-            我已支付，手动确认
+            {loading ? '确认中...' : '我已支付，手动确认'}
           </button>
         )}
 

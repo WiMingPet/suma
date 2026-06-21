@@ -1,5 +1,5 @@
 // lib/orderService.ts
-import { query } from './db';
+import { query, pool } from './db';
 
 export async function createOrder(outTradeNo: string, userId: string, amount: string, plan?: string) {
   const result = await query(
@@ -144,4 +144,202 @@ export async function setPasswordHash(userId: string, passwordHash: string): Pro
      DO UPDATE SET password_hash = $2`,
     [userId, passwordHash]
   );
+}
+
+// ========== 支付成功统一处理（事务保护）==========
+
+/**
+ * 处理支付成功（事务保护）
+ * 确保订单更新、会员升级、点币增加要么全部成功，要么全部回滚
+ */
+export async function handlePaymentSuccess(outTradeNo: string, paidAmount?: string) {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    // 1. 锁定并查询订单（FOR UPDATE防止并发问题）
+    const orderResult = await client.query(
+      'SELECT * FROM orders WHERE out_trade_no = $1 FOR UPDATE',
+      [outTradeNo]
+    );
+    
+    if (orderResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      console.error(`订单不存在: ${outTradeNo}`);
+      return { success: false, message: '订单不存在' };
+    }
+    
+    const order = orderResult.rows[0];
+    
+    // 2. 检查订单状态（防止重复处理）
+    if (order.status === 'paid') {
+      await client.query('ROLLBACK');
+      console.log(`订单已处理过: ${outTradeNo}`);
+      return { success: false, message: '订单已处理', userId: order.user_id };
+    }
+    
+    // 3. 验证金额（如果提供了实际支付金额）
+    if (paidAmount) {
+      const notifyAmount = parseFloat(paidAmount);
+      const orderAmount = parseFloat(order.amount);
+      if (Math.abs(notifyAmount - orderAmount) > 0.01) {
+        await client.query('ROLLBACK');
+        console.error(`金额不匹配: 通知${notifyAmount}, 订单${orderAmount}`);
+        return { success: false, message: '金额不匹配' };
+      }
+    }
+    
+    // 4. 更新订单状态为paid
+    await client.query(
+      `UPDATE orders 
+       SET status = 'paid', updated_at = CURRENT_TIMESTAMP 
+       WHERE out_trade_no = $1`,
+      [outTradeNo]
+    );
+    
+    // 5. 升级用户为Pro会员（根据套餐设置过期时间）
+    const planDurations: Record<string, string> = {
+      month: "NOW() + INTERVAL '30 days'",
+      season: "NOW() + INTERVAL '90 days'",
+      year: "NOW() + INTERVAL '365 days'",
+    };
+    
+    const duration = planDurations[order.plan] || planDurations.month;
+    
+    await client.query(
+      `INSERT INTO user_pro (user_id, is_pro, pro_expire) 
+       VALUES ($1, TRUE, ${duration}) 
+       ON CONFLICT (user_id) 
+       DO UPDATE SET is_pro = TRUE, pro_expire = ${duration}, updated_at = CURRENT_TIMESTAMP`,
+      [order.user_id]
+    );
+    
+    // 6. 计算并添加点币
+    const planPoints: Record<string, number> = {
+      month: 500,
+      season: 1500,
+      year: 5000,
+    };
+    
+    const pointsToAdd = planPoints[order.plan] || 0;
+    
+    if (pointsToAdd > 0) {
+      await client.query(
+        `INSERT INTO user_points (user_id, points) VALUES ($1, $2)
+         ON CONFLICT (user_id) 
+         DO UPDATE SET points = user_points.points + $2`,
+        [order.user_id, pointsToAdd]
+      );
+      
+      console.log(`✅ 添加点币: 用户${order.user_id}, +${pointsToAdd}`);
+    }
+    
+    // 7. 提交事务
+    await client.query('COMMIT');
+    
+    console.log(`✅ 支付处理完成: 订单${outTradeNo}, 用户${order.user_id}, 套餐${order.plan}`);
+    
+    return { 
+      success: true, 
+      message: '支付处理成功',
+      userId: order.user_id,
+      plan: order.plan,
+      points: pointsToAdd,
+    };
+    
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('支付事务处理失败:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * 强制更新订单为已支付（手动确认使用）
+ */
+export async function forceUpdateOrderPaid(outTradeNo: string) {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    // 查询订单
+    const orderResult = await client.query(
+      'SELECT * FROM orders WHERE out_trade_no = $1 FOR UPDATE',
+      [outTradeNo]
+    );
+    
+    if (orderResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return { success: false, message: '订单不存在' };
+    }
+    
+    const order = orderResult.rows[0];
+    
+    if (order.status === 'paid') {
+      await client.query('ROLLBACK');
+      return { success: false, message: '订单已处理' };
+    }
+    
+    // 更新订单状态
+    await client.query(
+      `UPDATE orders SET status = 'paid', updated_at = CURRENT_TIMESTAMP WHERE out_trade_no = $1`,
+      [outTradeNo]
+    );
+    
+    // 升级会员
+    const planDurations: Record<string, string> = {
+      month: "NOW() + INTERVAL '30 days'",
+      season: "NOW() + INTERVAL '90 days'",
+      year: "NOW() + INTERVAL '365 days'",
+    };
+    
+    const duration = planDurations[order.plan] || planDurations.month;
+    
+    await client.query(
+      `INSERT INTO user_pro (user_id, is_pro, pro_expire) 
+       VALUES ($1, TRUE, ${duration}) 
+       ON CONFLICT (user_id) 
+       DO UPDATE SET is_pro = TRUE, pro_expire = ${duration}, updated_at = CURRENT_TIMESTAMP`,
+      [order.user_id]
+    );
+    
+    // 添加点币
+    const planPoints: Record<string, number> = {
+      month: 500,
+      season: 1500,
+      year: 5000,
+    };
+    
+    const pointsToAdd = planPoints[order.plan] || 0;
+    
+    if (pointsToAdd > 0) {
+      await client.query(
+        `INSERT INTO user_points (user_id, points) VALUES ($1, $2)
+         ON CONFLICT (user_id) 
+         DO UPDATE SET points = user_points.points + $2`,
+        [order.user_id, pointsToAdd]
+      );
+    }
+    
+    await client.query('COMMIT');
+    
+    return { 
+      success: true, 
+      message: '手动确认成功',
+      userId: order.user_id,
+      plan: order.plan,
+      points: pointsToAdd,
+    };
+    
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('强制更新失败:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
 }

@@ -14,6 +14,9 @@ export async function query(text: string, params?: any[]) {
   return res;
 }
 
+// 导出 pool 供事务使用
+export { pool };
+
 // 创建订单表（如果不存在）
 export async function initDatabase() {
   const createOrdersTable = `
@@ -68,12 +71,12 @@ export async function initDatabase() {
   }
 
   // 迁移：添加 password_hash 字段
-try {
-  await query(`ALTER TABLE user_pro ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`);
-  console.log('迁移完成：user_pro 表添加 password_hash 字段');
-} catch (err) {
-  console.log('迁移 password_hash 字段失败:', err);
-}
+  try {
+    await query(`ALTER TABLE user_pro ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`);
+    console.log('迁移完成：user_pro 表添加 password_hash 字段');
+  } catch (err) {
+    console.log('迁移 password_hash 字段失败:', err);
+  }
 
   console.log('数据库表初始化完成');
 }
