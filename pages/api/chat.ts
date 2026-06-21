@@ -113,6 +113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.setHeader('Connection', 'keep-alive');
 
       const reader = response.body?.getReader();
+      console.log('🔍 reader 是否存在:', !!reader);
       if (!reader) {
         return res.status(500).json({ error: '无法获取响应流' });
       }

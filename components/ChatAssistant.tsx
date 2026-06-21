@@ -105,7 +105,7 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
       const res = await fetch('https://sumaai.cn/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: updatedMessages, stream: true }),
+        body: JSON.stringify({ messages: updatedMessages, stream: true }), // ✅ 开启流式
       });
 
       if (!res.ok) {
@@ -120,11 +120,21 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
       }
 
       const reader = res.body?.getReader();
+      if (!reader) {
+        setMessages(prev => {
+          const updated = [...prev];
+          updated[aiMsgIndex] = { role: 'assistant', content: '无法读取响应流' };
+          return updated;
+        });
+        setLoading(false);
+        return;
+      }
+
       const decoder = new TextDecoder();
       let buffer = '';
       let fullContent = '';
 
-      while (reader) {
+      while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
