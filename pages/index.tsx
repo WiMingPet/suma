@@ -5,9 +5,6 @@ import Head from 'next/head'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
 
-
-
-
 // 动态导入 Three.js 背景组件（避免 SSR 问题）
 const ThreeBackground = dynamic(() => import('../components/ThreeBackground'), {
   ssr: false
@@ -17,6 +14,7 @@ const ThreeBackground = dynamic(() => import('../components/ThreeBackground'), {
 import LoginModal from '../components/LoginModal'
 import SideMenu from '../components/SideMenu'
 import PaymentModal from '../components/PaymentModal'
+import ChatAssistant from '../components/ChatAssistant'
 import GameSnake from '../components/GameSnake'
 import GameTetris from '../components/GameTetris'
 import GameBubble from '../components/GameBubble'
@@ -26,16 +24,8 @@ interface User {
   phone: string
   is_pro: boolean
   daily_count: number
-  free_used: number   // 免费已使用次数（永久3次）
-  points: number   // 新增：点币余额
-}
-
-interface SavedApp {
-  id: string
-  name: string
-  code: string
-  type: string
-  created_at: string
+  free_used: number
+  points: number
 }
 
 export default function Home() {
@@ -46,6 +36,7 @@ export default function Home() {
   const [showGames, setShowGames] = useState(false)
   const [currentGame, setCurrentGame] = useState<string | null>(null)
   const [showPayment, setShowPayment] = useState(false)
+  const [showChat, setShowChat] = useState(false)
   const router = useRouter();
 
   const goToMemberCenter = () => {
@@ -55,57 +46,40 @@ export default function Home() {
   // 生成功能状态
   const [generatedCode, setGeneratedCode] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
-  // 在现有 useState 后面添加
   const [hasConsentedToAI, setHasConsentedToAI] = useState(false);
 
   // 各个Tab独立的输入状态
-  const [textPrompt, setTextPrompt] = useState('')      // 文字生成输入
-  const [imagePrompt, setImagePrompt] = useState('')    // 图片识别补充描述
-  const [voicePrompt, setVoicePrompt] = useState('')    // 语音对话（实际上语音不需要，但保留一致性）
+  const [textPrompt, setTextPrompt] = useState('')
+  const [imagePrompt, setImagePrompt] = useState('')
 
   // 图片上传状态
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isGeneratingImage, setIsGeneratingImage] = useState(false)
   
-  // 语音录制状态
-  const [isRecording, setIsRecording] = useState(false)
-  const [recordingTime, setRecordingTime] = useState(0)
-  const [isGeneratingVoice, setIsGeneratingVoice] = useState(false)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
-  
   // 预览弹窗
   const [previewCode, setPreviewCode] = useState<string | null>(null)
   
-  
   // 当前激活的功能标签
-  const [activeTab, setActiveTab] = useState<'text' | 'image' | 'voice'>('text')
-  // 切换Tab时清空生成结果
+  const [activeTab, setActiveTab] = useState<'text' | 'image'>('text')
+
   useEffect(() => {
     setGeneratedCode('');
     setPreviewCode(null);
   }, [activeTab]);
 
-  // 生成格式（HTML 或 PDF）
-  const [outputFormat, setOutputFormat] = useState<'html' | 'pdf'>('html')
-
-  // 辅助函数：计算剩余次数
   const getRemaining = () => {
     if (!user) return 0
-    if (user.is_pro) return user.points || 0  // Pro 用户返回点币余额
-    return Math.max(0, 3 - (user.free_used || 0))  // 免费用户返回剩余次数
+    if (user.is_pro) return user.points || 0
+    return Math.max(0, 3 - (user.free_used || 0))
   }
 
-  // 初始化用户状态（从 localStorage 恢复 token，再向后端验证获取最新数据）
+  // 初始化用户状态
   useEffect(() => {
     const token = localStorage.getItem('token')
     const savedUser = localStorage.getItem('suma_user')
     
     if (token && savedUser) {
-      // 从后端获取最新的用户信息（包括最新的 daily_count）
-      // ✅ 使用标准 fetch
       fetch('https://sumaai.cn/api/user-info', {
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -120,7 +94,6 @@ export default function Home() {
               free_used: data.user.free_used ?? 0,
               points: data.user.points ?? 0,
             })
-            // 同步更新 localStorage
             localStorage.setItem('suma_user', JSON.stringify({
               id: data.user.id,
               phone: data.user.phone,
@@ -135,9 +108,7 @@ export default function Home() {
           }
         })
         .catch(() => {
-          try {
-            setUser(JSON.parse(savedUser))
-          } catch (e) {}
+          try { setUser(JSON.parse(savedUser)) } catch (e) {}
         })
     } else if (savedUser) {
       try {
@@ -162,24 +133,20 @@ export default function Home() {
     setShowMenu(false)
   }
 
-  // ========== 恢复登录状态（页面刷新后保持登录）==========
   useEffect(() => {
     const savedUser = localStorage.getItem('suma_user')
     if (savedUser && !user) {
       try {
         setUser(JSON.parse(savedUser))
       } catch (e) {
-        console.error('解析用户失败', e)
         localStorage.removeItem('suma_user')
         localStorage.removeItem('token')
       }
     }
   }, [user])
 
-  // AI授权检查函数
   const checkAIConsent = async () => {
     if (hasConsentedToAI) return true;
-    
     return new Promise((resolve) => {
       const confirmed = window.confirm(
         '速码方舟AI软件将把您的输入内容发送给第三方AI服务商（阿里云）以生成代码。\n\n' +
@@ -202,13 +169,11 @@ export default function Home() {
       return
     }
 
-    // 次数检查
     if (!user.is_pro && getRemaining() <= 0) {
       alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
       return
     }
     
-    // 添加 AI 授权检查
     if (!(await checkAIConsent())) {
       alert('您需要同意AI服务协议才能使用此功能');
       return;
@@ -222,22 +187,16 @@ export default function Home() {
     setIsGenerating(true)
 
     try {
-      // ✅ 使用标准 fetch
       const res = await fetch('https://sumaai.cn/api/generate-text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          prompt: textPrompt
-        })
+        body: JSON.stringify({ userId: user.id, prompt: textPrompt })
       })
 
       const data = await res.json()
 
       if (data.success) {
         setGeneratedCode(data.code)
-
-        // 更新本地 user 状态
         const updatedUser = {
           ...user,
           daily_count: (user.daily_count || 0) + 1,
@@ -246,7 +205,6 @@ export default function Home() {
         }
         setUser(updatedUser)
 
-        // 构建新应用对象
         const newApp = {
           id: Date.now().toString(),
           name: textPrompt.slice(0, 30) + '...',
@@ -255,25 +213,19 @@ export default function Home() {
           created_at: new Date().toISOString()
         }
 
-        // 保存到本地缓存
         const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
         apps.unshift(newApp)
         localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
 
-        // 同步到服务器（后台静默，不阻塞界面）
         fetch('https://sumaai.cn/api/saved-apps', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-user-id': user.id
-          },
+          headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
           body: JSON.stringify(newApp)
-        }).catch(err => console.warn('服务器同步失败，已保存到本地', err))
+        }).catch(err => console.warn('服务器同步失败', err))
       } else {
         alert(data.error || '生成失败')
       }
     } catch (err) {
-      console.error('生成请求失败:', err)
       alert('生成失败，请稍后重试')
     } finally {
       setIsGenerating(false)
@@ -286,9 +238,7 @@ export default function Home() {
     if (file) {
       setImageFile(file)
       const reader = new FileReader()
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string)
-      }
+      reader.onload = (e) => setImagePreview(e.target?.result as string)
       reader.readAsDataURL(file)
     }
   }
@@ -300,12 +250,10 @@ export default function Home() {
       return
     }
 
-    // 次数检查
     if (!user.is_pro && getRemaining() <= 0) {
       alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
       return
     }
-    // AI 授权检查（新增）
     if (!(await checkAIConsent())) {
       alert('您需要同意AI服务协议才能使用此功能');
       return;
@@ -319,28 +267,19 @@ export default function Home() {
     setIsGeneratingImage(true)
 
     try {
-      // 将图片转换为 base64
       const reader = new FileReader()
       reader.onload = async (e) => {
         const base64 = (e.target?.result as string).split(',')[1]
-        
-        // ✅ 使用标准 fetch
         const res = await fetch('https://sumaai.cn/api/generate-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: user.id,
-            imageBase64: base64,
-            prompt: imagePrompt
-          })
+          body: JSON.stringify({ userId: user.id, imageBase64: base64, prompt: imagePrompt })
         })
 
         const data = await res.json()
 
         if (data.success) {
           setGeneratedCode(data.code)
-
-          // 更新本地 user 状态（次数+1，点币用后端返回的最新值）
           const updatedUser = {
             ...user,
             daily_count: (user.daily_count || 0) + 1,
@@ -349,7 +288,6 @@ export default function Home() {
           }
           setUser(updatedUser)
           
-          // 构建新应用对象
           const newApp = {
             id: Date.now().toString(),
             name: `图片应用-${Date.now()}`,
@@ -358,20 +296,15 @@ export default function Home() {
             created_at: new Date().toISOString()
           }
 
-          // 保存到本地缓存
           const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
           apps.unshift(newApp)
           localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
 
-          // 同步到服务器（后台静默，不阻塞界面）
           fetch('https://sumaai.cn/api/saved-apps', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-user-id': user.id
-            },
+            headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
             body: JSON.stringify(newApp)
-          }).catch(err => console.warn('服务器同步失败，已保存到本地', err))
+          }).catch(err => console.warn('服务器同步失败', err))
         } else {
           alert(data.error || '生成失败')
         }
@@ -384,179 +317,9 @@ export default function Home() {
     }
   }
 
-  // 开始录音
-  const startRecording = async () => {
-    console.log('开始录音');
-    
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      console.log('麦克风权限已获取');
-
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-          console.log('收到音频数据块:', event.data.size);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        console.log('录音停止，数据块数:', audioChunksRef.current.length);
-        
-        if (audioChunksRef.current.length === 0) {
-          alert('录音数据为空，请重试');
-          setIsRecording(false);
-          setRecordingTime(0);
-          return;
-        }
-
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        console.log('音频 Blob 大小:', audioBlob.size);
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const base64 = (e.target?.result as string).split(',')[1];
-          console.log('Base64 长度:', base64?.length);
-          if (base64) {
-            generateFromVoice(base64);
-          }
-        };
-        reader.onerror = (err) => {
-          console.error('读取音频数据失败:', err);
-          alert('读取录音数据失败，请重试');
-        };
-        reader.readAsDataURL(audioBlob);
-
-        stream.getTracks().forEach(track => track.stop());
-        setIsRecording(false);
-        setRecordingTime(0);
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-      setRecordingTime(0);
-
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      timerRef.current = setInterval(() => {
-        setRecordingTime(t => {
-          if (t >= 30) {
-            stopRecording();
-            return t;
-          }
-          return t + 1;
-        });
-      }, 1000);
-    } catch (err) {
-      console.error('录音启动失败:', err);
-      alert('无法访问麦克风，请检查权限设置');
-    }
-  };
-
-  // 停止录音
-  const stopRecording = () => {
-    console.log('停止录音');
-    
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      console.log('录音停止请求已发送');
-    } else {
-      console.log('没有正在进行的录音');
-    }
-  };
-
-  // 从语音生成应用
-  const generateFromVoice = async (audioBase64: string) => {
-    if (!user) {
-      setShowLogin(true)
-      return
-    }
-
-    // 次数检查
-    if (!user.is_pro && getRemaining() <= 0) {
-      alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
-      return
-    }
-    // AI 授权检查（新增）
-    if (!(await checkAIConsent())) {
-      alert('您需要同意AI服务协议才能使用此功能');
-      return;
-    }
-
-    setIsGeneratingVoice(true)
-
-    try {
-      // ✅ 使用标准 fetch
-      const res = await fetch('https://sumaai.cn/api/generate-voice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          audioBase64
-        })
-      })
-
-      const data = await res.json()
-
-      if (data.success) {
-        setGeneratedCode(data.code)
-
-        // 更新本地 user 状态
-        const updatedUser = {
-          ...user,
-          daily_count: (user.daily_count || 0) + 1,
-          points: data.points ?? user.points,
-          free_used: data.free_used ?? user.free_used
-        }
-        setUser(updatedUser)
-        
-        // 构建新应用对象
-        const newApp = {
-          id: Date.now().toString(),
-          name: `语音应用-${Date.now()}`,
-          code: data.code,
-          type: 'voice' as const,
-          created_at: new Date().toISOString()
-        }
-
-        // 保存到本地缓存
-        const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
-        apps.unshift(newApp)
-        localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
-
-        // 同步到服务器（后台静默，不阻塞界面）
-        fetch('https://sumaai.cn/api/saved-apps', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-user-id': user.id
-          },
-          body: JSON.stringify(newApp)
-        }).catch(err => console.warn('服务器同步失败，已保存到本地', err))
-      } else {
-        alert(data.error || '生成失败')
-      }
-    } catch (err) {
-      console.error('语音生成请求失败:', err)
-      alert('生成失败，请稍后重试')
-    } finally {
-      setIsGeneratingVoice(false)
-    }
-  }
-
   // 下载代码
   const handleDownload = () => {
     if (!generatedCode) return
-    
     const blob = new Blob([generatedCode], { type: 'text/html' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -574,18 +337,13 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      {/* Three.js 背景 */}
       <ThreeBackground />
 
-      {/* 主内容 */}
       <div className="min-h-screen relative z-10">
         {/* 顶部导航 */}
         <header className="fixed top-0 left-0 right-0 z-40 bg-black/30 backdrop-blur-md border-b border-white/10">
           <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-            <button
-              onClick={() => setShowMenu(true)}
-              className="p-2 hover:bg-white/10 rounded-lg transition"
-            >
+            <button onClick={() => setShowMenu(true)} className="p-2 hover:bg-white/10 rounded-lg transition">
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
@@ -596,43 +354,31 @@ export default function Home() {
             </h1>
 
             <div>
-            {user ? (
-              <div className="flex items-center gap-3">
-                <div 
-                  onClick={goToMemberCenter}
-                  className="text-right cursor-pointer hover:opacity-80 transition"
-                >
-                  <p className="text-sm text-white">{user.phone.slice(0, 3)}****{user.phone.slice(-4)}</p>
-                  <p className="text-xs text-gray-400">
-                    {user.is_pro ? `点币余额: ${user.points || 0}` : `剩余免费次数: ${Math.max(0, 3 - (user.free_used || 0))}`}
-                  </p>
-                </div>
-                {!user.is_pro && (
-                  <button
-                    onClick={() => setShowPayment(true)}
-                    className="px-3 py-1 bg-yellow-500 text-black rounded-lg text-sm font-medium hover:bg-yellow-400 transition"
-                  >
-                    升级Pro
+              {user ? (
+                <div className="flex items-center gap-3">
+                  <div onClick={goToMemberCenter} className="text-right cursor-pointer hover:opacity-80 transition">
+                    <p className="text-sm text-white">{user.phone.slice(0, 3)}****{user.phone.slice(-4)}</p>
+                    <p className="text-xs text-gray-400">
+                      {user.is_pro ? `点币余额: ${user.points || 0}` : `剩余免费次数: ${Math.max(0, 3 - (user.free_used || 0))}`}
+                    </p>
+                  </div>
+                  {!user.is_pro && (
+                    <button onClick={() => setShowPayment(true)} className="px-3 py-1 bg-yellow-500 text-black rounded-lg text-sm font-medium hover:bg-yellow-400 transition">
+                      升级Pro
+                    </button>
+                  )}
+                  <button onClick={goToMemberCenter} className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full text-white font-bold">
+                    {user.phone.slice(-2)}
                   </button>
-                )}
-                <button
-                  onClick={goToMemberCenter}
-                  className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full text-white font-bold"
-                >
-                  {user.phone.slice(-2)}
+                </div>
+              ) : (
+                <button onClick={() => setShowLogin(true)} className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium">
+                  登录
                 </button>
-              </div>
-            ) : ( 
-              <button
-                onClick={() => setShowLogin(true)}
-                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium"
-              >
-                登录
-              </button>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
         {/* 主要内容区 */}
         <main className="pt-24 pb-20 px-4 max-w-6xl mx-auto">
@@ -641,8 +387,7 @@ export default function Home() {
             <div 
               onClick={() => setActiveTab('text')}
               className={`p-6 rounded-2xl border transition cursor-pointer ${
-               
-               activeTab === 'text' 
+                activeTab === 'text' 
                   ? 'bg-blue-600/20 border-blue-500' 
                   : 'bg-gray-900/50 border-gray-700 hover:border-gray-600'
               }`}
@@ -673,21 +418,18 @@ export default function Home() {
               <p className="text-sm text-gray-400">上传图片，AI 识别内容并生成对应应用</p>
             </div>
 
+            {/* 替换为 AI 助手 */}
             <div 
-              onClick={() => setActiveTab('voice')}
-              className={`p-6 rounded-2xl border transition cursor-pointer ${
-                activeTab === 'voice' 
-                  ? 'bg-green-600/20 border-green-500' 
-                  : 'bg-gray-900/50 border-gray-700 hover:border-gray-600'
-              }`}
+              onClick={() => setShowChat(true)}
+              className="p-6 rounded-2xl border transition cursor-pointer bg-gray-900/50 border-gray-700 hover:border-gray-600"
             >
               <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl flex items-center justify-center mb-4">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">语音对话</h3>
-              <p className="text-sm text-gray-400">说出你的需求，AI 语音识别并生成应用</p>
+              <h3 className="text-lg font-bold text-white mb-2">AI助手</h3>
+              <p className="text-sm text-gray-400">AI编程助手，深度对话，技术问答</p>
             </div>
           </div>
 
@@ -698,7 +440,7 @@ export default function Home() {
                 <textarea
                   value={textPrompt}
                   onChange={(e) => setTextPrompt(e.target.value)}
-                  placeholder="描述你想要的应用，例如：帮我做一个计算器，要支持加减乘除运算，有漂亮的渐变背景..."
+                  placeholder="描述你想要的应用，例如：帮我做一个计算器..."
                   className="w-full h-32 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none"
                 />
                 <div className="flex items-center justify-between mt-4">
@@ -738,10 +480,7 @@ export default function Home() {
                   {imagePreview && (
                     <div className="relative">
                       <img src={imagePreview} alt="预览" className="max-h-40 rounded-lg" />
-                      <button
-                        onClick={() => { setImagePreview(null); setImageFile(null) }}
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
-                      >
+                      <button onClick={() => { setImagePreview(null); setImageFile(null) }} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -772,43 +511,6 @@ export default function Home() {
                 </div>
               </div>
             )}
-
-            {activeTab === 'voice' && (
-              <div className="text-center py-8">
-                <button
-                  onClick={() => {
-                    if (!user.is_pro && getRemaining() <= 0) {
-                      alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
-                      return
-                    }
-                    isRecording ? stopRecording() : startRecording()
-                  }}
-                  disabled={isGeneratingVoice}
-                  className={`w-24 h-24 rounded-full flex items-center justify-center transition ${
-                    isRecording 
-                      ? 'bg-red-500 animate-pulse' 
-                      : 'bg-gradient-to-r from-green-500 to-emerald-500'
-                  } disabled:opacity-50`}
-                >
-                  {isRecording ? (
-                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
-                    </svg>
-                  ) : (
-                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                    </svg>
-                  )}
-                </button>
-                <p className="mt-4 text-gray-400">
-                  {isRecording ? `录音中... ${recordingTime}/30秒` : '点击录音（最多30秒）'}
-                </p>
-                {isGeneratingVoice && (
-                  <p className="mt-2 text-blue-400">AI 识别中...</p>
-                )}
-              </div>
-            )}
           </div>
 
           {/* 生成结果预览 */}
@@ -817,42 +519,22 @@ export default function Home() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-bold text-white">生成结果</h3>
-                  <span className="px-2 py-0.5 text-xs bg-purple-600/30 text-purple-300 rounded-full border border-purple-500/50">
-                    🤖 AI生成
-                  </span>
+                  <span className="px-2 py-0.5 text-xs bg-purple-600/30 text-purple-300 rounded-full border border-purple-500/50">🤖 AI生成</span>
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => setPreviewCode(generatedCode)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm"
-                  >
-                    预览
-                  </button>
-                  <button
-                    onClick={handleDownload}
-                    className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm"
-                  >
-                    下载 HTML
-                  </button>
-                  {/* 举报按钮 */}
+                  <button onClick={() => setPreviewCode(generatedCode)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">预览</button>
+                  <button onClick={handleDownload} className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm">下载 HTML</button>
                   <button
                     onClick={async () => {
                       const reason = prompt('请描述举报原因（选填）：');
                       try {
-                        // ✅ 使用标准 fetch
                         await fetch('https://sumaai.cn/api/report', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            content: generatedCode,
-                            reason: reason || '用户举报',
-                            userId: user?.id,
-                            timestamp: new Date().toISOString()
-                          })
+                          body: JSON.stringify({ content: generatedCode, reason: reason || '用户举报', userId: user?.id, timestamp: new Date().toISOString() })
                         });
                         alert('举报已提交，我们会尽快处理。感谢反馈！');
                       } catch (error) {
-                        console.error('举报请求失败:', error);
                         alert('举报提交失败，请稍后重试');
                       }
                     }}
@@ -863,48 +545,24 @@ export default function Home() {
                 </div>
               </div>
               <div className="h-64 bg-gray-800 rounded-lg overflow-hidden">
-                <iframe
-                  srcDoc={generatedCode}
-                  className="w-full h-full"
-                  title="预览"
-                />
+                <iframe srcDoc={generatedCode} className="w-full h-full" title="预览" />
               </div>
             </div>
           )}
-          </main>
-          {/* 底部 */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-black/50 backdrop-blur-md border-t border-white/10 py-3">
-        <div className="max-w-6xl mx-auto px-4 flex items-center justify-center gap-4">
-          <button
-            onClick={() => setShowGames(true)}
-            className="text-sm text-gray-400 hover:text-white transition"
-          >
-            轻松时刻 ☕
-          </button>
-          <a
-            href="https://beian.miit.gov.cn"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-gray-400 hover:text-white transition"
-          >
-            粤ICP备2026044431号
-          </a>
-          <button
-            onClick={() => router.push('/privacy')}
-            className="text-sm text-gray-400 hover:text-white transition cursor-pointer"
-          >
-            隐私政策
-          </button>
-        </div>
-      </footer>
-    </div>
+        </main>
+
+        {/* 底部 */}
+        <footer className="fixed bottom-0 left-0 right-0 bg-black/50 backdrop-blur-md border-t border-white/10 py-3">
+          <div className="max-w-6xl mx-auto px-4 flex items-center justify-center gap-4">
+            <button onClick={() => setShowGames(true)} className="text-sm text-gray-400 hover:text-white transition">轻松时刻 ☕</button>
+            <a href="https://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer" className="text-sm text-gray-400 hover:text-white transition">粤ICP备2026044431号</a>
+            <button onClick={() => router.push('/privacy')} className="text-sm text-gray-400 hover:text-white transition cursor-pointer">隐私政策</button>
+          </div>
+        </footer>
+      </div>
 
       {/* 登录弹窗 */}
-      <LoginModal
-        isOpen={showLogin}
-        onClose={() => setShowLogin(false)}
-        onLoginSuccess={handleLoginSuccess}
-      />
+      <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} onLoginSuccess={handleLoginSuccess} />
 
       {/* 支付弹窗 */}
       <PaymentModal
@@ -914,25 +572,12 @@ export default function Home() {
         onSuccess={() => {
           setShowPayment(false)
           alert('支付成功！正在确认充值，请稍候...')
-          
           const token = localStorage.getItem('token')
-          if (!token) {
-            alert('登录已过期，请重新登录')
-            return
-          }
-
-          fetch('https://sumaai.cn/api/user-info', {
-            headers: { Authorization: `Bearer ${token}` }
-          })
-            .then(res => {
-              if (!res.ok) throw new Error(`HTTP ${res.status}`)
-              return res.json()
-            })
+          if (!token) { alert('登录已过期，请重新登录'); return }
+          fetch('https://sumaai.cn/api/user-info', { headers: { Authorization: `Bearer ${token}` } })
+            .then(res => res.json())
             .then(data => {
               if (data.success && data.user) {
-                console.log('支付后用户信息:', data.user)
-                
-                // ✅ 确保所有字段完整
                 const updatedUser = {
                   id: data.user.id || user?.id || '',
                   phone: data.user.phone || user?.phone || '',
@@ -941,7 +586,6 @@ export default function Home() {
                   free_used: data.user.free_used ?? 0,
                   points: data.user.points ?? 0,
                 }
-                
                 setUser(updatedUser)
                 localStorage.setItem('suma_user', JSON.stringify(updatedUser))
                 alert(`充值成功！点币余额：${updatedUser.points}`)
@@ -949,20 +593,17 @@ export default function Home() {
                 alert('充值已成功，但获取最新余额失败，请刷新页面查看')
               }
             })
-            .catch((err) => {
-              console.error('获取用户信息失败:', err)
-              alert('充值已成功，但获取最新余额失败，请刷新页面查看')
-            })
+            .catch(() => alert('充值已成功，但获取最新余额失败，请刷新页面查看'))
         }}
       />
 
       {/* 侧滑菜单 */}
-      <SideMenu
-        isOpen={showMenu}
-        onClose={() => setShowMenu(false)}
-        user={user}
-        onLogout={handleLogout}
-      />
+      <SideMenu isOpen={showMenu} onClose={() => setShowMenu(false)} user={user} onLogout={handleLogout} />
+
+      {/* AI 助手聊天窗口 */}
+      {showChat && (
+        <ChatAssistant isOpen={showChat} onClose={() => setShowChat(false)} />
+      )}
 
       {/* 游戏选择弹窗 */}
       {showGames && (
@@ -978,24 +619,15 @@ export default function Home() {
               </button>
             </div>
             <div className="grid grid-cols-3 gap-4">
-              <button
-                onClick={() => { setShowGames(false); setCurrentGame('snake') }}
-                className="p-4 bg-green-600/20 border border-green-500/30 rounded-xl hover:bg-green-600/30 transition"
-              >
+              <button onClick={() => { setShowGames(false); setCurrentGame('snake') }} className="p-4 bg-green-600/20 border border-green-500/30 rounded-xl hover:bg-green-600/30 transition">
                 <div className="text-3xl mb-2">🐍</div>
                 <p className="text-white font-medium">贪吃蛇</p>
               </button>
-              <button
-                onClick={() => { setShowGames(false); setCurrentGame('tetris') }}
-                className="p-4 bg-blue-600/20 border border-blue-500/30 rounded-xl hover:bg-blue-600/30 transition"
-              >
+              <button onClick={() => { setShowGames(false); setCurrentGame('tetris') }} className="p-4 bg-blue-600/20 border border-blue-500/30 rounded-xl hover:bg-blue-600/30 transition">
                 <div className="text-3xl mb-2">🧱</div>
                 <p className="text-white font-medium">俄罗斯方块</p>
               </button>
-              <button
-                onClick={() => { setShowGames(false); setCurrentGame('bubble') }}
-                className="p-4 bg-purple-600/20 border border-purple-500/30 rounded-xl hover:bg-purple-600/30 transition"
-              >
+              <button onClick={() => { setShowGames(false); setCurrentGame('bubble') }} className="p-4 bg-purple-600/20 border border-purple-500/30 rounded-xl hover:bg-purple-600/30 transition">
                 <div className="text-3xl mb-2">🫧</div>
                 <p className="text-white font-medium">泡泡消消乐</p>
               </button>
@@ -1014,19 +646,12 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80" onClick={() => setPreviewCode(null)} />
           <div className="relative bg-white w-full max-w-4xl h-[80vh] rounded-lg overflow-hidden">
-            <button
-              onClick={() => setPreviewCode(null)}
-              className="absolute top-4 right-4 z-10 bg-gray-900 text-white p-2 rounded-full"
-            >
+            <button onClick={() => setPreviewCode(null)} className="absolute top-4 right-4 z-10 bg-gray-900 text-white p-2 rounded-full">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            <iframe
-              srcDoc={previewCode}
-              className="w-full h-full"
-              title="预览"
-            />
+            <iframe srcDoc={previewCode} className="w-full h-full" title="预览" />
           </div>
         </div>
       )}

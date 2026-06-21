@@ -1,0 +1,88 @@
+// pages/api/chat.ts
+import type { NextApiRequest, NextApiResponse } from 'next';
+
+const MODEL = process.env.CHAT_MODEL || 'deepseek-chat';
+const API_KEY = process.env.CHAT_API_KEY || '';
+const API_BASE = process.env.CHAT_API_BASE || 'https://api.deepseek.com/v1';
+
+const SYSTEM_PROMPT = `你是速码方舟AI软件的AI编程助手，专门帮助用户解决编程和技术问题。
+
+你的职责：
+1. 回答编程、前端开发、后端开发、算法等技术问题
+2. 提供代码示例、调试建议、技术方案
+3. 解释技术概念，帮助用户学习和成长
+4. 协助用户用自然语言描述需求，生成或修改应用
+
+你会礼貌拒绝：
+- 非技术类的闲聊、情感、生活问题
+- 时事政治、敏感话题
+- 违法、违规、违禁内容
+- 任何与编程开发无关的问题
+
+拒绝话术："抱歉，我是AI编程助手，主要回答技术开发相关问题。请提出编程问题，我会全力协助。"
+
+保持专业、友好、高效的回答风格。`;
+
+const BLOCKED_KEYWORDS = ['政治', '色情', '赌博', '毒品', '暴力', '诈骗'];
+
+function containsBlockedContent(text: string): boolean {
+  const lower = text.toLowerCase();
+  return BLOCKED_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { messages } = req.body;
+  if (!messages || !Array.isArray(messages)) {
+    return res.status(400).json({ error: '缺少 messages 参数' });
+  }
+
+  // 检查最后一条用户消息
+  const lastUserMsg = [...messages].reverse().find((m: any) => m.role === 'user');
+  if (lastUserMsg) {
+    const content = typeof lastUserMsg.content === 'string'
+      ? lastUserMsg.content
+      : lastUserMsg.content?.map((p: any) => p.text || '').join(' ');
+
+    if (containsBlockedContent(content)) {
+      return res.status(200).json({
+        success: true,
+        reply: '抱歉，您的问题涉及不当内容，我是AI编程助手，请提出编程相关问题。',
+      });
+    }
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+        stream: false,
+        temperature: 0.7,
+        max_tokens: 2048,
+      }),
+    });
+
+    if (!response.ok) {
+      const errData = await response.json();
+      console.error('大模型API错误:', errData);
+      return res.status(500).json({ error: errData.error?.message || 'AI服务暂不可用' });
+    }
+
+    const data = await response.json();
+    const reply = data.choices?.[0]?.message?.content || '抱歉，我暂时无法回答。';
+
+    return res.status(200).json({ success: true, reply });
+  } catch (error) {
+    console.error('聊天请求失败:', error);
+    return res.status(500).json({ error: '请求失败，请稍后重试' });
+  }
+}
