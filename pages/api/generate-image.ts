@@ -50,10 +50,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       [taskId, userId, 'image', 'processing', prompt || '', `图片应用-${Date.now()}`]
     );
 
-    res.status(200).json({ success: true, taskId, message: '后台生成中，可关闭页面' });
+  res.status(200).json({ success: true, taskId, message: '后台生成中，可关闭页面' });
 
-    executeImageTask(taskId, userId, imageBase64, prompt, isPro).catch(err => {
-      console.error('后台生成失败:', err);
+  console.log('🔄 开始后台图片生成任务:', taskId);
+  executeImageTask(taskId, userId, imageBase64, prompt, isPro)
+    .then(() => console.log('✅ 后台图片任务完成:', taskId))
+    .catch(err => {
+      console.error('❌ 后台图片生成失败:', taskId, err);
       query('UPDATE tasks SET status = $1 WHERE task_id = $2', ['failed', taskId]);
     });
     return;
@@ -110,6 +113,8 @@ async function executeImageGeneration(userId: string, imageBase64: string, promp
   let generatedCode = '';
   let errorMsg = '';
 
+  console.log('📸 开始调用阿里云VL模型，图片大小:', imageBase64?.length || 0);
+
   try {
     const response = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
       method: 'POST',
@@ -156,20 +161,27 @@ ${prompt ? `补充要求：${prompt}` : ''}
       })
     });
 
+    console.log('📸 API响应状态:', response.status);
+
     const data = await response.json();
 
     if (data.error) {
       errorMsg = data.error.message || 'API调用失败';
+      console.error('❌ VL模型错误:', JSON.stringify(data.error));
     } else if (data.choices?.[0]?.message) {
       generatedCode = data.choices[0].message.content;
+      console.log('✅ 图片生成成功，代码长度:', generatedCode.length);
     } else {
       errorMsg = '返回数据格式错误';
+      console.error('❌ 数据格式错误:', JSON.stringify(data).substring(0, 200));
     }
   } catch (err: any) {
     errorMsg = err.message || '网络请求失败';
+    console.error('❌ 请求异常:', errorMsg);
   }
 
   if (!generatedCode) {
+    console.log('⚠️ 使用降级代码，原因:', errorMsg);
     generatedCode = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>图片识别应用</title><style>body{font-family:sans-serif;padding:20px;background:linear-gradient(135deg,#f093fb,#f5576c);color:#fff;min-height:100vh;}</style></head><body><div style="max-width:600px;margin:0 auto;background:rgba(255,255,255,0.1);border-radius:16px;padding:24px"><h1>📸 图片识别应用</h1><p>⚠️ ${errorMsg}</p></div></body></html>`;
   }
 
@@ -180,10 +192,13 @@ ${prompt ? `补充要求：${prompt}` : ''}
       const imageSize = (imageBase64.length * 0.75) / 1024;
       cost = Math.max(30, Math.floor(imageSize / 100) * 10);
     }
+    console.log(`💰 扣除点币: ${cost}`);
     await deductPoints(userId, cost);
   } else {
     await incrementFreeUsed(userId);
+    console.log('🆓 扣除免费次数');
   }
 
+  console.log('📸 图片生成任务完成');
   return { success: true, code: generatedCode };
 }
