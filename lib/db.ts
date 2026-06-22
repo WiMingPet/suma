@@ -96,10 +96,17 @@ export async function initDatabase() {
     console.log('迁移 password_hash 字段失败:', err);
   }
 
-  // 迁移：给 saved_apps 添加唯一约束
   try {
-    await query(`ALTER TABLE saved_apps ADD CONSTRAINT IF NOT EXISTS unique_app_id UNIQUE (app_id)`);
-    console.log('迁移完成：saved_apps 添加唯一约束');
+    const check = await query(`
+      SELECT constraint_name FROM information_schema.table_constraints 
+      WHERE table_name = 'saved_apps' AND constraint_name = 'unique_app_id'
+    `);
+    if (check.rows.length === 0) {
+      await query(`ALTER TABLE saved_apps ADD CONSTRAINT unique_app_id UNIQUE (app_id)`);
+      console.log('迁移完成：saved_apps 添加唯一约束');
+    } else {
+      console.log('约束 unique_app_id 已存在，跳过');
+    }
   } catch (err) {
     console.log('迁移 unique_app_id 失败:', err);
   }

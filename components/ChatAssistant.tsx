@@ -97,7 +97,6 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
     setMessages(updatedMessages);
     setInput('');
 
-    // 先占位
     const aiMsgIndex = updatedMessages.length;
     setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
@@ -105,61 +104,36 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
       const res = await fetch('https://sumaai.cn/api/chat/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: updatedMessages, stream: true }), // ✅ 开启流式
+        body: JSON.stringify({ messages: updatedMessages, stream: true }),
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        setMessages(prev => {
-          const updated = [...prev];
-          updated[aiMsgIndex] = { role: 'assistant', content: `❌ ${err.error || '出错了'}` };
-          return updated;
-        });
-        setLoading(false);
-        return;
-      }
-
       const reader = res.body?.getReader();
-      if (!reader) {
-        setMessages(prev => {
-          const updated = [...prev];
-          updated[aiMsgIndex] = { role: 'assistant', content: '无法读取响应流' };
-          return updated;
-        });
-        setLoading(false);
-        return;
-      }
+      if (!reader) throw new Error('No reader');
 
       const decoder = new TextDecoder();
-      let buffer = '';
       let fullContent = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
 
         for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith('data: ')) continue;
-          
-          const data = trimmed.slice(6);
-          if (data === '[DONE]') continue;
-
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.content) {
-              fullContent += parsed.content;
-              setMessages(prev => {
-                const updated = [...prev];
-                updated[aiMsgIndex] = { role: 'assistant', content: fullContent };
-                return updated;
-              });
-            }
-          } catch {}
+          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+            try {
+              const json = JSON.parse(line.slice(6));
+              if (json.content) {
+                fullContent += json.content;
+                setMessages(prev => {
+                  const updated = [...prev];
+                  updated[aiMsgIndex] = { role: 'assistant', content: fullContent };
+                  return updated;
+                });
+              }
+            } catch {}
+          }
         }
       }
     } catch {
