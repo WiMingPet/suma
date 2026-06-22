@@ -111,9 +111,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
 
       const reader = response.body?.getReader();
-      console.log('🔍 reader 是否存在:', !!reader);
       if (!reader) {
         return res.status(500).json({ error: '无法获取响应流' });
       }
@@ -124,7 +125,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try {
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) {
+            // ✅ 确保发送结束标志
+            res.write('data: [DONE]\n\n');
+            break;
+          }
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
@@ -147,12 +152,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 res.write(`data: ${JSON.stringify({ content })}\n\n`);
               }
             } catch {
-              // 忽略解析失败的行
+              // 忽略
             }
           }
         }
       } catch (err) {
         console.error('流式读取错误:', err);
+        // ✅ 错误时也发送结束标志
+        res.write('data: [DONE]\n\n');
       } finally {
         reader.releaseLock();
         res.end();

@@ -113,16 +113,39 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
 
       const decoder = new TextDecoder();
       let fullContent = '';
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          // 处理最后可能残留的数据
+          if (buffer.trim()) {
+            const lines = buffer.split('\n');
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed && trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
+                try {
+                  const json = JSON.parse(trimmed.slice(6));
+                  if (json.content) fullContent += json.content;
+                } catch (e) {}
+              }
+            }
+          }
+          break;
+        }
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+        buffer += decoder.decode(value, { stream: true });
+        
+        // 按 \n 分割并处理每个完整的行
+        let newlineIndex;
+        while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+          const line = buffer.slice(0, newlineIndex).trim();
+          buffer = buffer.slice(newlineIndex + 1);
+          
+          if (!line) continue;
+          if (line === 'data: [DONE]') continue;
+          
+          if (line.startsWith('data: ')) {
             try {
               const json = JSON.parse(line.slice(6));
               if (json.content) {
@@ -135,11 +158,15 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
                   });
                 });
               }
-            } catch {}
+            } catch (e) {
+              console.warn('解析失败:', line);
+            }
           }
         }
       }
-    } catch {
+
+    } catch (error) {
+      console.error('错误:', error);
       setMessages(prev => {
         const updated = [...prev];
         updated[aiMsgIndex] = { role: 'assistant', content: '网络错误，请重试' };
