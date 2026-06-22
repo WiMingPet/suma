@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -126,10 +127,12 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
               const json = JSON.parse(line.slice(6));
               if (json.content) {
                 fullContent += json.content;
-                setMessages(prev => {
-                  const updated = [...prev];
-                  updated[aiMsgIndex] = { role: 'assistant', content: fullContent };
-                  return updated;
+                flushSync(() => {
+                  setMessages(prev => {
+                    const updated = [...prev];
+                    updated[aiMsgIndex] = { role: 'assistant', content: fullContent };
+                    return updated;
+                  });
                 });
               }
             } catch {}
