@@ -82,7 +82,7 @@ export default function MemberCenter() {
             <div key={key} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex justify-between items-center">
               <div>
                 <h3 className="font-bold text-lg">{plan.name}</h3>
-                <p className="text-sm text-gray-500">赠送 {plan.points} 点币</p>
+                <p className="text-sm text-gray-500">获得 {plan.points} 点币</p>
               </div>
               <div className="text-right">
                 <p className="text-xl font-bold text-orange-500">¥{plan.price}</p>
