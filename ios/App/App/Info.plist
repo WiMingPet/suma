@@ -49,10 +49,17 @@
     <true/>
     
     <!-- 网络配置：允许任意加载，解决 ATS 拦截问题 -->
-    <key>NSAppTransportSecurity</key>
-				<dict>
-					<key>NSAllowsArbitraryLoads</key>
-					<true/>
-				</dict>
-			</dict>
-			</plist>
+<key>NSAppTransportSecurity</key>
+<dict>
+    <key>NSAllowsArbitraryLoads</key>
+    <true/>
+</dict>
+
+<!-- ✅ 允许 WebView 缩放 -->
+<key>WKWebViewConfiguration</key>
+<dict>
+    <key>ignoresViewportScaleLimits</key>
+    <true/>
+</dict>
+</dict>
+</plist>
