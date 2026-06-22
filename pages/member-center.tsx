@@ -1,103 +1,20 @@
 // pages/member-center.tsx
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
+import { useUser } from '../contexts/UserContext';
 import PaymentModal from '../components/PaymentModal';
-
-interface UserInfo {
-  phone?: string;
-  points?: number;
-  is_pro?: boolean;
-  pro_expire_at?: string;
-}
 
 export default function MemberCenter() {
   const router = useRouter();
-  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const { user, loading, refreshUser } = useUser();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'month' | 'season' | 'year'>('month');
-  const [loading, setLoading] = useState(true);
 
   const plans = {
     month: { name: '月卡', price: 29.9, points: 500, days: 30 },
     season: { name: '季卡', price: 69.9, points: 1500, days: 90 },
     year: { name: '年卡', price: 199, points: 5000, days: 365 },
   };
-
-  const fetchUserInfo = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const savedUser = localStorage.getItem('suma_user');
-      
-      // 优先从 localStorage 加载缓存数据
-      let cachedUser: UserInfo | null = null;
-      if (savedUser) {
-        try {
-          const cached = JSON.parse(savedUser);
-          cachedUser = {
-            phone: cached.phone || '',
-            points: cached.points ?? 0,
-            is_pro: cached.is_pro ?? false,
-            pro_expire_at: cached.pro_expire_at || null,
-          };
-          setUserInfo(cachedUser);
-          setLoading(false);
-        } catch (e) {
-          console.error('解析缓存失败:', e);
-        }
-      }
-
-      // 如果没有 token，使用缓存
-      if (!token) {
-        if (!cachedUser) {
-          setUserInfo(null);
-          setLoading(false);
-        }
-        return;
-      }
-      
-      // 从服务器获取最新数据
-      try {
-        const res = await fetch('https://sumaai.cn/api/user-info', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
-        if (!res.ok) {
-          // token 无效，清除登录状态
-          if (res.status === 401 || res.status === 403) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('suma_user');
-            setUserInfo(null);
-          }
-          return;
-        }
-
-        const data = await res.json();
-        
-        if (data.success && data.user) {
-          const serverUser = {
-            phone: data.user.phone || '',
-            points: data.user.points ?? 0,
-            is_pro: data.user.is_pro ?? false,
-            pro_expire_at: data.user.pro_expire_at || null,
-          };
-          setUserInfo(serverUser);
-          // 更新缓存
-          localStorage.setItem('suma_user', JSON.stringify(serverUser));
-        }
-      } catch (err) {
-        console.warn('获取服务器数据失败，使用缓存:', err);
-        // 网络错误时保留缓存数据
-      }
-    } catch (error) {
-      console.error('获取用户信息失败:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUserInfo();
-  }, []);
 
   const handleBuy = (plan: 'month' | 'season' | 'year') => {
     setSelectedPlan(plan);
@@ -116,14 +33,11 @@ export default function MemberCenter() {
     );
   }
 
-  if (!userInfo || !userInfo.phone) {
+  if (!user || !user.phone) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
         <p className="text-gray-500">未登录，请返回首页登录</p>
-        <button
-          onClick={() => router.push('/')}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg"
-        >
+        <button onClick={() => router.push('/')} className="px-6 py-2 bg-blue-600 text-white rounded-lg">
           返回首页
         </button>
       </div>
@@ -134,10 +48,7 @@ export default function MemberCenter() {
     <div className="min-h-screen bg-gray-50 pb-20">
       <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6">
         <div className="flex items-center justify-between mb-4">
-          <button 
-            onClick={handleBack} 
-            className="p-2 hover:bg-white/20 rounded-lg transition flex items-center gap-1"
-          >
+          <button onClick={handleBack} className="p-2 hover:bg-white/20 rounded-lg transition flex items-center gap-1">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
@@ -146,20 +57,20 @@ export default function MemberCenter() {
           <h1 className="text-xl font-bold">会员中心</h1>
           <div className="w-16"></div>
         </div>
-        
+
         <div className="mt-4 flex justify-between items-end">
           <div>
             <p className="text-sm opacity-90">手机号</p>
-            <p className="text-lg font-semibold">{userInfo.phone}</p>
+            <p className="text-lg font-semibold">{user.phone}</p>
           </div>
           <div className="text-right">
             <p className="text-sm opacity-90">点币余额</p>
-            <p className="text-2xl font-bold">{userInfo.points || 0}</p>
+            <p className="text-2xl font-bold">{user.points || 0}</p>
           </div>
         </div>
-        {userInfo.is_pro && userInfo.pro_expire_at && (
+        {user.is_pro && (user as any).pro_expire_at && (
           <div className="mt-3 text-sm bg-white/20 rounded-lg p-2 text-center">
-            会员有效期至：{new Date(userInfo.pro_expire_at).toLocaleDateString()}
+            会员有效期至：{new Date((user as any).pro_expire_at).toLocaleDateString()}
           </div>
         )}
       </div>
@@ -168,10 +79,7 @@ export default function MemberCenter() {
         <h2 className="text-lg font-semibold text-gray-800">选择套餐</h2>
         <div className="space-y-3">
           {Object.entries(plans).map(([key, plan]) => (
-            <div
-              key={key}
-              className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex justify-between items-center"
-            >
+            <div key={key} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex justify-between items-center">
               <div>
                 <h3 className="font-bold text-lg">{plan.name}</h3>
                 <p className="text-sm text-gray-500">赠送 {plan.points} 点币</p>
@@ -205,10 +113,10 @@ export default function MemberCenter() {
       <PaymentModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
-        userId={userInfo.phone || ''}
+        userId={user?.id || user?.phone || ''}
         onSuccess={() => {
           setShowPaymentModal(false);
-          fetchUserInfo();
+          refreshUser();
           alert('支付成功！');
         }}
         plan={selectedPlan}

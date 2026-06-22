@@ -4,20 +4,11 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router' 
 import AppCard from './AppCard'
 
-interface User {
-  id: string
-  phone: string
-  is_pro: boolean
-  daily_count: number
-  free_used: number
-  points: number
-}
+import { useUser } from '../contexts/UserContext'
 
 interface SideMenuProps {
   isOpen: boolean
   onClose: () => void
-  user: User | null
-  onLogout: () => void
 }
 
 interface SavedApp {
@@ -37,7 +28,8 @@ interface TaskItem {
   updatedAt: string
 }
 
-export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuProps) {
+export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
+  const { user, logout } = useUser();
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'apps' | 'favorites' | 'tasks'>('apps')
   const [apps, setApps] = useState<SavedApp[]>([])
@@ -222,7 +214,7 @@ export default function SideMenu({ isOpen, onClose, user, onLogout }: SideMenuPr
                   </p>
                 </div>
               </div>
-              <button onClick={() => { onLogout(); onClose() }} className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition">
+              <button onClick={() => { logout(); onClose() }} className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition">
                 退出
               </button>
             </div>

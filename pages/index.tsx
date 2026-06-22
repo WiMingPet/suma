@@ -18,19 +18,12 @@ import ChatAssistant from '../components/ChatAssistant'
 import GameSnake from '../components/GameSnake'
 import GameTetris from '../components/GameTetris'
 import GameBubble from '../components/GameBubble'
+import { useUser } from '../contexts/UserContext'
 
-interface User {
-  id: string
-  phone: string
-  is_pro: boolean
-  daily_count: number
-  free_used: number
-  points: number
-}
 
 export default function Home() {
   // 状态管理
-  const [user, setUser] = useState<User | null>(null)
+  const { user, setUser, refreshUser, logout } = useUser()
   const [showLogin, setShowLogin] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showGames, setShowGames] = useState(false)
@@ -74,76 +67,18 @@ export default function Home() {
     return Math.max(0, 3 - (user.free_used || 0))
   }
 
-  // 初始化用户状态
-  useEffect(() => {
-    const token = localStorage.getItem('token')
-    const savedUser = localStorage.getItem('suma_user')
-    
-    if (token && savedUser) {
-      fetch('https://sumaai.cn/api/user-info', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            setUser({
-              id: data.user.id,
-              phone: data.user.phone,
-              is_pro: data.user.is_pro,
-              daily_count: data.user.daily_count,
-              free_used: data.user.free_used ?? 0,
-              points: data.user.points ?? 0,
-            })
-            localStorage.setItem('suma_user', JSON.stringify({
-              id: data.user.id,
-              phone: data.user.phone,
-              is_pro: data.user.is_pro,
-              daily_count: data.user.daily_count,
-              free_used: data.user.free_used ?? 0,
-              points: data.user.points ?? 0
-            }))
-          } else {
-            localStorage.removeItem('token')
-            localStorage.removeItem('suma_user')
-          }
-        })
-        .catch(() => {
-          try { setUser(JSON.parse(savedUser)) } catch (e) {}
-        })
-    } else if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser))
-      } catch (e) {
-        localStorage.removeItem('suma_user')
-        localStorage.removeItem('token')
-      }
-    }
-  }, [])
 
-  const handleLoginSuccess = (userData: User) => {
+  const handleLoginSuccess = (userData: any) => {
     console.log('登录成功:', userData)
     setUser(userData)
     localStorage.setItem('suma_user', JSON.stringify(userData))
   }
   
   const handleLogout = () => {
-    localStorage.removeItem('suma_user')
-    localStorage.removeItem('token')
-    setUser(null)
+    logout()
     setShowMenu(false)
   }
 
-  useEffect(() => {
-    const savedUser = localStorage.getItem('suma_user')
-    if (savedUser && !user) {
-      try {
-        setUser(JSON.parse(savedUser))
-      } catch (e) {
-        localStorage.removeItem('suma_user')
-        localStorage.removeItem('token')
-      }
-    }
-  }, [user])
 
   const checkAIConsent = async () => {
     if (hasConsentedToAI) return true;
@@ -665,37 +600,16 @@ export default function Home() {
       <PaymentModal
         isOpen={showPayment}
         onClose={() => setShowPayment(false)}
-        userId={user?.id || ''}
+        userId={user?.id || user?.phone || ''}
         onSuccess={() => {
           setShowPayment(false)
-          alert('支付成功！正在确认充值，请稍候...')
-          const token = localStorage.getItem('token')
-          if (!token) { alert('登录已过期，请重新登录'); return }
-          fetch('https://sumaai.cn/api/user-info', { headers: { Authorization: `Bearer ${token}` } })
-            .then(res => res.json())
-            .then(data => {
-              if (data.success && data.user) {
-                const updatedUser = {
-                  id: data.user.id || user?.id || '',
-                  phone: data.user.phone || user?.phone || '',
-                  is_pro: data.user.is_pro ?? false,
-                  daily_count: data.user.daily_count ?? 0,
-                  free_used: data.user.free_used ?? 0,
-                  points: data.user.points ?? 0,
-                }
-                setUser(updatedUser)
-                localStorage.setItem('suma_user', JSON.stringify(updatedUser))
-                alert(`充值成功！点币余额：${updatedUser.points}`)
-              } else {
-                alert('充值已成功，但获取最新余额失败，请刷新页面查看')
-              }
-            })
-            .catch(() => alert('充值已成功，但获取最新余额失败，请刷新页面查看'))
+          refreshUser()
+          alert('支付成功！')
         }}
       />
 
       {/* 侧滑菜单 */}
-      <SideMenu isOpen={showMenu} onClose={() => setShowMenu(false)} user={user} onLogout={handleLogout} />
+      <SideMenu isOpen={showMenu} onClose={() => setShowMenu(false)} />
 
       {/* AI 助手聊天窗口 */}
       {showChat && (
