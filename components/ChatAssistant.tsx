@@ -101,7 +101,7 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
     setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
     try {
-      const res = await fetch('https://sumaai.cn/api/chat/', {
+      const res = await fetch('https://sumaai.cn/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: updatedMessages, stream: true }),
