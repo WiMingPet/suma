@@ -187,11 +187,7 @@ ${prompt ? `补充要求：${prompt}` : ''}
 
   // 扣除点币/次数
   if (isPro) {
-    let cost = 30;
-    if (imageBase64) {
-      const imageSize = (imageBase64.length * 0.75) / 1024;
-      cost = Math.max(30, Math.floor(imageSize / 100) * 10);
-    }
+    const cost = 30;
     console.log(`💰 扣除点币: ${cost}`);
     await deductPoints(userId, cost);
   } else {

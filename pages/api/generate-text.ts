@@ -163,11 +163,12 @@ async function executeTextGeneration(userId: string, prompt: string, isPro: bool
 
   // 扣除点币/次数
   if (isPro) {
-    const contentLength = generatedCode.length;
-    const cost = Math.max(1, Math.ceil(contentLength / 100) * 2);
+    const cost = 10;
+    console.log(`💰 扣除点币: ${cost}`);
     await deductPoints(userId, cost);
   } else {
     await incrementFreeUsed(userId);
+    console.log('🆓 扣除免费次数');
   }
 
   return { success: true, code: generatedCode };
