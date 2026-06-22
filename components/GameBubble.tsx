@@ -433,11 +433,11 @@ const GameBubble: React.FC<GameBubbleProps> = ({ onClose }) => {
       setMessage('🎉 恭喜通关！🎉');
       soundManager.playWin();
     } else if (newMatches.length === 0) {
+      setCombo(0);
       setMessage(`😞 无法继续消除，剩余 ${remaining} 个泡泡`);
     } else if (newMatches.length > 0) {
       setCombo(prev => prev + 1);
-      setMessage(`消除了 ${eliminatedCount} 个泡泡，剩余 ${remaining} 个`);
-      await eliminateMatches(nextGrid, newMatches);
+      setMessage(`消除了 ${eliminatedCount} 个泡泡，剩余 ${remaining} 个，请继续消除`);
     } else {
       setCombo(0);
       setMessage('请继续消除泡泡');
