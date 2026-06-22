@@ -118,7 +118,7 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
-          // 处理最后可能残留的数据
+          // 处理最后残留数据
           if (buffer.trim()) {
             const lines = buffer.split('\n');
             for (const line of lines) {
@@ -126,7 +126,14 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
               if (trimmed && trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
                 try {
                   const json = JSON.parse(trimmed.slice(6));
-                  if (json.content) fullContent += json.content;
+                  if (json.content) {
+                    fullContent += json.content;
+                    setMessages(prev => {
+                      const updated = [...prev];
+                      updated[aiMsgIndex] = { role: 'assistant', content: fullContent };
+                      return updated;
+                    });
+                  }
                 } catch (e) {}
               }
             }
@@ -136,7 +143,6 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
 
         buffer += decoder.decode(value, { stream: true });
         
-        // 按 \n 分割并处理每个完整的行
         let newlineIndex;
         while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
           const line = buffer.slice(0, newlineIndex).trim();
@@ -150,12 +156,11 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
               const json = JSON.parse(line.slice(6));
               if (json.content) {
                 fullContent += json.content;
-                flushSync(() => {
-                  setMessages(prev => {
-                    const updated = [...prev];
-                    updated[aiMsgIndex] = { role: 'assistant', content: fullContent };
-                    return updated;
-                  });
+                // ✅ 不用 flushSync，直接用 setMessages
+                setMessages(prev => {
+                  const updated = [...prev];
+                  updated[aiMsgIndex] = { role: 'assistant', content: fullContent };
+                  return updated;
                 });
               }
             } catch (e) {
