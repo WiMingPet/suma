@@ -143,6 +143,21 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
     }
   }
 
+  // 取消任务
+  const handleCancelTask = async (taskId: string) => {
+    if (!user) return;
+    try {
+      await fetch('https://sumaai.cn/api/tasks', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
+        body: JSON.stringify({ taskId })
+      });
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'cancelled' } : t));
+    } catch (err) {
+      alert('取消失败');
+    }
+  };
+
   const handleToggleFavorite = (appId: string, isFavorite: boolean) => {
     if (!user) return
     try {
@@ -279,9 +294,20 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
                     task.status === 'processing' ? 'bg-yellow-600 text-white animate-pulse' :
                     'bg-red-600 text-white'
                   }`}>
-                    {task.status === 'completed' ? '✅ 完成' :
-                     task.status === 'processing' ? '⏳ 生成中' :
-                     '❌ 失败'}
+                  {task.status === 'completed' ? '✅ 完成' :
+                  task.status === 'processing' ? (
+                    <span className="flex items-center gap-1">
+                      <span>⏳ 生成中</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleCancelTask(task.id); }}
+                        className="text-xs text-gray-400 hover:text-red-400 underline"
+                      >
+                        取消
+                      </button>
+                    </span>
+                  ) :
+                  task.status === 'cancelled' ? '🚫 已取消' :
+                  '❌ 失败'}
                   </span>
                 </div>
                 <p className="text-gray-500 text-xs mt-1">
