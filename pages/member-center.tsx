@@ -11,9 +11,9 @@ export default function MemberCenter() {
   const [selectedPlan, setSelectedPlan] = useState<'month' | 'season' | 'year'>('month');
 
   const plans = {
-    month: { name: '月卡', price: 29.9, points: 500, days: 30 },
-    season: { name: '季卡', price: 69.9, points: 1500, days: 90 },
-    year: { name: '年卡', price: 199, points: 5000, days: 365 },
+    month: { name: '500点币', price: 29, points: 500 },
+    season: { name: '1500点币', price: 69, points: 1500 },
+    year: { name: '5000点币', price: 199, points: 5000 },
   };
 
   const handleBuy = (plan: 'month' | 'season' | 'year') => {

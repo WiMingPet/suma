@@ -21,7 +21,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [pollCount, setPollCount] = useState(0);
 
-  const planPrices = { month: 29.9, season: 69.9, year: 199 };
+  const planPrices = { month: 29, season: 69, year: 199 };
   const planPoints = { month: 500, season: 1500, year: 5000 };
 
   const paymentMethod = getPaymentMethod();
@@ -56,10 +56,10 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
     try {
       const products = await fetchProducts();
       const planList = products.map((p: any) => {
-        let name = '月卡';
+        let name = '500点币';
         let points = 500;
-        if (p.identifier?.includes('seasonal')) { name = '季卡'; points = 1500; }
-        if (p.identifier?.includes('yearly')) { name = '年卡'; points = 5000; }
+        if (p.identifier?.includes('seasonal')) { name = '1500点币'; points = 1500; }
+        if (p.identifier?.includes('yearly')) { name = '5000点币'; points = 5000; }
         return {
           id: p.identifier,
           name,
@@ -71,9 +71,9 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
     } catch (error) {
       console.error('加载产品失败:', error);
       setPlans([
-        { id: 'com.sumaai.monthly', name: '月卡', price: '¥29.00', points: 500 },
-        { id: 'com.sumaai.seasonal', name: '季卡', price: '¥69.00', points: 1500 },
-        { id: 'com.sumaai.yearly', name: '年卡', price: '¥199.00', points: 5000 },
+        { id: 'com.sumaai.monthly', name: '500点币', price: '¥29', points: 500 },
+        { id: 'com.sumaai.seasonal', name: '1500点币', price: '¥69', points: 1500 },
+        { id: 'com.sumaai.yearly', name: '5000点币', price: '¥199', points: 5000 },
       ]);
     } finally {
       setLoadingProducts(false);
@@ -282,30 +282,30 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
                   className={`py-2 rounded border ${plan === 'month' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
                   onClick={() => setPlan('month')}
                 >
-                  📅 月卡<br/>
+                  💰 500点币<br/>
                   {isIAP && plans.length > 0 ? 
-                    plans.find((p: any) => p.id === 'com.sumaai.monthly')?.price || '¥29.00' : 
-                    '¥29.00'
+                    plans.find((p: any) => p.id === 'com.sumaai.monthly')?.price || '¥29' : 
+                    '¥29'
                   }
                 </button>
                 <button
                   className={`py-2 rounded border ${plan === 'season' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
                   onClick={() => setPlan('season')}
                 >
-                  🌿 季卡<br/>
+                  💰 1500点币<br/>
                   {isIAP && plans.length > 0 ? 
-                    plans.find((p: any) => p.id === 'com.sumaai.seasonal')?.price || '¥69.00' : 
-                    '¥69.00'
+                    plans.find((p: any) => p.id === 'com.sumaai.seasonal')?.price || '¥69' : 
+                    '¥69'
                   }
                 </button>
                 <button
                   className={`py-2 rounded border ${plan === 'year' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
                   onClick={() => setPlan('year')}
                 >
-                  🏆 年卡<br/>
+                  💰 5000点币<br/>
                   {isIAP && plans.length > 0 ? 
-                    plans.find((p: any) => p.id === 'com.sumaai.yearly')?.price || '¥199.00' : 
-                    '¥199.00'
+                    plans.find((p: any) => p.id === 'com.sumaai.yearly')?.price || '¥199' : 
+                    '¥199'
                   }
                 </button>
               </>
