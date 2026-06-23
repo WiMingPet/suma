@@ -77,25 +77,25 @@ export default function Privacy() {
               <p><strong>3.7 第三方服务商信息</strong><br />
               服务商名称：阿里云计算有限公司<br />
               服务名称：阿里云百炼大模型服务<br />
-              隐私政策：<a href="https://www.aliyun.com/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">https://www.aliyun.com/privacy</a></p>
+              隐私政策：<a href="https://terms.aliyun.com/legal-agreement/terms/suit_bu1_ali_cloud/suit_bu1_ali_cloud202107091605_49213.html" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">https://terms.aliyun.com/legal-agreement/terms/suit_bu1_ali_cloud/suit_bu1_ali_cloud202107091605_49213.html</a></p>
             </section>
 
             <section className="bg-green-50 p-4 rounded-lg border border-green-200">
               <h2 className="text-xl font-semibold mb-3 text-green-800">4. AI编程助手声明</h2>
               <p className="mb-2"><strong>4.1 功能说明</strong><br />
-              AI编程助手是基于第三方大语言模型（如DeepSeek）的智能问答功能，帮助您解答编程和技术问题。该功能支持多轮对话，具备上下文记忆能力。</p>
+              AI编程助手是基于第三方大语言模型 <strong>DeepSeek</strong> 的智能问答功能，帮助您解答编程和技术问题。该功能支持多轮对话，具备上下文记忆能力。</p>
               <p className="mb-2"><strong>4.2 数据发送</strong><br />
-              当您使用AI编程助手时，您输入的文字内容将被发送给第三方AI服务商（DeepSeek或其他服务商）处理，以生成回复。AI服务商的身份会在功能授权弹窗中明确告知。</p>
+              当您使用AI编程助手时，您输入的文字内容将被发送给第三方AI服务商 <strong>DeepSeek（深度求索）</strong> 处理，以生成回复。</p>
               <p className="mb-2"><strong>4.3 数据用途</strong><br />
-              AI服务商处理您数据的唯一目的是：理解您的问题并生成相应的回答。您的对话数据不会被用于训练其人工智能模型。</p>
+              AI服务商处理您数据的唯一目的是：理解您的问题并生成相应的回答。您的对话数据<strong>不会被存储</strong>，也<strong>不会被用于训练</strong>其人工智能模型。</p>
               <p className="mb-2"><strong>4.4 用户授权</strong><br />
-              在您首次使用AI编程助手前，App会弹出授权弹窗，明确告知数据接收方身份和处理目的。您需要主动点击"同意"后，才能使用该功能。您可以随时停止使用。</p>
+              在您首次使用AI编程助手前，App会弹出授权弹窗，明确告知数据接收方为 <strong>DeepSeek</strong> 及其处理目的。您需要主动点击"同意"后，才能使用该功能。您可以随时停止使用。</p>
               <p className="mb-2"><strong>4.5 内容监管</strong><br />
               AI编程助手生成的回复被视为用户生成内容（UGC）。每条AI回复旁设有"举报"按钮，如您发现不当内容，可随时举报，我们将在收到举报后及时处理。</p>
               <p><strong>4.6 第三方服务商信息</strong><br />
-              服务商名称：DeepSeek（深度求索）<br />
+              服务商名称：深度求索（DeepSeek）<br />
               服务说明：大语言模型API服务<br />
-              隐私政策：<a href="https://www.deepseek.com/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">https://www.deepseek.com/privacy</a></p>
+                            隐私政策：<a href="https://cdn.deepseek.com/policies/zh-CN/deepseek-privacy-policy.html" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">https://cdn.deepseek.com/policies/zh-CN/deepseek-privacy-policy.html</a></p>
             </section>
 
             <section>
@@ -105,7 +105,7 @@ export default function Privacy() {
 
             <section>
               <h2 className="text-xl font-semibold mb-3">6. 用户权利</h2>
-              <p>您有权查询、更正、删除您的个人信息，撤回对AI功能处理的同意，注销您的账号以及投诉举报。如需行使上述权利，请通过 privacy@sumaai.cn 联系我们。</p>
+              <p>您有权查询、更正、删除您的个人信息，撤回对AI功能处理的同意，注销您的账号以及投诉举报。如需行使上述权利，请通过 <a href="mailto:privacy@sumaai.cn" className="text-blue-600 underline">privacy@sumaai.cn</a> 联系我们。</p>
             </section>
 
             <section>
@@ -121,7 +121,7 @@ export default function Privacy() {
             <section>
               <h2 className="text-xl font-semibold mb-3">9. 联系我们</h2>
               <p>广州速码智能信息有限公司<br />
-              邮箱：privacy@sumaai.cn<br />
+              邮箱：<a href="mailto:privacy@sumaai.cn" className="text-blue-600 underline">privacy@sumaai.cn</a><br />
               电话：15920978058<br />
               地址：广州市白云区永平街永泰磨刀南街80号1002之C3510房</p>
             </section>

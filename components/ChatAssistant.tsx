@@ -196,27 +196,45 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-        <div className="relative bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full text-center">
-          <h3 className="text-xl font-bold mb-4">🤖 AI编程助手</h3>
-          <p className="text-gray-600 mb-4 text-left">
-            使用AI编程助手前，请知悉：
-          </p>
-          <ul className="text-gray-500 text-sm text-left space-y-2 mb-6">
-            <li>• 您的对话内容将发送给第三方AI服务商处理</li>
-            <li>• AI生成的回复可能不总是准确，请自行验证</li>
-            <li>• 请勿输入个人隐私或敏感信息</li>
-            <li>• 详见<strong>隐私政策</strong></li>
-          </ul>
-          <div className="flex gap-3">
+        <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md w-full">
+          <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">🔒 数据使用说明</h3>
+          
+          <div className="text-left text-sm text-gray-600 dark:text-gray-300 space-y-3">
+            <p>使用AI编程助手前，请知悉：</p>
+            
+            <ul className="space-y-2 list-disc pl-4">
+              <li>
+                您输入的问题内容将发送至 <strong className="text-blue-600">DeepSeek</strong>（第三方AI服务商）进行处理
+              </li>
+              <li>
+                我们<strong>不会存储</strong>您的对话内容，仅用于本次回答生成
+              </li>
+              <li>
+                AI生成的回复可能不总是准确，请自行验证
+              </li>
+              <li>
+                请勿输入个人隐私或敏感信息
+              </li>
+              <li>
+                数据使用详情请查看 <a 
+                  href="/privacy" 
+                  target="_blank" 
+                  className="text-blue-600 underline"
+                >隐私政策</a>
+              </li>
+            </ul>
+          </div>
+
+          <div className="flex gap-3 mt-6">
             <button
               onClick={onClose}
-              className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50"
+              className="flex-1 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
             >
               拒绝
             </button>
             <button
               onClick={() => setAgreed(true)}
-              className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
             >
               同意并继续
             </button>

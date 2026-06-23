@@ -6,9 +6,11 @@ import PaymentModal from '../components/PaymentModal';
 
 export default function MemberCenter() {
   const router = useRouter();
-  const { user, loading, refreshUser } = useUser();
+  const { user, loading, refreshUser, logout } = useUser();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'month' | 'season' | 'year'>('month');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const plans = {
     month: { name: '500点币', price: 29, points: 500 },
@@ -17,12 +19,44 @@ export default function MemberCenter() {
   };
 
   const handleBuy = (plan: 'month' | 'season' | 'year') => {
+    // ✅ 不再检查登录，直接打开支付
     setSelectedPlan(plan);
     setShowPaymentModal(true);
   };
 
   const handleBack = () => {
     router.push('/');
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm('⚠️ 确定要永久删除账号吗？\n\n此操作不可撤销，您的所有数据（包括点币、生成的应用等）将被清除。')) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const res = await fetch('/api/delete-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user?.id }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert('✅ 账号已成功删除，感谢您的使用。');
+        await logout();
+        router.push('/');
+      } else {
+        alert(`❌ 删除失败：${data.error || '请稍后再试'}`);
+      }
+    } catch (error) {
+      console.error('删除账号错误:', error);
+      alert('网络错误，请检查网络连接后重试');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
   };
 
   if (loading) {
@@ -33,16 +67,7 @@ export default function MemberCenter() {
     );
   }
 
-  if (!user || !user.phone) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
-        <p className="text-gray-500">未登录，请返回首页登录</p>
-        <button onClick={() => router.push('/')} className="px-6 py-2 bg-blue-600 text-white rounded-lg">
-          返回首页
-        </button>
-      </div>
-    );
-  }
+  // ✅ 删除强制登录拦截，允许游客访问
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -61,14 +86,22 @@ export default function MemberCenter() {
         <div className="mt-4 flex justify-between items-end">
           <div>
             <p className="text-sm opacity-90">手机号</p>
-            <p className="text-lg font-semibold">{user.phone}</p>
+            <p className="text-lg font-semibold">{user?.phone || '未登录'}</p>
           </div>
           <div className="text-right">
             <p className="text-sm opacity-90">点币余额</p>
-            <p className="text-2xl font-bold">{user.points || 0}</p>
+            <p className="text-2xl font-bold">{user?.points ?? 0}</p>
           </div>
         </div>
-        {user.is_pro && (user as any).pro_expire_at && (
+
+        {/* ✅ 游客提示 */}
+        {!user && (
+          <div className="mt-3 text-sm bg-yellow-400/20 rounded-lg p-2 text-center text-yellow-100">
+            💡 购买后注册账号，可将点币同步到其他设备
+          </div>
+        )}
+
+        {user?.is_pro && (user as any).pro_expire_at && (
           <div className="mt-3 text-sm bg-white/20 rounded-lg p-2 text-center">
             会员有效期至：{new Date((user as any).pro_expire_at).toLocaleDateString()}
           </div>
@@ -105,19 +138,69 @@ export default function MemberCenter() {
             <li>点币有效期为永久</li>
             <li>会员权益在有效期内有效</li>
             <li>购买后不支持退款</li>
-            <li>支付方式：Apple Pay / 支付宝（根据设备自动适配）</li>
+            <li>支付方式：Apple 账户余额及绑定的支付方式</li>
           </ul>
         </div>
       </div>
 
+      {/* ✅ 账号删除区域 - 仅登录用户可见 */}
+      {user && (
+        <div className="px-4 py-6 mt-4 border-t border-gray-200">
+          <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+            <p className="text-sm font-medium text-red-800 mb-2">⚠️ 账号管理</p>
+            <p className="text-xs text-red-600 mb-3">
+              删除账号将永久清除您的所有数据（点币、生成的应用、会员权益等），此操作不可撤销。
+            </p>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isDeleting}
+              className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50"
+            >
+              {isDeleting ? '处理中...' : '注销账号'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-bold text-red-600 mb-2">⚠️ 确认删除</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              您确定要永久删除账号 <strong>{user?.phone}</strong> 吗？
+              此操作将清除您的所有数据，且无法恢复。
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={isDeleting}
+                className="flex-1 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50"
+              >
+                {isDeleting ? '删除中...' : '确认删除'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <PaymentModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
-        userId={user?.id || user?.phone || ''}
+        userId={user?.id || null} // ✅ 允许 null
         onSuccess={() => {
           setShowPaymentModal(false);
           refreshUser();
-          alert('支付成功！');
+          if (!user) {
+            alert('✅ 购买成功！注册账号可将点币同步到其他设备');
+          } else {
+            alert('支付成功！');
+          }
         }}
         plan={selectedPlan}
       />

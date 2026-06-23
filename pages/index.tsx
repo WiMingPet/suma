@@ -169,14 +169,36 @@ export default function Home() {
 
   // 图片上传处理
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setImageFile(file)
-      const reader = new FileReader()
-      reader.onload = (e) => setImagePreview(e.target?.result as string)
-      reader.readAsDataURL(file)
+    const file = e.target.files?.[0];
+    if (!file) {
+      // ✅ 用户取消选择，不报错
+      return;
     }
-  }
+
+    // ✅ 检查文件大小（限制10MB）
+    if (file.size > 10 * 1024 * 1024) {
+      alert('图片大小不能超过10MB，请压缩后重试');
+      // 重置input，允许重新选择
+      e.target.value = '';
+      return;
+    }
+
+    // ✅ 检查文件类型
+    if (!file.type.startsWith('image/')) {
+      alert('请选择图片文件');
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    } catch (error) {
+      console.error('图片加载失败:', error);
+      alert('图片加载失败，请重试');
+      e.target.value = '';
+    }
+  };
 
   // 图片生成应用
   const handleGenerateImage = async () => {

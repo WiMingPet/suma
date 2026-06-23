@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>速码方舟AI软件</string>
+    <string>速码方舟AI软件</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -48,18 +48,26 @@
     <key>UIViewControllerBasedStatusBarAppearance</key>
     <true/>
     
-    <!-- 网络配置：允许任意加载，解决 ATS 拦截问题 -->
-<key>NSAppTransportSecurity</key>
-<dict>
-    <key>NSAllowsArbitraryLoads</key>
-    <true/>
-</dict>
+    <!-- ✅ 网络配置 -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+    </dict>
 
-<!-- ✅ 允许 WebView 缩放 -->
-<key>WKWebViewConfiguration</key>
-<dict>
-    <key>ignoresViewportScaleLimits</key>
-    <true/>
-</dict>
+    <!-- ✅ 允许 WebView 缩放 -->
+    <key>WKWebViewConfiguration</key>
+    <dict>
+        <key>ignoresViewportScaleLimits</key>
+        <true/>
+    </dict>
+
+    <!-- ✅ 相机权限（修复拍照崩溃） -->
+    <key>NSCameraUsageDescription</key>
+    <string>需要访问相机以拍摄照片，用于生成应用或识别内容</string>
+
+    <!-- ✅ 相册权限（如果有点击相册功能） -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>需要访问相册以选择图片，用于生成应用或识别内容</string>
 </dict>
 </plist>
