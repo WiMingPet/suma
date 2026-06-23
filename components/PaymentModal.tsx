@@ -58,8 +58,8 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
       const planList = products.map((p: any) => {
         let name = '500点币';
         let points = 500;
-        if (p.identifier?.includes('seasonal')) { name = '1500点币'; points = 1500; }
-        if (p.identifier?.includes('yearly')) { name = '5000点币'; points = 5000; }
+        if (p.identifier?.includes('coins_1500')) { name = '1500点币'; points = 1500; }
+        if (p.identifier?.includes('coins_5000')) { name = '5000点币'; points = 5000; }
         return {
           id: p.identifier,
           name,
@@ -71,9 +71,9 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
     } catch (error) {
       console.error('加载产品失败:', error);
       setPlans([
-        { id: 'com.sumaai.monthly', name: '500点币', price: '¥29', points: 500 },
-        { id: 'com.sumaai.seasonal', name: '1500点币', price: '¥69', points: 1500 },
-        { id: 'com.sumaai.yearly', name: '5000点币', price: '¥199', points: 5000 },
+        { id: 'com.sumaai.coins_500', name: '500点币', price: '¥29', points: 500 },
+        { id: 'com.sumaai.coins_1500', name: '1500点币', price: '¥69', points: 1500 },
+        { id: 'com.sumaai.coins_5000', name: '5000点币', price: '¥199', points: 5000 },
       ]);
     } finally {
       setLoadingProducts(false);
@@ -225,8 +225,8 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
 
   const getDisplayPrice = () => {
     if (isIAP && plans.length > 0) {
-      const id = plan === 'month' ? 'com.sumaai.monthly' : 
-                 plan === 'season' ? 'com.sumaai.seasonal' : 'com.sumaai.yearly';
+      const id = plan === 'month' ? 'com.sumaai.coins_500' : 
+                 plan === 'season' ? 'com.sumaai.coins_1500' : 'com.sumaai.coins_5000';
       const p = plans.find((item: any) => item.id === id);
       if (p) return p.price;
     }
@@ -284,7 +284,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
                 >
                   💰 500点币<br/>
                   {isIAP && plans.length > 0 ? 
-                    plans.find((p: any) => p.id === 'com.sumaai.monthly')?.price || '¥29' : 
+                    plans.find((p: any) => p.id === 'com.sumaai.coins_500')?.price || '¥29' : 
                     '¥29'
                   }
                 </button>
@@ -294,7 +294,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
                 >
                   💰 1500点币<br/>
                   {isIAP && plans.length > 0 ? 
-                    plans.find((p: any) => p.id === 'com.sumaai.seasonal')?.price || '¥69' : 
+                    plans.find((p: any) => p.id === 'com.sumaai.coins_1500')?.price || '¥69' : 
                     '¥69'
                   }
                 </button>
@@ -304,7 +304,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
                 >
                   💰 5000点币<br/>
                   {isIAP && plans.length > 0 ? 
-                    plans.find((p: any) => p.id === 'com.sumaai.yearly')?.price || '¥199' : 
+                    plans.find((p: any) => p.id === 'com.sumaai.coins_5000')?.price || '¥199' : 
                     '¥199'
                   }
                 </button>

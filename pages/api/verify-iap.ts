@@ -121,9 +121,9 @@ async function processReceipt(
   
   // 如果没有传入 plan，从 productId 推断
   if (!planConfig) {
-    if (productId?.includes('monthly')) planConfig = PLAN_CONFIG.month;
-    else if (productId?.includes('seasonal')) planConfig = PLAN_CONFIG.season;
-    else if (productId?.includes('yearly')) planConfig = PLAN_CONFIG.year;
+    if (productId?.includes('coins_500')) planConfig = PLAN_CONFIG.month;
+    else if (productId?.includes('coins_1500')) planConfig = PLAN_CONFIG.season;
+    else if (productId?.includes('coins_5000')) planConfig = PLAN_CONFIG.year;
     else {
       return res.status(400).json({ success: false, message: '未知产品类型' });
     }

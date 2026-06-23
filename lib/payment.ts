@@ -43,9 +43,9 @@ export interface PaymentResult {
 
 // 产品 ID 映射
 const PRODUCT_IDS = {
-  month: 'com.sumaai.monthly',
-  season: 'com.sumaai.seasonal',
-  year: 'com.sumaai.yearly',
+  month: 'com.sumaai.coins_500',
+  season: 'com.sumaai.coins_1500',
+  year: 'com.sumaai.coins_5000',
 };
 
 // 缓存产品信息
@@ -81,9 +81,9 @@ export async function getProductPrice(productId: string): Promise<string> {
 export async function getProductsWithPrices(): Promise<{ id: string; name: string; price: string; points: number }[]> {
   const products = await fetchProducts();
   const planMap: Record<string, { name: string; points: number }> = {
-    'com.sumaai.monthly': { name: '月卡', points: 500 },
-    'com.sumaai.seasonal': { name: '季卡', points: 1500 },
-    'com.sumaai.yearly': { name: '年卡', points: 5000 },
+    'com.sumaai.coins_500': { name: '月卡', points: 500 },
+    'com.sumaai.coins_1500': { name: '季卡', points: 1500 },
+    'com.sumaai.coins_5000': { name: '年卡', points: 5000 },
   };
   
   return products.map((p: any) => ({
@@ -171,9 +171,9 @@ export async function restorePurchases(): Promise<{ success: boolean; message?: 
 
 function getPlanFromProductId(productId: string): PaymentParams | null {
   const map: Record<string, 'month' | 'season' | 'year'> = {
-    'com.sumaai.monthly': 'month',
-    'com.sumaai.seasonal': 'season',
-    'com.sumaai.yearly': 'year',
+    'com.sumaai.coins_500': 'month',
+    'com.sumaai.coins_1500': 'season',
+    'com.sumaai.coins_5000': 'year',
   };
   const plan = map[productId];
   if (!plan) return null;
