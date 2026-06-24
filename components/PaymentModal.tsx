@@ -26,7 +26,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
 
   const paymentMethod = getPaymentMethod();
   const platform = getPlatform();
-  const isIAP = paymentMethod === 'iap';
+  const isIAP = true; 
 
   useEffect(() => {
     if (platform === 'ios') {
@@ -238,7 +238,8 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
             <button
               onClick={handleRestore}
               disabled={loading}
-              className="w-full mb-4 py-2 text-sm text-blue-600 hover:bg-blue-50 transition disabled:opacity-50"
+              tabIndex={-1}
+              className="w-full mb-4 py-2 text-sm text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition disabled:opacity-50 focus:outline-none"
             >
               🔄 恢复购买
             </button>
