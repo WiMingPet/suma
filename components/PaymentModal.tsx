@@ -243,6 +243,10 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
             >
               🔄 恢复购买
             </button>
+            {/* ✅ 加在这里 */}
+            <p className="text-xs text-gray-400 text-center mb-2">
+              platform={platform} | method={paymentMethod} | isIAP={isIAP ? 'true' : 'false'} | products={plans.length} | loading={loadingProducts ? 'true' : 'false'}
+            </p>
           </>
         )}
 
