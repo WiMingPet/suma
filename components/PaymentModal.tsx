@@ -112,15 +112,21 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
   };
 
   const createOrder = async () => {
+    console.log('🔥 1. createOrder 被调用');
+    alert('1. 开始创建订单'); // ✅ 加这行
     setLoading(true);
     try {
+      console.log('🔥 2. 调用 initiatePayment，参数:', { plan, amount: planPrices[plan], points: planPoints[plan] });
       const result = await initiatePayment({
         plan,
         amount: String(planPrices[plan]),
         points: planPoints[plan],
       });
+      console.log('🔥 3. initiatePayment 返回:', result);
+      alert('2. 返回结果: ' + JSON.stringify(result));
       
       if (result.success) {
+        console.log('🔥 4. 支付成功');
         if (isIAP) {
           alert(`支付成功！获得 ${planPoints[plan]} 点币`);
           onSuccess();
@@ -129,12 +135,14 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
           setOutTradeNo(result.orderId || '');
         }
       } else {
+        console.log('🔥 5. 支付失败:', result.message);
         alert(result.message || '创建订单失败');
       }
-    } catch (error) {
-      console.error('创建订单失败:', error);
-      alert('创建订单失败，请稍后重试');
+    } catch (error: any) {
+      console.error('🔥 6. 创建订单异常:', error);
+      alert('创建订单失败，请稍后重试: ' + (error.message || ''));
     } finally {
+      console.log('🔥 7. 执行 finally');
       setLoading(false);
     }
   };
@@ -174,9 +182,14 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
   };
 
   const handlePayment = () => {
+    alert('1. handlePayment 被调用！');
+    console.log('isIAP:', isIAP);
+    console.log('loading:', loading);
     if (isIAP) {
+      alert('2. 走 IAP 分支');
       createOrder();
     } else {
+      alert('2. 走支付宝分支');
       createAlipayOrder();
     }
   };
