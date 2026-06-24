@@ -373,7 +373,12 @@ export default function Home() {
               <span className="text-blue-400">速码</span>方舟AI软件
             </h1>
 
-            <div>
+            <div className="flex items-center gap-2">
+              {/* ✅ 未登录也能看到购买按钮 */}
+              <button onClick={() => setShowPayment(true)} className="px-3 py-1 bg-yellow-500 text-black rounded-lg text-sm font-medium hover:bg-yellow-400 transition">
+                购买点币
+              </button>
+
               {user ? (
                 <div className="flex items-center gap-3">
                   <div onClick={goToMemberCenter} className="text-right cursor-pointer hover:opacity-80 transition">
@@ -382,11 +387,6 @@ export default function Home() {
                       {user.is_pro ? `点币余额: ${user.points || 0}` : `剩余免费次数: ${Math.max(0, 3 - (user.free_used || 0))}`}
                     </p>
                   </div>
-                  {!user.is_pro && (
-                    <button onClick={() => setShowPayment(true)} className="px-3 py-1 bg-yellow-500 text-black rounded-lg text-sm font-medium hover:bg-yellow-400 transition">
-                      升级Pro
-                    </button>
-                  )}
                   <button onClick={goToMemberCenter} className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full text-white font-bold">
                     {user.phone.slice(-2)}
                   </button>
