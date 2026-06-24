@@ -224,10 +224,12 @@ async function initiateAlipayPayment(params: PaymentParams): Promise<PaymentResu
 }
 
 // IAP 支付
+// IAP 支付（带详细调试弹窗和超时）
 async function initiateIAPPayment(params: PaymentParams): Promise<PaymentResult> {
   try {
     const plugin = await getIAPPlugin();
     if (!plugin) {
+      alert('❌ IAP 插件未加载');
       return { success: false, message: 'IAP 插件未加载' };
     }
     
@@ -235,34 +237,56 @@ async function initiateIAPPayment(params: PaymentParams): Promise<PaymentResult>
     
     const productId = PRODUCT_IDS[params.plan];
     if (!productId) {
+      alert('❌ 产品配置错误: ' + params.plan);
       return { success: false, message: '产品配置错误' };
     }
+
+    // 列出可用方法
+    const methods = Object.keys(plugin).filter(k => typeof plugin[k] === 'function');
+    alert('🔧 可用方法: ' + methods.join(', '));
+
+    // 选择正确的购买方法名
+    const purchaseMethodName = methods.find(m => 
+      m === 'purchaseProduct' || m === 'purchase' || m === 'buy' || m === 'buyProduct'
+    );
     
-    let purchaseResult: any = null;
-    
-    if (typeof plugin.purchase === 'function') {
-      purchaseResult = await plugin.purchase({ productIdentifier: productId });
-    } else if (typeof plugin.buyProduct === 'function') {
-      purchaseResult = await plugin.buyProduct(productId);
-    } else if (typeof plugin.buy === 'function') {
-      purchaseResult = await plugin.buy(productId);
-    } else {
-      return { success: false, message: 'IAP 购买方法不可用' };
+    if (!purchaseMethodName) {
+      alert('❌ 未找到购买方法');
+      return { success: false, message: '未找到购买方法' };
     }
-    
-    // 检查购买结果
+
+    alert('▶️ 开始购买，产品ID: ' + productId + '，方法: ' + purchaseMethodName);
+
+    // 带超时的购买（60秒）
+    const purchasePromise = plugin[purchaseMethodName]({ productIdentifier: productId });
+    const timeoutPromise = new Promise<PaymentResult>((_, reject) => 
+      setTimeout(() => reject(new Error('购买超时（60秒）')), 60000)
+    );
+
+    let purchaseResult: any;
+    try {
+      purchaseResult = await Promise.race([purchasePromise, timeoutPromise]);
+    } catch (raceError: any) {
+      alert('⏱️ ' + raceError.message);
+      return { success: false, message: raceError.message };
+    }
+
+    alert('📦 购买返回: ' + JSON.stringify(purchaseResult).substring(0, 300));
+
+    // 检查购买状态
     const isPurchased = purchaseResult?.state === 'approved' || 
                         purchaseResult?.state === 'purchased' ||
                         purchaseResult?.purchaseState === 'PURCHASED' ||
                         purchaseResult?.success === true;
-    
+
     if (isPurchased) {
+      alert('✅ 支付成功，验证收据...');
       const receipt = purchaseResult.receipt || purchaseResult.transactionReceipt || '';
       const transactionId = purchaseResult.transactionId || purchaseResult.orderId || '';
       
       const verifyResult = await verifyReceiptOnServer(receipt, transactionId, params);
-      
       if (verifyResult.success) {
+        alert('✅ 收据验证成功');
         // 完成交易
         if (typeof plugin.finish === 'function') {
           await plugin.finish(purchaseResult);
@@ -273,23 +297,16 @@ async function initiateIAPPayment(params: PaymentParams): Promise<PaymentResult>
         }
         return { success: true, orderId: transactionId };
       } else {
+        alert('❌ 收据验证失败: ' + verifyResult.message);
         return { success: false, message: verifyResult.message || '收据验证失败' };
       }
+    } else {
+      alert('❌ 购买未成功，状态: ' + (purchaseResult?.state || '未知'));
+      return { success: false, message: purchaseResult?.message || purchaseResult?.errorMessage || '购买失败' };
     }
-    
-    if (purchaseResult?.state === 'cancelled' || purchaseResult?.purchaseState === 'CANCELLED') {
-      return { success: false, message: '已取消购买' };
-    }
-    
-    return { success: false, message: purchaseResult?.message || purchaseResult?.errorMessage || '购买失败' };
   } catch (error: any) {
-    console.error('IAP 支付错误:', error);
-    
-    if (error?.message?.toLowerCase().includes('cancel')) {
-      return { success: false, message: '已取消购买' };
-    }
-    
-    return { success: false, message: error?.message || '支付失败，请重试' };
+    alert('💥 重大异常: ' + (error.message || JSON.stringify(error)));
+    return { success: false, message: error.message || '支付失败' };
   }
 }
 
