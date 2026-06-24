@@ -51,45 +51,64 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
     }
   }, [isOpen]);
 
+  // ✅ 提取默认产品设置函数，避免重复代码
+  const setDefaultPlans = () => {
+    setPlans([
+      { id: 'com.sumaai.coins_500', name: '500点币', price: '¥29', points: 500 },
+      { id: 'com.sumaai.coins_1500', name: '1500点币', price: '¥69', points: 1500 },
+      { id: 'com.sumaai.coins_5000', name: '5000点币', price: '¥199', points: 5000 },
+    ]);
+  };
+
+  // ✅ 改造后的 loadProducts（包含你的方案）
   const loadProducts = async () => {
     setLoadingProducts(true);
     try {
       const products = await fetchProducts();
-      const planList = products.map((p: any) => {
-        let name = '500点币';
-        let points = 500;
-        if (p.identifier?.includes('coins_1500')) { name = '1500点币'; points = 1500; }
-        if (p.identifier?.includes('coins_5000')) { name = '5000点币'; points = 5000; }
-        return {
-          id: p.identifier,
-          name,
-          price: p.priceString || `¥${planPrices[plan]}`,
-          points,
-        };
-      });
-      setPlans(planList);
+      if (products && products.length > 0) {
+        const planList = products.map((p: any) => {
+          let name = '500点币';
+          let points = 500;
+          if (p.identifier?.includes('coins_1500')) { name = '1500点币'; points = 1500; }
+          if (p.identifier?.includes('coins_5000')) { name = '5000点币'; points = 5000; }
+          return {
+            id: p.identifier,
+            name,
+            price: p.priceString || `¥${planPrices[plan]}`,
+            points,
+          };
+        });
+        setPlans(planList);
+      } else {
+        // ✅ 无数据时使用默认产品
+        setDefaultPlans();
+      }
     } catch (error) {
       console.error('加载产品失败:', error);
-      setPlans([
-        { id: 'com.sumaai.coins_500', name: '500点币', price: '¥29', points: 500 },
-        { id: 'com.sumaai.coins_1500', name: '1500点币', price: '¥69', points: 1500 },
-        { id: 'com.sumaai.coins_5000', name: '5000点币', price: '¥199', points: 5000 },
-      ]);
+      // ✅ 失败也设置默认产品
+      setDefaultPlans();
     } finally {
       setLoadingProducts(false);
     }
   };
 
-  // 恢复购买
-  const handleRestore = async () => {
+  // ✅ 改造后的恢复购买（带焦点移除）
+  const handleRestore = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.blur(); // 点击后立即移除焦点，消除蓝色框
     setLoading(true);
-    const result = await restorePurchases();
-    alert(result.message);
-    if (result.success) {
-      onSuccess();
-      onClose();
+    try {
+      const result = await restorePurchases();
+      alert(result.message);
+      if (result.success) {
+        onSuccess();
+        onClose();
+      }
+    } catch (error) {
+      console.error('恢复购买失败:', error);
+      alert('恢复购买失败，请重试');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const createOrder = async () => {
@@ -247,7 +266,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
             <button
               onClick={handleRestore}
               disabled={loading}
-              className="w-full mb-4 py-2 text-sm text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition disabled:opacity-50"
+              className="w-full mb-4 py-2 text-sm text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition disabled:opacity-50 focus:outline-none"
             >
               🔄 恢复购买
             </button>
@@ -279,7 +298,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
             ) : (
               <>
                 <button
-                  className={`py-2 rounded border ${plan === 'month' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
+                  className={`py-2 rounded border focus:outline-none ${plan === 'month' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
                   onClick={() => setPlan('month')}
                 >
                   💰 500点币<br/>
@@ -289,7 +308,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
                   }
                 </button>
                 <button
-                  className={`py-2 rounded border ${plan === 'season' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
+                  className={`py-2 rounded border focus:outline-none ${plan === 'season' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
                   onClick={() => setPlan('season')}
                 >
                   💰 1500点币<br/>
@@ -299,7 +318,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
                   }
                 </button>
                 <button
-                  className={`py-2 rounded border ${plan === 'year' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
+                  className={`py-2 rounded border focus:outline-none ${plan === 'year' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 border-gray-300'}`}
                   onClick={() => setPlan('year')}
                 >
                   💰 5000点币<br/>
@@ -316,7 +335,8 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
         {!qrCode && !loading && (
           <button
             onClick={handlePayment}
-            className="w-full py-3 bg-green-600 text-white rounded-lg disabled:opacity-50"
+            disabled={loadingProducts}
+            className="w-full py-3 bg-green-600 text-white rounded-lg disabled:opacity-50 focus:outline-none"
           >
             {isIAP ? `${getDisplayPrice()} 立即购买` : '生成订单'}
           </button>
@@ -347,13 +367,13 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
           <button
             onClick={handleManualConfirm}
             disabled={loading}
-            className="w-full mt-2 py-2 bg-blue-500 text-white rounded-lg disabled:opacity-50 hover:bg-blue-600 transition"
+            className="w-full mt-2 py-2 bg-blue-500 text-white rounded-lg disabled:opacity-50 hover:bg-blue-600 transition focus:outline-none"
           >
             {loading ? '确认中...' : '我已支付，手动确认'}
           </button>
         )}
 
-        <button onClick={onClose} className="w-full mt-3 text-gray-500">
+        <button onClick={onClose} className="w-full mt-3 text-gray-500 focus:outline-none">
           取消
         </button>
       </div>
