@@ -112,45 +112,43 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
   };
 
   const createOrder = async () => {
-    console.log('🔥 1. createOrder 被调用');
-    alert('1. 开始创建订单'); // ✅ 加这行
+    alert('3. createOrder 被调用！');
     setLoading(true);
     try {
-      console.log('🔥 2. 调用 initiatePayment，参数:', { plan, amount: planPrices[plan], points: planPoints[plan] });
+      alert('4. 准备调用 initiatePayment...');
       const result = await initiatePayment({
         plan,
         amount: String(planPrices[plan]),
         points: planPoints[plan],
       });
-      console.log('🔥 3. initiatePayment 返回:', result);
-      alert('2. 返回结果: ' + JSON.stringify(result));
+      alert('5. initiatePayment 返回结果: ' + JSON.stringify(result));
       
       if (result.success) {
-        console.log('🔥 4. 支付成功');
         if (isIAP) {
-          alert(`支付成功！获得 ${planPoints[plan]} 点币`);
+          alert('6. 支付成功！获得 ' + planPoints[plan] + ' 点币');
           onSuccess();
           onClose();
         } else {
           setOutTradeNo(result.orderId || '');
         }
       } else {
-        console.log('🔥 5. 支付失败:', result.message);
-        alert(result.message || '创建订单失败');
+        alert('6. 支付失败: ' + (result.message || '未知错误'));
       }
     } catch (error: any) {
-      console.error('🔥 6. 创建订单异常:', error);
-      alert('创建订单失败，请稍后重试: ' + (error.message || ''));
+      alert('6. 出错了: ' + (error.message || '未知错误'));
+      console.error('创建订单失败:', error);
     } finally {
-      console.log('🔥 7. 执行 finally');
       setLoading(false);
+      alert('7. 执行 finally，loading 已重置');
     }
   };
 
   const createAlipayOrder = async () => {
+    alert('3. createAlipayOrder 被调用！');
     setLoading(true);
     try {
       const amount = planPrices[plan];
+      alert('4. 准备调用支付宝 API...');
       const res = await fetch('https://sumaai.cn/api/create-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -158,26 +156,28 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
       });
 
       const data = await res.json();
+      alert('5. 支付宝返回: ' + JSON.stringify(data));
 
       if (method === 'qrcode') {
         if (data.success) {
           setQrCode(data.qrCode);
           setOutTradeNo(data.outTradeNo);
         } else {
-          alert(data.error || '创建订单失败');
+          alert('6. 创建订单失败: ' + (data.error || '未知错误'));
         }
       } else {
         if (data.success && data.payUrl) {
           window.location.href = data.payUrl;
         } else {
-          alert(data.error || '创建订单失败');
+          alert('6. 创建订单失败: ' + (data.error || '未知错误'));
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      alert('6. 出错了: ' + (error.message || '未知错误'));
       console.error('创建订单失败:', error);
-      alert('创建订单失败，请稍后重试');
     } finally {
       setLoading(false);
+      alert('7. 执行 finally，loading 已重置');
     }
   };
 
