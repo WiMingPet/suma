@@ -99,6 +99,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
   };
 
   const createOrder = async () => {
+    alert('1. 开始购买...');
     setLoading(true);
     try {
       const result = await initiatePayment({
@@ -106,20 +107,20 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
         amount: String(planPrices[plan]),
         points: planPoints[plan],
       });
+      alert('2. 返回结果: ' + JSON.stringify(result));
       if (result.success) {
         if (isIAP) {
-          alert(`支付成功！获得 ${planPoints[plan]} 点币`);
+          alert('3. 支付成功！');
           onSuccess();
           onClose();
         } else {
           setOutTradeNo(result.orderId || '');
         }
       } else {
-        alert(result.message || '购买失败，请重试');
+        alert('3. 失败: ' + result.message);
       }
     } catch (error: any) {
-      console.error('创建订单失败:', error);
-      alert('支付失败，请确认已登录沙盒测试账号');
+      alert('3. 异常: ' + error.message);
     } finally {
       setLoading(false);
     }
