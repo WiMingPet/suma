@@ -375,8 +375,8 @@ export default function Home() {
 
             <div className="flex items-center gap-2">
               {/* ✅ 未登录也能看到购买按钮 */}
-              <button onClick={() => setShowPayment(true)} className="px-3 py-1 bg-yellow-500 text-black rounded-lg text-xs font-medium hover:bg-yellow-400 transition whitespace-nowrap flex-shrink-0">
-                购买点币
+              <button onClick={() => setShowPayment(true)} className="px-1.5 py-0.5 bg-yellow-500 text-black rounded-full text-[10px] font-medium whitespace-nowrap flex-shrink-0">
+                购买
               </button>
 
               {user ? (
