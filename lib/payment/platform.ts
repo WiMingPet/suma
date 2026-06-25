@@ -2,17 +2,31 @@
 import { Capacitor } from '@capacitor/core';
 import { PaymentPlatform, PaymentMethod } from './base';
 
-// 检测当前平台
 export function getPlatform(): PaymentPlatform {
   if (typeof window === 'undefined') return 'web';
 
-  // ✅ URL 参数优先
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('platform') === 'harmony') return 'harmony';
+  // 1. 永久标记优先：App 启动时写入 localStorage，怎么跳转都不怕丢
+  try {
+    if (localStorage.getItem('suma_platform') === 'harmony') return 'harmony';
+  } catch (e) {}
 
-  // ✅ UA 兜底检测鸿蒙
+  // 2. URL 参数次之
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('platform') === 'harmony') {
+    try {
+      localStorage.setItem('suma_platform', 'harmony');
+    } catch (e) {}
+    return 'harmony';
+  }
+
+  // 3. UA 兜底（百度浏览器、鸿蒙WebView）
   const ua = navigator.userAgent;
-  if (/HarmonyOS|ArkWeb/i.test(ua)) return 'harmony';
+  if (/HarmonyOS|ArkWeb/i.test(ua)) {
+    try {
+      localStorage.setItem('suma_platform', 'harmony');
+    } catch (e) {}
+    return 'harmony';
+  }
 
   if (Capacitor.isNativePlatform()) {
     const platform = Capacitor.getPlatform();
@@ -26,7 +40,6 @@ export function getPlatform(): PaymentPlatform {
   return 'web';
 }
 
-// 获取支付方式
 export function getPaymentMethod(): PaymentMethod {
   const platform = getPlatform();
   if (platform === 'ios') return 'iap';

@@ -174,6 +174,69 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
       alert('操作失败')
     }
   }
+  // 完全禁止自动复制时的兜底方案：可点击复制
+  function showFallbackDialog(phone: string, email: string) {
+    const dialog = document.createElement('div');
+    dialog.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
+    dialog.innerHTML = `
+      <div style="background:#1f2937;border-radius:16px;padding:24px;max-width:300px;width:90%;text-align:center;border:1px solid #374151;">
+        <p style="color:white;font-size:18px;font-weight:bold;margin-bottom:12px;">📞 联系客服</p>
+        <button id="copyPhone" style="width:100%;padding:12px;background:#3b82f6;color:white;border:none;border-radius:12px;font-size:16px;margin-bottom:8px;">
+          📞 复制电话：${phone}
+        </button>
+        <button id="copyEmail" style="width:100%;padding:12px;background:#10b981;color:white;border:none;border-radius:12px;font-size:16px;margin-bottom:8px;">
+          ✉️ 复制邮箱：${email}
+        </button>
+        <button id="copyAll" style="width:100%;padding:12px;background:#8b5cf6;color:white;border:none;border-radius:12px;font-size:14px;margin-bottom:16px;">
+          📋 复制全部
+        </button>
+        <button id="closeDialog" style="padding:8px 24px;background:#4b5563;color:white;border:none;border-radius:8px;font-size:14px;">
+          关闭
+        </button>
+      </div>
+    `;
+    document.body.appendChild(dialog);
+    
+    // 复制电话
+    dialog.querySelector('#copyPhone')!.addEventListener('click', () => {
+      copyToClipboard(phone, '电话已复制');
+    });
+    // 复制邮箱
+    dialog.querySelector('#copyEmail')!.addEventListener('click', () => {
+      copyToClipboard(email, '邮箱已复制');
+    });
+    // 复制全部
+    dialog.querySelector('#copyAll')!.addEventListener('click', () => {
+      copyToClipboard(`电话: ${phone} 邮箱: ${email}`, '全部信息已复制');
+    });
+    // 关闭
+    dialog.querySelector('#closeDialog')!.addEventListener('click', () => {
+      document.body.removeChild(dialog);
+    });
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) document.body.removeChild(dialog);
+    });
+  }
+
+  function copyToClipboard(text: string, successMsg: string) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => alert(successMsg)).catch(() => alert(text));
+    } else {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        alert(successMsg);
+      } catch (e) {
+        alert(text);
+      }
+    }
+  }
 
   const handleDownload = (code: string, name: string) => {
     const blob = new Blob([code], { type: 'text/html' })
@@ -237,17 +300,39 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
         </div>
 
         <button onClick={() => {
-          navigator.clipboard.writeText('电话: 15920978058 邮箱: 3060302415@qq.com').then(() => {
-            alert('客服联系方式已复制到剪贴板');
-          }).catch(() => {
-            alert('📞 客服电话：15920978058\n邮箱：3060302415@qq.com');
-          });
+          const phone = '15920978058';
+          const email = '3060302415@qq.com';
+          const fullText = `电话: ${phone} 邮箱: ${email}`;
+          
+          // 第一步：尝试自动复制全部信息
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(fullText).then(() => {
+              alert('客服联系方式已复制到剪贴板');
+            }).catch(() => {
+              showFallbackDialog(phone, email);
+            });
+          } else {
+            // 第二步：老旧浏览器兜底
+            try {
+              const textarea = document.createElement('textarea');
+              textarea.value = fullText;
+              textarea.style.position = 'fixed';
+              textarea.style.left = '-9999px';
+              document.body.appendChild(textarea);
+              textarea.select();
+              document.execCommand('copy');
+              document.body.removeChild(textarea);
+              alert('客服联系方式已复制到剪贴板');
+            } catch (e) {
+              showFallbackDialog(phone, email);
+            }
+          }
         }} className="flex items-center justify-between px-4 py-3 mx-3 my-2 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl transition border border-blue-500/20">
           <div className="flex items-center gap-3">
             <span className="text-xl">💬</span>
             <div className="text-left">
               <p className="text-white font-medium">帮助与客服</p>
-              <p className="text-xs text-gray-400">点击复制联系方式</p>
+              <p className="text-xs text-gray-400">遇到问题？联系我们</p>
             </div>
           </div>
           <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
