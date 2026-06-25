@@ -369,8 +369,9 @@ export default function Home() {
               </svg>
             </button>
 
-            <h1 className="text-xl font-bold text-white">
-              <span className="text-blue-400">速码</span>方舟AI软件
+            <h1 className="text-lg font-bold text-white leading-tight text-center">
+              <span className="text-blue-400">速码</span>方舟<br/>
+              AI软件
             </h1>
 
             <div className="flex items-center gap-2">
