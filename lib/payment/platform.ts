@@ -6,9 +6,13 @@ import { PaymentPlatform, PaymentMethod } from './base';
 export function getPlatform(): PaymentPlatform {
   if (typeof window === 'undefined') return 'web';
 
-  // ✅ URL 参数优先（鸿蒙 App 传入 ?platform=harmony）
+  // ✅ URL 参数优先
   const params = new URLSearchParams(window.location.search);
   if (params.get('platform') === 'harmony') return 'harmony';
+
+  // ✅ UA 兜底检测鸿蒙
+  const ua = navigator.userAgent;
+  if (/HarmonyOS|ArkWeb/i.test(ua)) return 'harmony';
 
   if (Capacitor.isNativePlatform()) {
     const platform = Capacitor.getPlatform();
@@ -16,9 +20,8 @@ export function getPlatform(): PaymentPlatform {
     if (platform === 'android') return 'android';
   }
 
-  const userAgent = navigator.userAgent;
-  if (/iPhone|iPad|iPod/.test(userAgent)) return 'ios';
-  if (/Android/.test(userAgent)) return 'android';
+  if (/iPhone|iPad|iPod/.test(ua)) return 'ios';
+  if (/Android/.test(ua)) return 'android';
 
   return 'web';
 }
