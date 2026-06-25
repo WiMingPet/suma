@@ -1,7 +1,7 @@
 // components/PaymentModal.tsx
 import { useState, useEffect } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
-import { initiatePayment, getPaymentMethod, initIAP, getPlatform, restorePurchases, fetchProducts } from '../lib/payment';
+import { initiatePayment, getPaymentMethod, initIAP, getPlatform, restorePurchases, fetchProducts } from '../lib/payment/index';
 
 interface PaymentModalProps {
   isOpen: boolean;

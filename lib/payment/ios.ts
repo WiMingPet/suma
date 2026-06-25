@@ -1,45 +1,5 @@
-// lib/payment.ts
-import { Capacitor } from '@capacitor/core';
-import { NativePurchases, Product } from '@capgo/native-purchases';
-
-export type PaymentPlatform = 'ios' | 'android' | 'web';
-export type PaymentMethod = 'alipay' | 'iap';
-
-// 检测当前平台
-export function getPlatform(): PaymentPlatform {
-  if (typeof window === 'undefined') return 'web';
-  
-  if (Capacitor.isNativePlatform()) {
-    const platform = Capacitor.getPlatform();
-    if (platform === 'ios') return 'ios';
-    if (platform === 'android') return 'android';
-  }
-  
-  const userAgent = navigator.userAgent;
-  if (/iPhone|iPad|iPod/.test(userAgent)) return 'ios';
-  if (/Android/.test(userAgent)) return 'android';
-  
-  return 'web';
-}
-
-// 获取当前平台应该使用的支付方式
-export function getPaymentMethod(): PaymentMethod {
-  const platform = getPlatform();
-  if (platform === 'ios') return 'iap';
-  return 'alipay';
-}
-
-export interface PaymentParams {
-  plan: 'month' | 'season' | 'year';
-  amount: string;
-  points: number;
-}
-
-export interface PaymentResult {
-  success: boolean;
-  orderId?: string;
-  message?: string;
-}
+// lib/payment/ios.ts
+import { PaymentParams, PaymentResult } from './base';
 
 // 产品 ID 映射
 const PRODUCT_IDS = {
@@ -54,13 +14,12 @@ let cachedProducts: any[] = [];
 // 获取产品信息
 export async function fetchProducts(): Promise<any[]> {
   if (cachedProducts.length > 0) return cachedProducts;
-  
+
   try {
     const { NativePurchases } = await import('@capgo/native-purchases');
     const result = await NativePurchases.getProducts({
       productIdentifiers: Object.values(PRODUCT_IDS),
     });
-    // 修复：result 可能是一个对象 { products: [...] }
     const products = Array.isArray(result) ? result : (result as any)?.products || [];
     cachedProducts = products;
     return products;
@@ -81,11 +40,11 @@ export async function getProductPrice(productId: string): Promise<string> {
 export async function getProductsWithPrices(): Promise<{ id: string; name: string; price: string; points: number }[]> {
   const products = await fetchProducts();
   const planMap: Record<string, { name: string; points: number }> = {
-    'com.sumaai.coins_500': { name: '月卡', points: 500 },
-    'com.sumaai.coins_1500': { name: '季卡', points: 1500 },
-    'com.sumaai.coins_5000': { name: '年卡', points: 5000 },
+    'com.sumaai.coins_500': { name: '500点币', points: 500 },
+    'com.sumaai.coins_1500': { name: '1500点币', points: 1500 },
+    'com.sumaai.coins_5000': { name: '5000点币', points: 5000 },
   };
-  
+
   return products.map((p: any) => ({
     id: p.identifier,
     name: planMap[p.identifier]?.name || p.identifier,
@@ -113,13 +72,13 @@ async function getIAPPlugin() {
 let iapInitialized = false;
 export async function initIAP() {
   if (iapInitialized) return;
-  
+
   const plugin = await getIAPPlugin();
   if (!plugin) {
     console.warn('IAP 插件不可用');
     return;
   }
-  
+
   try {
     if (typeof plugin.initialize === 'function') {
       await plugin.initialize({
@@ -144,8 +103,7 @@ export async function restorePurchases(): Promise<{ success: boolean; message?: 
   try {
     const { NativePurchases } = await import('@capgo/native-purchases');
     const result = await NativePurchases.restorePurchases();
-    
-    // 处理恢复结果
+
     const purchases = Array.isArray(result) ? result : (result as any)?.purchases || [];
     if (purchases.length > 0) {
       for (const purchase of purchases) {
@@ -177,117 +135,53 @@ function getPlanFromProductId(productId: string): PaymentParams | null {
   };
   const plan = map[productId];
   if (!plan) return null;
-  
-  const plans = { month: 29.9, season: 69.9, year: 199 };
+
+  const plans = { month: 29, season: 69, year: 199 };
   const pointsMap = { month: 500, season: 1500, year: 5000 };
   return { plan, amount: String(plans[plan]), points: pointsMap[plan] };
 }
 
-// 发起支付
-export async function initiatePayment(params: PaymentParams): Promise<PaymentResult> {
-  const method = getPaymentMethod();
-  
-  if (method === 'iap') {
-    return initiateIAPPayment(params);
-  } else {
-    return initiateAlipayPayment(params);
-  }
-}
-
-// 支付宝支付
-async function initiateAlipayPayment(params: PaymentParams): Promise<PaymentResult> {
-  try {
-    const response = await fetch('https://sumaai.cn/api/create-payment', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        plan: params.plan,
-        amount: params.amount,
-        points: params.points,
-      }),
-    });
-    
-    const data = await response.json();
-    
-    if (data.code === 200 && data.qrCode) {
-      if (typeof window !== 'undefined') {
-        window.open(data.qrCode);
-      }
-      return { success: true, orderId: data.orderId };
-    }
-    
-    return { success: false, message: data.message || '支付失败' };
-  } catch (error) {
-    console.error('支付宝支付错误:', error);
-    return { success: false, message: '网络错误，请重试' };
-  }
-}
-
 // IAP 支付
-// IAP 支付（带详细调试弹窗和超时）
-async function initiateIAPPayment(params: PaymentParams): Promise<PaymentResult> {
+export async function initiateIAPPayment(params: PaymentParams): Promise<PaymentResult> {
   try {
     const plugin = await getIAPPlugin();
     if (!plugin) {
-      alert('❌ IAP 插件未加载');
       return { success: false, message: 'IAP 插件未加载' };
     }
-    
+
     await initIAP();
-    
+
     const productId = PRODUCT_IDS[params.plan];
     if (!productId) {
-      alert('❌ 产品配置错误: ' + params.plan);
       return { success: false, message: '产品配置错误' };
     }
 
-    // 列出可用方法
-    const methods = Object.keys(plugin).filter(k => typeof plugin[k] === 'function');
-    alert('🔧 可用方法: ' + methods.join(', '));
+    let purchaseResult: any = null;
 
-    // 选择正确的购买方法名
-    const purchaseMethodName = methods.find(m => 
-      m === 'purchaseProduct' || m === 'purchase' || m === 'buy' || m === 'buyProduct'
-    );
-    
-    if (!purchaseMethodName) {
-      alert('❌ 未找到购买方法');
-      return { success: false, message: '未找到购买方法' };
+    if (typeof plugin.purchaseProduct === 'function') {
+      purchaseResult = await plugin.purchaseProduct({ productIdentifier: productId });
+    } else if (typeof plugin.purchase === 'function') {
+      purchaseResult = await plugin.purchase({ productIdentifier: productId });
+    } else if (typeof plugin.buyProduct === 'function') {
+      purchaseResult = await plugin.buyProduct(productId);
+    } else if (typeof plugin.buy === 'function') {
+      purchaseResult = await plugin.buy({ productId });
+    } else {
+      return { success: false, message: 'IAP 购买方法不可用' };
     }
 
-    alert('▶️ 开始购买，产品ID: ' + productId + '，方法: ' + purchaseMethodName);
-
-    // 带超时的购买（60秒）
-    const purchasePromise = plugin[purchaseMethodName]({ productIdentifier: productId });
-    const timeoutPromise = new Promise<PaymentResult>((_, reject) => 
-      setTimeout(() => reject(new Error('购买超时（60秒）')), 60000)
-    );
-
-    let purchaseResult: any;
-    try {
-      purchaseResult = await Promise.race([purchasePromise, timeoutPromise]);
-    } catch (raceError: any) {
-      alert('⏱️ ' + raceError.message);
-      return { success: false, message: raceError.message };
-    }
-
-    alert('📦 购买返回: ' + JSON.stringify(purchaseResult).substring(0, 300));
-
-    // 检查购买状态
-    const isPurchased = purchaseResult?.state === 'approved' || 
-                        purchaseResult?.state === 'purchased' ||
-                        purchaseResult?.purchaseState === 'PURCHASED' ||
-                        purchaseResult?.success === true;
+    const isPurchased = purchaseResult?.state === 'approved' ||
+      purchaseResult?.state === 'purchased' ||
+      purchaseResult?.purchaseState === 'PURCHASED' ||
+      purchaseResult?.success === true;
 
     if (isPurchased) {
-      alert('✅ 支付成功，验证收据...');
       const receipt = purchaseResult.receipt || purchaseResult.transactionReceipt || '';
       const transactionId = purchaseResult.transactionId || purchaseResult.orderId || '';
-      
+
       const verifyResult = await verifyReceiptOnServer(receipt, transactionId, params);
+
       if (verifyResult.success) {
-        alert('✅ 收据验证成功');
-        // 完成交易
         if (typeof plugin.finish === 'function') {
           await plugin.finish(purchaseResult);
         } else if (typeof plugin.finishPurchase === 'function') {
@@ -297,23 +191,30 @@ async function initiateIAPPayment(params: PaymentParams): Promise<PaymentResult>
         }
         return { success: true, orderId: transactionId };
       } else {
-        alert('❌ 收据验证失败: ' + verifyResult.message);
         return { success: false, message: verifyResult.message || '收据验证失败' };
       }
-    } else {
-      alert('❌ 购买未成功，状态: ' + (purchaseResult?.state || '未知'));
-      return { success: false, message: purchaseResult?.message || purchaseResult?.errorMessage || '购买失败' };
     }
+
+    if (purchaseResult?.state === 'cancelled' || purchaseResult?.purchaseState === 'CANCELLED') {
+      return { success: false, message: '已取消购买' };
+    }
+
+    return { success: false, message: purchaseResult?.message || purchaseResult?.errorMessage || '购买失败' };
   } catch (error: any) {
-    alert('💥 重大异常: ' + (error.message || JSON.stringify(error)));
-    return { success: false, message: error.message || '支付失败' };
+    console.error('IAP 支付错误:', error);
+
+    if (error?.message?.toLowerCase().includes('cancel')) {
+      return { success: false, message: '已取消购买' };
+    }
+
+    return { success: false, message: error?.message || '支付失败，请重试' };
   }
 }
 
 // 服务端验证收据
 async function verifyReceiptOnServer(
-  receipt: string, 
-  transactionId: string, 
+  receipt: string,
+  transactionId: string,
   params: PaymentParams
 ): Promise<{ success: boolean; message?: string }> {
   try {
@@ -328,7 +229,7 @@ async function verifyReceiptOnServer(
         points: params.points,
       }),
     });
-    
+
     const data = await response.json();
     return { success: data.success, message: data.message };
   } catch (error) {
