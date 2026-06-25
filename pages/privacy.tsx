@@ -96,9 +96,42 @@ export default function Privacy() {
               服务商名称：深度求索（DeepSeek）<br />
               服务说明：大语言模型API服务<br />
                             隐私政策：<a href="https://cdn.deepseek.com/policies/zh-CN/deepseek-privacy-policy.html" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">https://cdn.deepseek.com/policies/zh-CN/deepseek-privacy-policy.html</a></p>
+            <section className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+              <h2 className="text-xl font-semibold mb-3 text-orange-800">5. 第三方SDK信息</h2>
+              <p className="mb-2">本App使用的第三方SDK及数据收集情况如下：</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-orange-100">
+                      <th className="border border-orange-200 p-2 text-left">SDK名称</th>
+                      <th className="border border-orange-200 p-2 text-left">服务商</th>
+                      <th className="border border-orange-200 p-2 text-left">收集数据</th>
+                      <th className="border border-orange-200 p-2 text-left">使用目的</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="border border-orange-200 p-2">DeepSeek API</td>
+                      <td className="border border-orange-200 p-2">深度求索</td>
+                      <td className="border border-orange-200 p-2">对话内容</td>
+                      <td className="border border-orange-200 p-2">AI编程助手问答</td>
+                    </tr>
+                    <tr>
+                      <td className="border border-orange-200 p-2">阿里云百炼</td>
+                      <td className="border border-orange-200 p-2">阿里云计算</td>
+                      <td className="border border-orange-200 p-2">文本描述、上传图片</td>
+                      <td className="border border-orange-200 p-2">AI代码生成</td>
+                    </tr>
+                    <tr>
+                      <td className="border border-orange-200 p-2">阿里云短信</td>
+                      <td className="border border-orange-200 p-2">阿里云计算</td>
+                      <td className="border border-orange-200 p-2">手机号</td>
+                      <td className="border border-orange-200 p-2">发送验证码</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </section>
-
-            <section>
               <h2 className="text-xl font-semibold mb-3">5. 数据存储与安全</h2>
               <p>我们采用行业标准的安全措施保护您的个人信息，防止未经授权的访问、披露、修改或销毁。您的输入内容在完成处理后，不会被AI服务商持久化存储。我们仅保留必要的交互日志用于问题排查，最长保留期限为30天。</p>
             </section>
