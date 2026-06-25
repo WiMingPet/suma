@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react';
-import { flushSync } from 'react-dom';
+import { useUser } from '../contexts/UserContext';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -20,6 +20,7 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
   const [agreed, setAgreed] = useState(false);
   const [previewCode, setPreviewCode] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const { user } = useUser();
 
   // 自动滚动到底部
   useEffect(() => {
@@ -90,6 +91,10 @@ export default function ChatAssistant({ isOpen, onClose }: ChatAssistantProps) {
 
   // 发送消息
   const sendMessage = async () => {
+    if (!user) {
+      alert('请先登录后再使用AI助手');
+      return;
+    }
     if (!input.trim()) return;
     setLoading(true);
 
