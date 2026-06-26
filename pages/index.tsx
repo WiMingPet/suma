@@ -344,7 +344,6 @@ export default function Home() {
     } catch (e) {
       window.open('data:text/html;charset=utf-8,' + encodeURIComponent(generatedCode), '_blank');
     }
-  };
   
     // Web 端原有逻辑
     const blob = new Blob([generatedCode], { type: 'text/html' });
