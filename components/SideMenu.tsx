@@ -241,13 +241,8 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
   }
 
   const handleDownload = (code: string, name: string) => {
-    const blob = new Blob([code], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${name}.html`
-    a.click()
-    URL.revokeObjectURL(url)
+    const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(code);
+    window.open(dataUri, '_blank');
   }
 
   if (!isOpen) return null

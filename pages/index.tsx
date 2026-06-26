@@ -339,14 +339,9 @@ export default function Home() {
 
   // 下载代码
   const handleDownload = () => {
-    if (!generatedCode) return
-    const blob = new Blob([generatedCode], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'generated-app.html'
-    a.click()
-    URL.revokeObjectURL(url)
+    if (!generatedCode) return;
+    const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(generatedCode);
+    window.open(dataUri, '_blank');
   }
 
   return (
