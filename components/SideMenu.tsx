@@ -242,7 +242,14 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
 
   const handleDownload = async (code: string, name: string) => {
     if (!code) return;
-
+    
+    // 鸿蒙原生保存
+    if ((window as any).harmonyBridge?.downloadFile) {
+      (window as any).harmonyBridge.downloadFile(code, name);
+      return;
+    }
+    
+    // 其他浏览器走服务端下载
     try {
       const res = await fetch('https://sumaai.cn/api/download-code', {
         method: 'POST',
