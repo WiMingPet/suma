@@ -330,16 +330,26 @@ export default function Home() {
   // 下载代码
   const handleDownload = async () => {
     if (!generatedCode) return;
-    
-    console.log('🔵 harmonyBridge 是否存在:', !!(window as any).harmonyBridge?.downloadFile);
-    
+
+    // 鸿蒙原生下载
     if ((window as any).harmonyBridge?.downloadFile) {
-      console.log('🔵 走原生下载');
-      (window as any).harmonyBridge.downloadFile(generatedCode, 'generated-app');
-      return;
+      try {
+        const res = await fetch('https://sumaai.cn/api/download-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: generatedCode })
+        });
+        const data = await res.json();
+        if (data.id) {
+          (window as any).harmonyBridge.downloadFile(data.id, 'generated-app');
+          return;
+        }
+      } catch (e) {
+        console.log('原生下载失败，走兜底:', e);
+      }
     }
-    
-    console.log('🔵 走服务端下载');
+
+    // 其他浏览器走服务端下载
     try {
       const res = await fetch('https://sumaai.cn/api/download-code', {
         method: 'POST',
@@ -347,17 +357,12 @@ export default function Home() {
         body: JSON.stringify({ code: generatedCode })
       });
       const data = await res.json();
-      console.log('🔵 API返回:', JSON.stringify(data));
       if (data.id) {
-        const url = `https://sumaai.cn/api/download-code?id=${data.id}`;
-        console.log('🔵 打开的URL:', url);
-        window.open(url, '_blank');
+        window.open(`https://sumaai.cn/api/download-code?id=${data.id}`, '_blank');
       }
     } catch (e) {
-      console.log('🔵 异常:', e);
       window.open('data:text/html;charset=utf-8,' + encodeURIComponent(generatedCode), '_blank');
     }
-
    
     // Web 端原有逻辑
     const blob = new Blob([generatedCode], { type: 'text/html' });
