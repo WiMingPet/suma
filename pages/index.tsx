@@ -31,6 +31,7 @@ export default function Home() {
   const [showPayment, setShowPayment] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const router = useRouter();
+  const [toast, setToast] = useState('');
 
   const goToMemberCenter = () => {
     router.push('/member-center');
@@ -578,16 +579,17 @@ export default function Home() {
                   <button onClick={handleDownload} className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm">下载 HTML</button>
                   <button
                     onClick={async () => {
-                      const reason = prompt('请描述举报原因（选填）：');
                       try {
                         await fetch('https://sumaai.cn/api/report', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ content: generatedCode, reason: reason || '用户举报', userId: user?.id, timestamp: new Date().toISOString() })
+                          body: JSON.stringify({ content: generatedCode, reason: '用户举报', userId: user?.id, timestamp: new Date().toISOString() })
                         });
-                        console.log('举报已提交，我们会尽快处理。感谢反馈！');
+                        setToast('✅ 举报已提交');
+                        setTimeout(() => setToast(''), 2000);
                       } catch (error) {
-                        console.log('举报提交失败，请稍后重试');
+                        setToast('❌ 提交失败');
+                        setTimeout(() => setToast(''), 2000);
                       }
                     }}
                     className="px-4 py-2 bg-red-600/20 text-red-400 rounded-lg text-sm hover:bg-red-600/30 transition"
@@ -603,6 +605,12 @@ export default function Home() {
           )}
         </main>
 
+        {/* Toast 提示 */}
+        {toast && (
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm">
+            {toast}
+          </div>
+        )}
         {/* 底部 */}
         <footer className="fixed bottom-0 left-0 right-0 bg-black/50 backdrop-blur-md border-t border-white/10 py-3">
           <div className="max-w-6xl mx-auto px-4 flex items-center justify-center gap-4">
