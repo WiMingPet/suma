@@ -242,6 +242,27 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
 
   const handleDownload = async (code: string, name: string) => {
     if (!code) return;
+
+    // 鸿蒙原生下载
+    if ((window as any).harmonyBridge?.downloadFile) {
+      // 先上传到服务器拿ID
+      try {
+        const res = await fetch('https://sumaai.cn/api/download-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+        if (data.id) {
+          (window as any).harmonyBridge.downloadFile(data.id, name || 'app');
+          return;
+        }
+      } catch (e) {
+        console.log('原生下载失败，走兜底:', e);
+      }
+    }
+
+    // 其他浏览器走服务端下载
     try {
       const res = await fetch('https://sumaai.cn/api/download-code', {
         method: 'POST',
