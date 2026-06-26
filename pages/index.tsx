@@ -331,13 +331,15 @@ export default function Home() {
   const handleDownload = async () => {
     if (!generatedCode) return;
     
-    // 鸿蒙原生保存
+    console.log('🔵 harmonyBridge 是否存在:', !!(window as any).harmonyBridge?.downloadFile);
+    
     if ((window as any).harmonyBridge?.downloadFile) {
+      console.log('🔵 走原生下载');
       (window as any).harmonyBridge.downloadFile(generatedCode, 'generated-app');
       return;
     }
     
-    // 其他浏览器走服务端下载
+    console.log('🔵 走服务端下载');
     try {
       const res = await fetch('https://sumaai.cn/api/download-code', {
         method: 'POST',
@@ -345,12 +347,17 @@ export default function Home() {
         body: JSON.stringify({ code: generatedCode })
       });
       const data = await res.json();
+      console.log('🔵 API返回:', JSON.stringify(data));
       if (data.id) {
-        window.open(`https://sumaai.cn/api/download-code?id=${data.id}`, '_blank');
+        const url = `https://sumaai.cn/api/download-code?id=${data.id}`;
+        console.log('🔵 打开的URL:', url);
+        window.open(url, '_blank');
       }
     } catch (e) {
+      console.log('🔵 异常:', e);
       window.open('data:text/html;charset=utf-8,' + encodeURIComponent(generatedCode), '_blank');
     }
+
    
     // Web 端原有逻辑
     const blob = new Blob([generatedCode], { type: 'text/html' });

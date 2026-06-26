@@ -243,13 +243,15 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
   const handleDownload = async (code: string, name: string) => {
     if (!code) return;
     
-    // 鸿蒙原生保存
+    console.log('🔵 SideMenu harmonyBridge 是否存在:', !!(window as any).harmonyBridge?.downloadFile);
+    
     if ((window as any).harmonyBridge?.downloadFile) {
+      console.log('🔵 SideMenu 走原生下载');
       (window as any).harmonyBridge.downloadFile(code, name);
       return;
     }
     
-    // 其他浏览器走服务端下载
+    console.log('🔵 SideMenu 走服务端下载');
     try {
       const res = await fetch('https://sumaai.cn/api/download-code', {
         method: 'POST',
@@ -257,10 +259,14 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
         body: JSON.stringify({ code })
       });
       const data = await res.json();
+      console.log('🔵 SideMenu API返回:', JSON.stringify(data));
       if (data.id) {
-        window.open(`https://sumaai.cn/api/download-code?id=${data.id}`, '_blank');
+        const url = `https://sumaai.cn/api/download-code?id=${data.id}`;
+        console.log('🔵 SideMenu 打开的URL:', url);
+        window.open(url, '_blank');
       }
     } catch (e) {
+      console.log('🔵 SideMenu 异常:', e);
       window.open('data:text/html;charset=utf-8,' + encodeURIComponent(code), '_blank');
     }
   };
