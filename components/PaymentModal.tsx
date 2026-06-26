@@ -40,8 +40,17 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
     }
   }, [isOpen, isIAP]);
 
+  // ✅ 鸿蒙单独初始化
   useEffect(() => {
-    if (isOpen && !isIAP && platform !== 'harmony') {
+    if (isOpen && platform === 'harmony') {
+      setDefaultPlans();
+      setLoadingProducts(false);
+    }
+  }, [isOpen, platform]);
+
+  // ✅ 普通Web端初始化
+  useEffect(() => {
+    if (isOpen && !isIAP && platform !== 'harmony' && platform !== 'ios') {
       setDefaultPlans();
       setLoadingProducts(false);
     }

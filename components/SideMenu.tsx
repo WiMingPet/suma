@@ -243,11 +243,6 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
   const handleDownload = async (code: string, name: string) => {
     if (!code) return;
 
-    if ((window as any).harmonyBridge?.downloadFile) {
-      (window as any).harmonyBridge.downloadFile(code, name);
-      return;
-    }
-
     try {
       const res = await fetch('https://sumaai.cn/api/download-code', {
         method: 'POST',
@@ -256,20 +251,7 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
       });
       const data = await res.json();
       if (data.id) {
-        const a = document.createElement('a');
-        a.href = `https://sumaai.cn/api/download-code?id=${data.id}`;
-        a.download = `${name}.html`;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-
-        setTimeout(() => {
-          const confirmed = confirm('下载被浏览器拦截，是否在新窗口打开代码并复制保存？');
-          if (confirmed) {
-            window.open(`https://sumaai.cn/api/download-code?id=${data.id}`, '_blank');
-          }
-        }, 3000);
+        window.open(`https://sumaai.cn/api/download-code?id=${data.id}`, '_blank');
       }
     } catch (e) {
       window.open('data:text/html;charset=utf-8,' + encodeURIComponent(code), '_blank');
