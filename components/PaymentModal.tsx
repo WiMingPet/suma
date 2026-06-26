@@ -35,8 +35,15 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
   }, [platform]);
 
   useEffect(() => {
-    if (isOpen && (isIAP || platform === 'harmony')) {
+    if (isOpen && isIAP) {
       loadProducts();
+    }
+  }, [isOpen, isIAP]);
+
+  useEffect(() => {
+    if (isOpen && !isIAP && platform !== 'harmony') {
+      setDefaultPlans();
+      setLoadingProducts(false);
     }
   }, [isOpen, isIAP, platform]);
 

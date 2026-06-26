@@ -305,33 +305,42 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
           const phone = '15920978058';
           const email = '3060302415@qq.com';
           const fullText = `电话: ${phone} 邮箱: ${email}`;
-          
-          // 先尝试自动复制
-          let copied = false;
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(fullText).then(() => {
-              // 自动复制成功，直接弹自定义弹窗提示
-              showFallbackDialog(phone, email, true);
-            }).catch(() => {
-              showFallbackDialog(phone, email, false);
-            });
-          } else {
-            // 老旧浏览器兜底
-            try {
-              const textarea = document.createElement('textarea');
-              textarea.value = fullText;
-              textarea.style.position = 'fixed';
-              textarea.style.left = '-9999px';
-              document.body.appendChild(textarea);
-              textarea.select();
-              document.execCommand('copy');
-              document.body.removeChild(textarea);
-              copied = true;
-              showFallbackDialog(phone, email, true);
-            } catch (e) {
-              showFallbackDialog(phone, email, false);
-            }
-          }
+
+          const dialog = document.createElement('div');
+          dialog.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
+          dialog.innerHTML = `
+            <div style="background:#1f2937;border-radius:16px;padding:24px;max-width:300px;width:90%;text-align:center;border:1px solid #374151;">
+              <p style="color:white;font-size:18px;font-weight:bold;margin-bottom:16px;">📞 联系客服</p>
+              <p style="color:#a0aec0;font-size:14px;margin-bottom:16px;">${phone}<br/>${email}</p>
+              <button id="doCopy" style="width:100%;padding:12px;background:#3b82f6;color:white;border:none;border-radius:12px;font-size:16px;margin-bottom:8px;">
+                📋 复制全部
+              </button>
+              <p id="copyStatus" style="color:#10b981;font-size:13px;margin-bottom:8px;display:none;">✅ 已复制</p>
+              <button id="closeDialog" style="padding:8px 24px;background:#4b5563;color:white;border:none;border-radius:8px;font-size:14px;">
+                关闭
+              </button>
+            </div>
+          `;
+          document.body.appendChild(dialog);
+
+          dialog.querySelector('#doCopy')!.addEventListener('click', () => {
+            const ta = document.createElement('textarea');
+            ta.value = fullText;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            (dialog.querySelector('#copyStatus') as HTMLElement).style.display = 'block';
+          });
+
+          dialog.querySelector('#closeDialog')!.addEventListener('click', () => {
+            document.body.removeChild(dialog);
+          });
+          dialog.addEventListener('click', (e) => {
+            if (e.target === dialog) document.body.removeChild(dialog);
+          });
         }} className="flex items-center justify-between px-4 py-3 mx-3 my-2 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl transition border border-blue-500/20">
           <div className="flex items-center gap-3">
             <span className="text-xl">💬</span>
