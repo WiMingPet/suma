@@ -35,10 +35,10 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
   }, [platform]);
 
   useEffect(() => {
-    if (isOpen && isIAP) {
+    if (isOpen && (isIAP || platform === 'harmony')) {
       loadProducts();
     }
-  }, [isOpen, isIAP]);
+  }, [isOpen, isIAP, platform]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -226,7 +226,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
           </div>
         )}
 
-        {!isIAP && platform !== 'harmony' && (
+        {!isIAP && (
           <div className="flex gap-4 mb-4">
             <button className={`flex-1 py-2 rounded ${method === 'qrcode' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`} onClick={() => setMethod('qrcode')}>
               电脑扫码
@@ -262,14 +262,14 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
         </div>
 
         {!qrCode && !loading && (
-          <button onClick={handlePayment} disabled={(isIAP || platform === 'harmony') && loadingProducts} className="w-full py-3 bg-green-600 text-white rounded-lg disabled:opacity-50">
-            {(isIAP || platform === 'harmony') ? `${getDisplayPrice()} 立即购买` : '生成订单'}
+          <button onClick={handlePayment} disabled={loadingProducts} className="w-full py-3 bg-green-600 text-white rounded-lg disabled:opacity-50">
+            {isIAP ? `${getDisplayPrice()} 立即购买` : '生成订单'}
           </button>
         )}
 
         {loading && <p className="text-center py-4">处理中...</p>}
 
-        {qrCode && !isIAP && platform !== 'harmony' && (
+        {qrCode && !isIAP && (
           <div className="flex flex-col items-center">
             <QRCodeCanvas value={qrCode} size={200} />
             <p className="mt-2 text-sm text-gray-600">请使用支付宝扫一扫支付</p>
@@ -277,7 +277,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
           </div>
         )}
 
-        {!isIAP && platform !== 'harmony' && outTradeNo && (
+        {!isIAP && outTradeNo && (
           <button onClick={handleManualConfirm} disabled={loading} className="w-full mt-2 py-2 bg-blue-500 text-white rounded-lg disabled:opacity-50">
             {loading ? '确认中...' : '我已支付，手动确认'}
           </button>
