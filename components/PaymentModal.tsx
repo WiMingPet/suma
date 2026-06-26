@@ -210,7 +210,6 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
 
   // 根据平台显示不同支付提示
   const getPaymentHint = () => {
-    if (platform === 'harmony') return '🔰 使用鸿蒙支付';
     if (isIAP) return '🍎 使用 Apple 内购支付';
     return null;
   };

@@ -174,13 +174,19 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
       alert('操作失败')
     }
   }
-  // 完全禁止自动复制时的兜底方案：可点击复制
-  function showFallbackDialog(phone: string, email: string) {
+  
+  function showFallbackDialog(phone: string, email: string, alreadyCopied: boolean = false) {
     const dialog = document.createElement('div');
     dialog.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
+    
+    const tipHtml = alreadyCopied 
+      ? '<p style="color:#10b981;font-size:14px;margin-bottom:12px;">✅ 已自动复制到剪贴板</p>'
+      : '';
+    
     dialog.innerHTML = `
       <div style="background:#1f2937;border-radius:16px;padding:24px;max-width:300px;width:90%;text-align:center;border:1px solid #374151;">
         <p style="color:white;font-size:18px;font-weight:bold;margin-bottom:12px;">📞 联系客服</p>
+        ${tipHtml}
         <button id="copyPhone" style="width:100%;padding:12px;background:#3b82f6;color:white;border:none;border-radius:12px;font-size:16px;margin-bottom:8px;">
           📞 复制电话：${phone}
         </button>
@@ -197,19 +203,15 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
     `;
     document.body.appendChild(dialog);
     
-    // 复制电话
     dialog.querySelector('#copyPhone')!.addEventListener('click', () => {
       copyToClipboard(phone, '电话已复制');
     });
-    // 复制邮箱
     dialog.querySelector('#copyEmail')!.addEventListener('click', () => {
       copyToClipboard(email, '邮箱已复制');
     });
-    // 复制全部
     dialog.querySelector('#copyAll')!.addEventListener('click', () => {
       copyToClipboard(`电话: ${phone} 邮箱: ${email}`, '全部信息已复制');
     });
-    // 关闭
     dialog.querySelector('#closeDialog')!.addEventListener('click', () => {
       document.body.removeChild(dialog);
     });
@@ -304,15 +306,17 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
           const email = '3060302415@qq.com';
           const fullText = `电话: ${phone} 邮箱: ${email}`;
           
-          // 第一步：尝试自动复制全部信息
+          // 先尝试自动复制
+          let copied = false;
           if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(fullText).then(() => {
-              alert('客服联系方式已复制到剪贴板');
+              // 自动复制成功，直接弹自定义弹窗提示
+              showFallbackDialog(phone, email, true);
             }).catch(() => {
-              showFallbackDialog(phone, email);
+              showFallbackDialog(phone, email, false);
             });
           } else {
-            // 第二步：老旧浏览器兜底
+            // 老旧浏览器兜底
             try {
               const textarea = document.createElement('textarea');
               textarea.value = fullText;
@@ -322,9 +326,10 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
               textarea.select();
               document.execCommand('copy');
               document.body.removeChild(textarea);
-              alert('客服联系方式已复制到剪贴板');
+              copied = true;
+              showFallbackDialog(phone, email, true);
             } catch (e) {
-              showFallbackDialog(phone, email);
+              showFallbackDialog(phone, email, false);
             }
           }
         }} className="flex items-center justify-between px-4 py-3 mx-3 my-2 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl transition border border-blue-500/20">
