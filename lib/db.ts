@@ -130,9 +130,19 @@ export async function initDatabase() {
   await query(createTasksTable);
   await query(`CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id)`);
   console.log('数据库表 tasks 初始化完成');
+
+  // 临时下载表
+  const createDownloadTempTable = `
+    CREATE TABLE IF NOT EXISTS download_temp (
+      id VARCHAR(50) PRIMARY KEY,
+      code TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+  await query(createDownloadTempTable);
+  console.log('数据库表 download_temp 初始化完成');
 }
 
-// 初始化数据库
 initDatabase().catch(console.error);
 
 export default pool;

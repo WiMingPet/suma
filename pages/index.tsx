@@ -328,13 +328,43 @@ export default function Home() {
   };
 
   // 下载代码
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!generatedCode) return;
-    // 鸿蒙原生下载
+
+    // ① 鸿蒙原生下载
     if ((window as any).harmonyBridge?.downloadFile) {
       (window as any).harmonyBridge.downloadFile(generatedCode, 'generated-app');
       return;
     }
+
+    // ② 服务端下载
+    try {
+      const res = await fetch('https://sumaai.cn/api/download-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: generatedCode })
+      });
+      const data = await res.json();
+      if (data.id) {
+        const a = document.createElement('a');
+        a.href = `https://sumaai.cn/api/download-code?id=${data.id}`;
+        a.download = 'generated-app.html';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        setTimeout(() => {
+          const confirmed = confirm('下载被浏览器拦截，是否在新窗口打开代码并复制保存？');
+          if (confirmed) {
+            window.open(`https://sumaai.cn/api/download-code?id=${data.id}`, '_blank');
+          }
+        }, 3000);
+      }
+    } catch (e) {
+      window.open('data:text/html;charset=utf-8,' + encodeURIComponent(generatedCode), '_blank');
+    }
+  
     // Web 端原有逻辑
     const blob = new Blob([generatedCode], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
