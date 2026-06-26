@@ -82,19 +82,8 @@ export default function Home() {
 
   const checkAIConsent = async () => {
     if (hasConsentedToAI) return true;
-    return new Promise((resolve) => {
-      const confirmed = window.confirm(
-        '速码方舟AI软件将把您的输入内容发送给第三方AI服务商（阿里云）以生成代码。\n\n' +
-        '服务商不会使用您的数据训练其模型。\n\n' +
-        '是否继续？'
-      );
-      if (confirmed) {
-        setHasConsentedToAI(true);
-        resolve(true);
-      } else {
-        resolve(false);
-      }
-    });
+    setHasConsentedToAI(true);
+    return true;
   };
 
   // 文字生成应用
@@ -105,17 +94,17 @@ export default function Home() {
     }
 
     if (!user.is_pro && getRemaining() <= 0) {
-      alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
+      console.log('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
       return
     }
     
     if (!(await checkAIConsent())) {
-      alert('您需要同意AI服务协议才能使用此功能');
+      console.log('您需要同意AI服务协议才能使用此功能');
       return;
     }
     
     if (!textPrompt.trim()) {
-      alert('请输入应用描述')
+      console.log('请输入应用描述')
       return
     }
 
@@ -158,10 +147,10 @@ export default function Home() {
           body: JSON.stringify(newApp)
         }).catch(err => console.warn('服务器同步失败', err))
       } else {
-        alert(data.error || '生成失败')
+        console.log(data.error || '生成失败')
       }
     } catch (err) {
-      alert('生成失败，请稍后重试')
+      console.log('生成失败，请稍后重试')
     } finally {
       setIsGenerating(false)
     }
@@ -177,7 +166,7 @@ export default function Home() {
 
     // ✅ 检查文件大小（限制10MB）
     if (file.size > 10 * 1024 * 1024) {
-      alert('图片大小不能超过10MB，请压缩后重试');
+      console.log('图片大小不能超过10MB，请压缩后重试');
       // 重置input，允许重新选择
       e.target.value = '';
       return;
@@ -185,7 +174,7 @@ export default function Home() {
 
     // ✅ 检查文件类型
     if (!file.type.startsWith('image/')) {
-      alert('请选择图片文件');
+      console.log('请选择图片文件');
       e.target.value = '';
       return;
     }
@@ -195,7 +184,7 @@ export default function Home() {
       setImagePreview(URL.createObjectURL(file));
     } catch (error) {
       console.error('图片加载失败:', error);
-      alert('图片加载失败，请重试');
+      console.log('图片加载失败，请重试');
       e.target.value = '';
     }
   };
@@ -208,16 +197,16 @@ export default function Home() {
     }
 
     if (!user.is_pro && getRemaining() <= 0) {
-      alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
+      console.log('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
       return
     }
     if (!(await checkAIConsent())) {
-      alert('您需要同意AI服务协议才能使用此功能');
+      console.log('您需要同意AI服务协议才能使用此功能');
       return;
     }
     
     if (!imageFile) {
-      alert('请上传图片')
+      console.log('请上传图片')
       return
     }
 
@@ -263,13 +252,13 @@ export default function Home() {
             body: JSON.stringify(newApp)
           }).catch(err => console.warn('服务器同步失败', err))
         } else {
-          alert(data.error || '生成失败')
+          console.log(data.error || '生成失败')
         }
         setIsGeneratingImage(false)
       }
       reader.readAsDataURL(imageFile)
     } catch (err) {
-      alert('生成失败，请稍后重试')
+      console.log('生成失败，请稍后重试')
       setIsGeneratingImage(false)
     }
   }
@@ -277,7 +266,7 @@ export default function Home() {
   // 后台生成 - 文字
   const handleBackgroundText = async () => {
     if (!(await checkAIConsent())) {
-      alert('您需要同意AI服务协议才能使用此功能');
+      console.log('您需要同意AI服务协议才能使用此功能');
       return;
     }
 
@@ -290,13 +279,13 @@ export default function Home() {
       });
       const data = await res.json();
       if (data.success) {
-        alert('✅ 后台生成中！完成后自动保存到"我的应用"，可关闭页面');
+        console.log('✅ 后台生成中！完成后自动保存到"我的应用"，可关闭页面');
         setTextPrompt('');
       } else {
-        alert(data.error || '创建失败');
+        console.log(data.error || '创建失败');
       }
     } catch (err) {
-      alert('创建失败，请稍后重试');
+      console.log('创建失败，请稍后重试');
     } finally {
       setIsGenerating(false);
     }
@@ -305,7 +294,7 @@ export default function Home() {
   // 后台生成 - 图片
   const handleBackgroundImage = async () => {
     if (!(await checkAIConsent())) {
-      alert('您需要同意AI服务协议才能使用此功能');
+      console.log('您需要同意AI服务协议才能使用此功能');
       return;
     }
 
@@ -321,18 +310,18 @@ export default function Home() {
         });
         const data = await res.json();
         if (data.success) {
-          alert('✅ 后台生成中！完成后自动保存到"我的应用"，可关闭页面');
+          console.log('✅ 后台生成中！完成后自动保存到"我的应用"，可关闭页面');
           setImagePreview(null);
           setImageFile(null);
           setImagePrompt('');
         } else {
-          alert(data.error || '创建失败');
+          console.log(data.error || '创建失败');
         }
         setIsGeneratingImage(false);
       };
       reader.readAsDataURL(imageFile!);
     } catch (err) {
-      alert('创建失败，请稍后重试');
+      console.log('创建失败，请稍后重试');
       setIsGeneratingImage(false);
     }
   };
@@ -340,9 +329,22 @@ export default function Home() {
   // 下载代码
   const handleDownload = () => {
     if (!generatedCode) return;
-    const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(generatedCode);
-    window.open(dataUri, '_blank');
-  }
+    // 鸿蒙原生下载
+    if ((window as any).harmonyBridge?.downloadFile) {
+      (window as any).harmonyBridge.downloadFile(generatedCode, 'generated-app');
+      return;
+    }
+    // Web 端原有逻辑
+    const blob = new Blob([generatedCode], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'generated-app.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <>
@@ -467,7 +469,7 @@ export default function Home() {
                     <button
                       onClick={() => {
                         if (!user.is_pro && getRemaining() <= 0) {
-                          alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
+                          console.log('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
                           return
                         }
                         handleGenerateText()
@@ -481,10 +483,10 @@ export default function Home() {
                       onClick={() => {
                         if (!user) { setShowLogin(true); return }
                         if (!user.is_pro && getRemaining() <= 0) {
-                          alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
+                          console.log('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
                           return
                         }
-                        if (!textPrompt.trim()) { alert('请输入应用描述'); return }
+                        if (!textPrompt.trim()) { console.log('请输入应用描述'); return }
                         handleBackgroundText()
                       }}
                       disabled={isGenerating}
@@ -532,7 +534,7 @@ export default function Home() {
                     <button
                       onClick={() => {
                         if (!user.is_pro && getRemaining() <= 0) {
-                          alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
+                          console.log('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
                           return
                         }
                         handleGenerateImage()
@@ -546,10 +548,10 @@ export default function Home() {
                       onClick={() => {
                         if (!user) { setShowLogin(true); return }
                         if (!user.is_pro && getRemaining() <= 0) {
-                          alert('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
+                          console.log('免费次数已用完（共3次），请升级Pro会员或购买点币套餐')
                           return
                         }
-                        if (!imageFile) { alert('请上传图片'); return }
+                        if (!imageFile) { console.log('请上传图片'); return }
                         handleBackgroundImage()
                       }}
                       disabled={isGeneratingImage}
@@ -583,9 +585,9 @@ export default function Home() {
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ content: generatedCode, reason: reason || '用户举报', userId: user?.id, timestamp: new Date().toISOString() })
                         });
-                        alert('举报已提交，我们会尽快处理。感谢反馈！');
+                        console.log('举报已提交，我们会尽快处理。感谢反馈！');
                       } catch (error) {
-                        alert('举报提交失败，请稍后重试');
+                        console.log('举报提交失败，请稍后重试');
                       }
                     }}
                     className="px-4 py-2 bg-red-600/20 text-red-400 rounded-lg text-sm hover:bg-red-600/30 transition"
@@ -622,7 +624,7 @@ export default function Home() {
         onSuccess={() => {
           setShowPayment(false)
           refreshUser()
-          alert('支付成功！')
+          console.log('支付成功！')
         }}
       />
 

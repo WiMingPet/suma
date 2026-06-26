@@ -241,9 +241,22 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
   }
 
   const handleDownload = (code: string, name: string) => {
-    const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(code);
-    window.open(dataUri, '_blank');
-  }
+    // 鸿蒙原生下载
+    if ((window as any).harmonyBridge?.downloadFile) {
+      (window as any).harmonyBridge.downloadFile(code, name);
+      return;
+    }
+    // Web 端原有逻辑
+    const blob = new Blob([code], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   if (!isOpen) return null
 
