@@ -71,6 +71,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: '生成失败' });
   }
 
+  // ✅ 在保存前对代码添加 AI 标识
+  const codeWithLabel = addAILabel(result.code, prompt);
+
   // 保存到 saved_apps
   const appId = `app_${Date.now()}`;
   await query(
@@ -172,4 +175,51 @@ async function executeTextGeneration(userId: string, prompt: string, isPro: bool
   }
 
   return { success: true, code: generatedCode };
+}
+// ========== ✅ 添加 AI 标识 ==========
+function addAILabel(code: string, prompt: string): string {
+  // 检查是否已经包含 AI 标识，避免重复添加
+  if (code.includes('AI生成') || code.includes('AI 生成')) {
+    return code;
+  }
+
+  // 提取标题（从 prompt 或代码中的 title）
+  const titleMatch = code.match(/<title>(.*?)<\/title>/);
+  const pageTitle = titleMatch ? titleMatch[1] : (prompt.slice(0, 30) + '...');
+
+  // 插入 AI 标识到 <body> 内部（顶部）
+  const labelHTML = `
+<!-- AI 生成标识 -->
+<div style="background:#f0f7ff;padding:6px 14px;font-size:12px;color:#4a6fa5;text-align:center;border-bottom:2px solid #d0e0ff;font-family:system-ui,sans-serif;">
+  🤖 本页面由 AI 生成 · 内容仅供参考
+</div>
+`;
+
+  // 检查是否有 <body> 标签
+  if (code.includes('<body>')) {
+    return code.replace('<body>', `<body>${labelHTML}`);
+  }
+
+  // 如果没有 <body>，在 <html> 内添加
+  if (code.includes('<html>')) {
+    return code.replace('<html>', `<html><body>${labelHTML}`);
+  }
+
+  // 兜底：在最外层添加
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${pageTitle}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
+    .ai-label { background: #f0f7ff; padding: 8px 16px; font-size: 13px; color: #4a6fa5; text-align: center; border-bottom: 2px solid #d0e0ff; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <div class="ai-label">🤖 本页面由 AI 生成 · 内容仅供参考</div>
+  <div>${code}</div>
+</body>
+</html>`;
 }

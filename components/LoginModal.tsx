@@ -1,5 +1,5 @@
 'use client'
-
+import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { logger } from '../lib/logger'  
 // ✅ 移除 CapacitorHttp 导入，使用标准 fetch
@@ -625,6 +625,13 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         </div>
 
         <p className="text-gray-500 text-xs text-center mt-6">未注册的用户将自动创建账号</p>
+        {/* ✅ 添加隐私政策链接 */}
+        <p className="text-gray-500 text-xs text-center mt-2">
+          继续使用即代表您已阅读并同意
+          <Link href="/privacy" target="_blank" className="text-blue-400 underline hover:text-blue-300 transition">
+            《隐私政策》
+          </Link>
+        </p>
       </div>
     </div>
   )
