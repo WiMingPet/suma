@@ -331,19 +331,11 @@ export default function Home() {
   const handleDownload = async () => {
     if (!generatedCode) return;
 
-    // 鸿蒙原生下载
+    // 鸿蒙原生下载 - 直接传递代码内容
     if ((window as any).harmonyBridge?.downloadFile) {
       try {
-        const res = await fetch('https://sumaai.cn/api/download-code', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: generatedCode })
-        });
-        const data = await res.json();
-        if (data.id) {
-          (window as any).harmonyBridge.downloadFile(data.id, 'generated-app');
-          return;
-        }
+        (window as any).harmonyBridge.downloadFile(generatedCode, 'generated-app');
+        return;
       } catch (e) {
         console.log('原生下载失败，走兜底:', e);
       }
@@ -359,21 +351,61 @@ export default function Home() {
       const data = await res.json();
       if (data.id) {
         window.open(`https://sumaai.cn/api/download-code?id=${data.id}`, '_blank');
+        return;
       }
     } catch (e) {
-      window.open('data:text/html;charset=utf-8,' + encodeURIComponent(generatedCode), '_blank');
+      console.log('服务端下载失败，走前端生成:', e);
     }
-   
-    // Web 端原有逻辑
-    const blob = new Blob([generatedCode], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'generated-app.html';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+
+    // 【最终兜底】前端生成带界面的HTML文件
+    try {
+      const fullHtml = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Generated App</title>
+      <style>
+          body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background: #f5f5f5; }
+          .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+          pre { background: #1e1e1e; color: #d4d4d4; padding: 20px; border-radius: 8px; overflow-x: auto; font-size: 14px; }
+          .btn { display: inline-block; background: #007aff; color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px; border: none; cursor: pointer; }
+          .btn-success { background: #34c759; margin-left: 10px; }
+      </style>
+  </head>
+  <body>
+      <div class="container">
+          <h1>📱 生成的应用代码</h1>
+          <p>以下是您通过AI生成的应用源码，您可以复制或保存为HTML文件。</p>
+          <pre>${generatedCode}</pre>
+          <button onclick="navigator.clipboard.writeText(document.querySelector('pre').innerText)" class="btn">📋 复制代码</button>
+          <button onclick="window.print()" class="btn btn-success">🖨️ 打印/保存为PDF</button>
+          <p style="margin-top:30px;font-size:14px;color:#666;">💡 提示：您也可以手动将代码保存为 <code>.html</code> 文件在浏览器中运行</p>
+      </div>
+  </body>
+  </html>
+      `;
+
+      const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `generated-app-${Date.now()}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('所有下载方式均失败:', e);
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(`<pre>${generatedCode}</pre>`);
+        newWindow.document.title = 'Generated App Source';
+      } else {
+        alert('下载失败，请手动复制代码：\n\n' + generatedCode);
+      }
+    }
   };
 
   return (
