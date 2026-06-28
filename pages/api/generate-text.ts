@@ -4,6 +4,22 @@ import { getUserPoints, deductPoints, incrementFreeUsed, getFreeUsed, getOrCreat
 
 const MAX_FREE = 3
 
+// ✅ AI 标识标签
+const AI_LABEL = `<!-- 🤖 AI生成标识 -->
+<div style="background:#f0f7ff;padding:6px 14px;font-size:12px;color:#4a6fa5;text-align:center;border-bottom:2px solid #d0e0ff;font-family:system-ui,sans-serif;position:sticky;top:0;z-index:999;">
+  🤖 本页面由 AI 生成 · 内容仅供参考
+</div>`;
+
+function addAILabel(code: string): string {
+  if (code.includes('<body>')) {
+    return code.replace('<body>', `<body>\n${AI_LABEL}`);
+  }
+  if (code.includes('<html>')) {
+    return code.replace('<html>', `<html>\n${AI_LABEL}`);
+  }
+  return AI_LABEL + '\n' + code;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -24,11 +40,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: '用户ID不能为空' })
   }
 
-  // 从数据库获取或创建用户
   const userRecord = await getOrCreateUserInDB(userId)
   const isPro = userRecord.is_pro
-
-  // 检查次数
   const freeUsed = await getFreeUsed(userId)
   const remainingCount = Math.max(0, MAX_FREE - freeUsed)
 
@@ -43,20 +56,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
-  // ========== 后台模式：立即返回，异步执行 ==========
   if (background) {
     const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-    // 创建任务记录
     await query(
       `INSERT INTO tasks (task_id, user_id, type, status, prompt, name) VALUES ($1, $2, $3, $4, $5, $6)`,
       [taskId, userId, 'text', 'processing', prompt, prompt.slice(0, 30) + '...']
     );
-
-    // 立即返回
     res.status(200).json({ success: true, taskId, message: '后台生成中，可关闭页面' });
-
-    // 异步执行生成
     executeTextTask(taskId, userId, prompt, isPro).catch(err => {
       console.error('后台生成失败:', err);
       query('UPDATE tasks SET status = $1 WHERE task_id = $2', ['failed', taskId]);
@@ -64,82 +70,47 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return;
   }
 
-  // ========== 前台模式：等待完成 ==========
   const result = await executeTextGeneration(userId, prompt, isPro);
-
   if (!result.success) {
     return res.status(500).json({ error: '生成失败' });
   }
 
-  // ✅ 强制添加 AI 标识
-  const aiLabel = `<!-- AI生成标识 -->
-  <div style="background:#f0f7ff;padding:6px 14px;font-size:12px;color:#4a6fa5;text-align:center;border-bottom:2px solid #d0e0ff;font-family:system-ui,sans-serif;position:sticky;top:0;z-index:999;">
-    🤖 本页面由 AI 生成 · 内容仅供参考
-  </div>`;
-
-  let codeWithLabel = result.code;
-  if (codeWithLabel.includes('<body>')) {
-    codeWithLabel = codeWithLabel.replace('<body>', `<body>${aiLabel}`);
-  } else {
-    codeWithLabel = aiLabel + codeWithLabel;
-  }
-
-  // 保存到 saved_apps
+  const codeWithLabel = addAILabel(result.code);
   const appId = `app_${Date.now()}`;
   await query(
     `INSERT INTO saved_apps (app_id, user_id, name, code, type) VALUES ($1, $2, $3, $4, $5)`,
-    [appId, userId, prompt.slice(0, 30) + '...', result.code, 'text']
+    [appId, userId, prompt.slice(0, 30) + '...', codeWithLabel, 'text']
   );
 
-  // 获取最新状态
   const newFreeUsed = await getFreeUsed(userId);
   const finalPoints = await getUserPoints(userId);
 
   return res.status(200).json({
     success: true,
-    code: result.code,
+    code: codeWithLabel,
     free_used: newFreeUsed,
     points: finalPoints
   });
 }
 
-// ========== 后台异步执行 ==========
 async function executeTextTask(taskId: string, userId: string, prompt: string, isPro: boolean) {
   const result = await executeTextGeneration(userId, prompt, isPro);
-
   if (result.success) {
-
-    // ✅ 强制添加 AI 标识
-    const aiLabel = `<!-- AI生成标识 -->
-  <div style="background:#f0f7ff;padding:6px 14px;font-size:12px;color:#4a6fa5;text-align:center;border-bottom:2px solid #d0e0ff;font-family:system-ui,sans-serif;position:sticky;top:0;z-index:999;">
-    🤖 本页面由 AI 生成 · 内容仅供参考
-  </div>`;
-
-    let codeWithLabel = result.code;
-    if (codeWithLabel.includes('<body>')) {
-      codeWithLabel = codeWithLabel.replace('<body>', `<body>${aiLabel}`);
-    } else {
-      codeWithLabel = aiLabel + codeWithLabel;
-    }
+    const codeWithLabel = addAILabel(result.code);
     const appId = `app_${Date.now()}`;
-
-    // 更新任务状态
     await query(
       `UPDATE tasks SET status = $1, code = $2, updated_at = NOW() WHERE task_id = $3`,
-      ['completed', result.code, taskId]
+      ['completed', codeWithLabel, taskId]
     );
-
-    // 自动保存到我的应用
     await query(
       `INSERT INTO saved_apps (app_id, user_id, name, code, type) VALUES ($1, $2, $3, $4, $5)`,
-      [appId, userId, prompt.slice(0, 30) + '...', result.code, 'text']
+      [appId, userId, prompt.slice(0, 30) + '...', codeWithLabel, 'text']
     );
   } else {
     await query('UPDATE tasks SET status = $1 WHERE task_id = $2', ['failed', taskId]);
   }
 }
 
-// ========== 核心生成逻辑 ==========
 async function executeTextGeneration(userId: string, prompt: string, isPro: boolean) {
   let generatedCode = '';
   let errorMsg = '';
@@ -152,7 +123,7 @@ async function executeTextGeneration(userId: string, prompt: string, isPro: bool
         'Authorization': `Bearer ${process.env.DASHSCOPE_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'qwen-plus',
+        model: 'qwen3.7-plus',
         messages: [
           {
             role: 'system',
@@ -187,7 +158,6 @@ async function executeTextGeneration(userId: string, prompt: string, isPro: bool
     generatedCode = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>AI生成应用</title><style>body{font-family:sans-serif;padding:20px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;min-height:100vh;}</style></head><body><div style="max-width:600px;margin:0 auto;background:rgba(255,255,255,0.1);border-radius:16px;padding:24px"><h1>${prompt.substring(0, 30)}</h1><p>⚠️ ${errorMsg}</p></div></body></html>`;
   }
 
-  // 扣除点币/次数
   if (isPro) {
     const cost = 10;
     console.log(`💰 扣除点币: ${cost}`);

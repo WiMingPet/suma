@@ -4,6 +4,22 @@ import { getUserPoints, deductPoints, incrementFreeUsed, getFreeUsed, getOrCreat
 
 const MAX_FREE = 3
 
+// ✅ AI 标识标签
+const AI_LABEL = `<!-- 🤖 AI生成标识 -->
+<div style="background:#f0f7ff;padding:6px 14px;font-size:12px;color:#4a6fa5;text-align:center;border-bottom:2px solid #d0e0ff;font-family:system-ui,sans-serif;position:sticky;top:0;z-index:999;">
+  🤖 本页面由 AI 生成 · 内容仅供参考
+</div>`;
+
+function addAILabel(code: string): string {
+  if (code.includes('<body>')) {
+    return code.replace('<body>', `<body>\n${AI_LABEL}`);
+  }
+  if (code.includes('<html>')) {
+    return code.replace('<html>', `<html>\n${AI_LABEL}`);
+  }
+  return AI_LABEL + '\n' + code;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -12,18 +28,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { imageBase64, prompt, userId, background } = req.body
 
   console.log('========== generate-image ==========')
-  console.log('userId:', userId)
-  console.log('补充描述:', prompt)
-  console.log('图片大小:', imageBase64?.length || 0)
-  console.log('background:', background)
 
-  if (!imageBase64) {
-    return res.status(400).json({ error: '请上传图片' })
-  }
-
-  if (!userId) {
-    return res.status(400).json({ error: '用户ID不能为空' })
-  }
+  if (!imageBase64) return res.status(400).json({ error: '请上传图片' })
+  if (!userId) return res.status(400).json({ error: '用户ID不能为空' })
 
   const userRecord = await getOrCreateUserInDB(userId)
   const isPro = userRecord.is_pro
@@ -41,105 +48,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
-  // ========== 后台模式 ==========
   if (background) {
     const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
     await query(
       `INSERT INTO tasks (task_id, user_id, type, status, prompt, name) VALUES ($1, $2, $3, $4, $5, $6)`,
       [taskId, userId, 'image', 'processing', prompt || '', `图片应用-${Date.now()}`]
     );
-
-  res.status(200).json({ success: true, taskId, message: '后台生成中，可关闭页面' });
-
-  console.log('🔄 开始后台图片生成任务:', taskId);
-  executeImageTask(taskId, userId, imageBase64, prompt, isPro)
-    .then(() => console.log('✅ 后台图片任务完成:', taskId))
-    .catch(err => {
-      console.error('❌ 后台图片生成失败:', taskId, err);
+    res.status(200).json({ success: true, taskId, message: '后台生成中，可关闭页面' });
+    executeImageTask(taskId, userId, imageBase64, prompt, isPro).catch(err => {
+      console.error('后台生成失败:', err);
       query('UPDATE tasks SET status = $1 WHERE task_id = $2', ['failed', taskId]);
     });
     return;
   }
 
-  // ========== 前台模式 ==========
   const result = await executeImageGeneration(userId, imageBase64, prompt, isPro);
+  if (!result.success) return res.status(500).json({ error: '生成失败' });
 
-  if (!result.success) {
-    return res.status(500).json({ error: '生成失败' });
-  }
-
-  // ✅ 强制添加 AI 标识
-  const aiLabel = `<!-- AI生成标识 -->
-<div style="background:#f0f7ff;padding:6px 14px;font-size:12px;color:#4a6fa5;text-align:center;border-bottom:2px solid #d0e0ff;font-family:system-ui,sans-serif;position:sticky;top:0;z-index:999;">
-  🤖 本页面由 AI 生成 · 内容仅供参考
-</div>`;
-
-  let codeWithLabel = result.code;
-  if (codeWithLabel.includes('<body>')) {
-    codeWithLabel = codeWithLabel.replace('<body>', `<body>${aiLabel}`);
-  } else {
-    codeWithLabel = aiLabel + codeWithLabel;
-  }
-
-  // 保存到 saved_apps
+  const codeWithLabel = addAILabel(result.code);
   const appId = `app_${Date.now()}`;
   await query(
     `INSERT INTO saved_apps (app_id, user_id, name, code, type) VALUES ($1, $2, $3, $4, $5)`,
-    [appId, userId, `图片应用-${Date.now()}`, result.code, 'image']
+    [appId, userId, `图片应用-${Date.now()}`, codeWithLabel, 'image']
   );
 
   const newFreeUsed = await getFreeUsed(userId);
   const finalPoints = await getUserPoints(userId);
-
-  return res.status(200).json({
-    success: true,
-    code: result.code,
-    free_used: newFreeUsed,
-    points: finalPoints
-  });
+  return res.status(200).json({ success: true, code: codeWithLabel, free_used: newFreeUsed, points: finalPoints });
 }
 
-// ========== 后台异步执行 ==========
 async function executeImageTask(taskId: string, userId: string, imageBase64: string, prompt: string, isPro: boolean) {
   const result = await executeImageGeneration(userId, imageBase64, prompt, isPro);
-
   if (result.success) {
-
-    const aiLabel = `<!-- AI生成标识 -->
-<div style="background:#f0f7ff;padding:6px 14px;font-size:12px;color:#4a6fa5;text-align:center;border-bottom:2px solid #d0e0ff;font-family:system-ui,sans-serif;position:sticky;top:0;z-index:999;">
-  🤖 本页面由 AI 生成 · 内容仅供参考
-</div>`;
-
-    let codeWithLabel = result.code;
-    if (codeWithLabel.includes('<body>')) {
-      codeWithLabel = codeWithLabel.replace('<body>', `<body>${aiLabel}`);
-    } else {
-      codeWithLabel = aiLabel + codeWithLabel;
-    }
-
+    const codeWithLabel = addAILabel(result.code);
     const appId = `app_${Date.now()}`;
-
-    await query(
-      `UPDATE tasks SET status = $1, code = $2, updated_at = NOW() WHERE task_id = $3`,
-      ['completed', result.code, taskId]
-    );
-
-    await query(
-      `INSERT INTO saved_apps (app_id, user_id, name, code, type) VALUES ($1, $2, $3, $4, $5)`,
-      [appId, userId, `图片应用-${Date.now()}`, result.code, 'image']
-    );
+    await query(`UPDATE tasks SET status = $1, code = $2, updated_at = NOW() WHERE task_id = $3`, ['completed', codeWithLabel, taskId]);
+    await query(`INSERT INTO saved_apps (app_id, user_id, name, code, type) VALUES ($1, $2, $3, $4, $5)`, [appId, userId, `图片应用-${Date.now()}`, codeWithLabel, 'image']);
   } else {
     await query('UPDATE tasks SET status = $1 WHERE task_id = $2', ['failed', taskId]);
   }
 }
 
-// ========== 核心生成逻辑 ==========
 async function executeImageGeneration(userId: string, imageBase64: string, prompt: string, isPro: boolean) {
   let generatedCode = '';
   let errorMsg = '';
-
-  console.log('📸 开始调用阿里云VL模型，图片大小:', imageBase64?.length || 0);
 
   try {
     const response = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
@@ -149,18 +101,12 @@ async function executeImageGeneration(userId: string, imageBase64: string, promp
         'Authorization': `Bearer ${process.env.DASHSCOPE_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'qwen-vl-plus',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image_url',
-                image_url: { url: `data:image/jpeg;base64,${imageBase64}` }
-              },
-              {
-                type: 'text',
-                text: `请仔细分析这张图片，以技术教程的风格输出详细内容。
+        model: 'qwen3-vl-32b-thinking',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
+            { type: 'text', text: `请仔细分析这张图片，以技术教程的风格输出详细内容。
 
 ## 输出格式要求
 1. 先用一段话概括图片展示的核心内容
@@ -178,49 +124,34 @@ async function executeImageGeneration(userId: string, imageBase64: string, promp
 ${prompt ? `补充要求：${prompt}` : ''}
 
 请直接输出完整的 HTML 代码，确保内容充实、排版清晰。`
-              }
-            ]
-          }
-        ],
+          }]
+        }],
         temperature: 0.7,
         max_tokens: 8192
       })
     });
 
-    console.log('📸 API响应状态:', response.status);
-
     const data = await response.json();
-
     if (data.error) {
       errorMsg = data.error.message || 'API调用失败';
-      console.error('❌ VL模型错误:', JSON.stringify(data.error));
     } else if (data.choices?.[0]?.message) {
       generatedCode = data.choices[0].message.content;
-      console.log('✅ 图片生成成功，代码长度:', generatedCode.length);
     } else {
       errorMsg = '返回数据格式错误';
-      console.error('❌ 数据格式错误:', JSON.stringify(data).substring(0, 200));
     }
   } catch (err: any) {
     errorMsg = err.message || '网络请求失败';
-    console.error('❌ 请求异常:', errorMsg);
   }
 
   if (!generatedCode) {
-    console.log('⚠️ 使用降级代码，原因:', errorMsg);
     generatedCode = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>图片识别应用</title><style>body{font-family:sans-serif;padding:20px;background:linear-gradient(135deg,#f093fb,#f5576c);color:#fff;min-height:100vh;}</style></head><body><div style="max-width:600px;margin:0 auto;background:rgba(255,255,255,0.1);border-radius:16px;padding:24px"><h1>📸 图片识别应用</h1><p>⚠️ ${errorMsg}</p></div></body></html>`;
   }
 
-  // 扣除点币/次数
   if (isPro) {
-    const cost = 30;
-    console.log(`💰 扣除点币: ${cost}`);
-    await deductPoints(userId, cost);
+    await deductPoints(userId, 30);
   } else {
     await incrementFreeUsed(userId);
-    console.log('🆓 扣除免费次数');
   }
 
-  console.log('📸 图片生成任务完成');
   return { success: true, code: generatedCode };
 }

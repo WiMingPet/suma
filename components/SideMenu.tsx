@@ -79,13 +79,16 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
   // ========== 加载任务列表 ==========
   const loadTasks = async () => {
     if (!user) return
+    console.log('🔵 loadTasks 被调用, userId:', user.id);
     try {
       const res = await fetch(`https://sumaai.cn/api/tasks?userId=${user.id}`, {
         headers: { 'x-user-id': user.id }
       })
       const data = await res.json()
+      console.log('🔵 tasks API返回:', JSON.stringify(data));
       if (data.success) {
         setTasks(data.tasks || [])
+        console.log('🔵 tasks 已设置, 数量:', data.tasks?.length);
       }
     } catch (err) {
       console.error('加载任务失败:', err)
@@ -243,67 +246,29 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
   const handleDownload = async (code: string, name: string) => {
     if (!code) return;
 
-    // 【修改】鸿蒙原生下载 - 直接传递代码内容
+    // 鸿蒙原生下载
     if ((window as any).harmonyBridge?.downloadFile) {
       try {
-        // 直接调用原生方法，传入代码内容和文件名
         (window as any).harmonyBridge.downloadFile(code, name || 'app');
-        return; // 调用成功，直接返回
+        return;
       } catch (e) {
         console.log('原生下载失败，走兜底:', e);
-        // 失败后继续执行下面的兜底方案
       }
     }
 
-    // 【修改】其他浏览器 - 直接使用前端生成下载，不再依赖服务端API
+    // 服务端下载
     try {
-      const fullHtml = `
-  <!DOCTYPE html>
-  <html>
-  <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${name || 'Generated App'}</title>
-      <style>
-          body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background: #f5f5f5; }
-          .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-          pre { background: #1e1e1e; color: #d4d4d4; padding: 20px; border-radius: 8px; overflow-x: auto; font-size: 14px; }
-          .btn { display: inline-block; background: #007aff; color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px; border: none; cursor: pointer; }
-          .btn-success { background: #34c759; margin-left: 10px; }
-      </style>
-  </head>
-  <body>
-      <div class="container">
-          <h1>📱 ${name || '生成的应用代码'}</h1>
-          <p>以下是您通过AI生成的应用源码，您可以复制或保存为HTML文件。</p>
-          <pre>${code}</pre>
-          <button onclick="navigator.clipboard.writeText(document.querySelector('pre').innerText)" class="btn">📋 复制代码</button>
-          <button onclick="window.print()" class="btn btn-success">🖨️ 打印/保存为PDF</button>
-          <p style="margin-top:30px;font-size:14px;color:#666;">💡 提示：您也可以手动将代码保存为 <code>.html</code> 文件在浏览器中运行</p>
-      </div>
-  </body>
-  </html>
-      `;
-
-      const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${name || 'app'}-${Date.now()}.html`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error('所有下载方式均失败:', e);
-      // 极端情况：新窗口展示源码
-      const newWindow = window.open('', '_blank');
-      if (newWindow) {
-        newWindow.document.write(`<pre>${code}</pre>`);
-        newWindow.document.title = name || 'Generated App Source';
-      } else {
-        alert('下载失败，请手动复制代码：\n\n' + code);
+      const res = await fetch('https://sumaai.cn/api/download-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+      const data = await res.json();
+      if (data.id) {
+        window.open(`https://sumaai.cn/api/download-code?id=${data.id}`, '_blank');
       }
+    } catch (e) {
+      window.open('data:text/html;charset=utf-8,' + encodeURIComponent(code), '_blank');
     }
   };
 
