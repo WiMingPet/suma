@@ -4,9 +4,9 @@ import { getUserPoints, deductPoints, incrementFreeUsed, getFreeUsed, getOrCreat
 
 const MAX_FREE = 3
 
-// ✅ 新版：右上角小标签，不干扰内容
+// ✅ 左上角小标签，不被关闭按钮遮挡
 const AI_LABEL = `<!-- 🤖 AI生成标识 -->
-<div style="position:fixed;top:12px;right:12px;background:rgba(102,126,234,0.9);color:#fff;padding:4px 10px;border-radius:20px;font-size:12px;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);font-family:system-ui,sans-serif;">
+<div style="position:fixed;top:8px;left:8px;background:rgba(102,126,234,0.85);color:#fff;padding:3px 10px;border-radius:12px;font-size:11px;z-index:9999;font-family:system-ui,sans-serif;">
   🤖 AI生成
 </div>`;
 
@@ -56,6 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
+  // ========== 后台模式 ==========
   if (background) {
     const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     await query(
@@ -70,17 +71,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return;
   }
 
+  // ========== 前台模式 ==========
   const result = await executeTextGeneration(userId, prompt, isPro);
   if (!result.success) {
     return res.status(500).json({ error: '生成失败' });
   }
 
+  // ✅ 只添加标识，不保存到数据库（后端不做保存，前端只存本地缓存）
   const codeWithLabel = addAILabel(result.code);
-  const appId = `app_${Date.now()}`;
-  await query(
-    `INSERT INTO saved_apps (app_id, user_id, name, code, type) VALUES ($1, $2, $3, $4, $5)`,
-    [appId, userId, prompt.slice(0, 30) + '...', codeWithLabel, 'text']
-  );
 
   const newFreeUsed = await getFreeUsed(userId);
   const finalPoints = await getUserPoints(userId);
@@ -93,6 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   });
 }
 
+// ========== 后台异步执行 ==========
 async function executeTextTask(taskId: string, userId: string, prompt: string, isPro: boolean) {
   const result = await executeTextGeneration(userId, prompt, isPro);
   if (result.success) {
@@ -102,6 +101,7 @@ async function executeTextTask(taskId: string, userId: string, prompt: string, i
       `UPDATE tasks SET status = $1, code = $2, updated_at = NOW() WHERE task_id = $3`,
       ['completed', codeWithLabel, taskId]
     );
+    // ✅ 后台生成保存到数据库
     await query(
       `INSERT INTO saved_apps (app_id, user_id, name, code, type) VALUES ($1, $2, $3, $4, $5)`,
       [appId, userId, prompt.slice(0, 30) + '...', codeWithLabel, 'text']
@@ -111,6 +111,7 @@ async function executeTextTask(taskId: string, userId: string, prompt: string, i
   }
 }
 
+// ========== 核心生成逻辑 ==========
 async function executeTextGeneration(userId: string, prompt: string, isPro: boolean) {
   let generatedCode = '';
   let errorMsg = '';

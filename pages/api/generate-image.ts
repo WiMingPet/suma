@@ -4,9 +4,9 @@ import { getUserPoints, deductPoints, incrementFreeUsed, getFreeUsed, getOrCreat
 
 const MAX_FREE = 3
 
-// ✅ 新版：右上角小标签，不干扰内容
+// ✅ 左上角小标签
 const AI_LABEL = `<!-- 🤖 AI生成标识 -->
-<div style="position:fixed;top:12px;right:12px;background:rgba(102,126,234,0.9);color:#fff;padding:4px 10px;border-radius:20px;font-size:12px;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);font-family:system-ui,sans-serif;">
+<div style="position:fixed;top:8px;left:8px;background:rgba(102,126,234,0.85);color:#fff;padding:3px 10px;border-radius:12px;font-size:11px;z-index:9999;font-family:system-ui,sans-serif;">
   🤖 AI生成
 </div>`;
 
@@ -62,16 +62,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return;
   }
 
+  // ========== 前台模式：只返回代码，不保存数据库 ==========
   const result = await executeImageGeneration(userId, imageBase64, prompt, isPro);
   if (!result.success) return res.status(500).json({ error: '生成失败' });
 
   const codeWithLabel = addAILabel(result.code);
-  const appId = `app_${Date.now()}`;
-  await query(
-    `INSERT INTO saved_apps (app_id, user_id, name, code, type) VALUES ($1, $2, $3, $4, $5)`,
-    [appId, userId, `图片应用-${Date.now()}`, codeWithLabel, 'image']
-  );
-
   const newFreeUsed = await getFreeUsed(userId);
   const finalPoints = await getUserPoints(userId);
   return res.status(200).json({ success: true, code: codeWithLabel, free_used: newFreeUsed, points: finalPoints });
@@ -83,6 +78,7 @@ async function executeImageTask(taskId: string, userId: string, imageBase64: str
     const codeWithLabel = addAILabel(result.code);
     const appId = `app_${Date.now()}`;
     await query(`UPDATE tasks SET status = $1, code = $2, updated_at = NOW() WHERE task_id = $3`, ['completed', codeWithLabel, taskId]);
+    // ✅ 后台生成保存到数据库
     await query(`INSERT INTO saved_apps (app_id, user_id, name, code, type) VALUES ($1, $2, $3, $4, $5)`, [appId, userId, `图片应用-${Date.now()}`, codeWithLabel, 'image']);
   } else {
     await query('UPDATE tasks SET status = $1 WHERE task_id = $2', ['failed', taskId]);
