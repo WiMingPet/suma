@@ -122,14 +122,10 @@ export default function Home() {
 
       if (data.success) {
         setGeneratedCode(data.code)
-        const updatedUser = {
-          ...user,
-          daily_count: (user.daily_count || 0) + 1,
-          points: data.points ?? user.points,
-          free_used: data.free_used ?? user.free_used
-        }
-        setUser(updatedUser)
+        // ✅ 从服务器刷新最新余额
+        refreshUser()
 
+        // ✅ 仅更新本地缓存，不重复插入数据库
         const newApp = {
           id: Date.now().toString(),
           name: textPrompt.slice(0, 30) + '...',
@@ -137,16 +133,9 @@ export default function Home() {
           type: 'text' as const,
           created_at: new Date().toISOString()
         }
-
         const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
         apps.unshift(newApp)
         localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
-
-        fetch('https://sumaai.cn/api/saved-apps', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
-          body: JSON.stringify(newApp)
-        }).catch(err => console.warn('服务器同步失败', err))
       } else {
         console.log(data.error || '生成失败')
       }
@@ -227,14 +216,8 @@ export default function Home() {
 
         if (data.success) {
           setGeneratedCode(data.code)
-          const updatedUser = {
-            ...user,
-            daily_count: (user.daily_count || 0) + 1,
-            points: data.points ?? user.points,
-            free_used: data.free_used ?? user.free_used
-          }
-          setUser(updatedUser)
-          
+          refreshUser()
+
           const newApp = {
             id: Date.now().toString(),
             name: `图片应用-${Date.now()}`,
@@ -242,27 +225,12 @@ export default function Home() {
             type: 'image' as const,
             created_at: new Date().toISOString()
           }
-
           const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
           apps.unshift(newApp)
           localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
-
-          fetch('https://sumaai.cn/api/saved-apps', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
-            body: JSON.stringify(newApp)
-          }).catch(err => console.warn('服务器同步失败', err))
         } else {
           console.log(data.error || '生成失败')
         }
-        setIsGeneratingImage(false)
-      }
-      reader.readAsDataURL(imageFile)
-    } catch (err) {
-      console.log('生成失败，请稍后重试')
-      setIsGeneratingImage(false)
-    }
-  }
 
   // 后台生成 - 文字
   const handleBackgroundText = async () => {

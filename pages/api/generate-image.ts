@@ -4,10 +4,10 @@ import { getUserPoints, deductPoints, incrementFreeUsed, getFreeUsed, getOrCreat
 
 const MAX_FREE = 3
 
-// ✅ AI 标识标签
+// ✅ 新版：右上角小标签，不干扰内容
 const AI_LABEL = `<!-- 🤖 AI生成标识 -->
-<div style="background:#f0f7ff;padding:6px 14px;font-size:12px;color:#4a6fa5;text-align:center;border-bottom:2px solid #d0e0ff;font-family:system-ui,sans-serif;position:sticky;top:0;z-index:999;">
-  🤖 本页面由 AI 生成 · 内容仅供参考
+<div style="position:fixed;top:12px;right:12px;background:rgba(102,126,234,0.9);color:#fff;padding:4px 10px;border-radius:20px;font-size:12px;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);font-family:system-ui,sans-serif;">
+  🤖 AI生成
 </div>`;
 
 function addAILabel(code: string): string {
