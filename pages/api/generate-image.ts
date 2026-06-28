@@ -68,8 +68,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!result.success) {
     return res.status(500).json({ error: '生成失败' });
   }
-  // ✅ 在保存前对代码添加 AI 标识
-  const codeWithLabel = addAILabel(result.code, prompt || '图片识别应用');
+
+  // ✅ 强制添加 AI 标识
+  const aiLabel = `<!-- AI生成标识 -->
+<div style="background:#f0f7ff;padding:6px 14px;font-size:12px;color:#4a6fa5;text-align:center;border-bottom:2px solid #d0e0ff;font-family:system-ui,sans-serif;position:sticky;top:0;z-index:999;">
+  🤖 本页面由 AI 生成 · 内容仅供参考
+</div>`;
+
+  let codeWithLabel = result.code;
+  if (codeWithLabel.includes('<body>')) {
+    codeWithLabel = codeWithLabel.replace('<body>', `<body>${aiLabel}`);
+  } else {
+    codeWithLabel = aiLabel + codeWithLabel;
+  }
 
   // 保存到 saved_apps
   const appId = `app_${Date.now()}`;
@@ -94,6 +105,19 @@ async function executeImageTask(taskId: string, userId: string, imageBase64: str
   const result = await executeImageGeneration(userId, imageBase64, prompt, isPro);
 
   if (result.success) {
+
+    const aiLabel = `<!-- AI生成标识 -->
+<div style="background:#f0f7ff;padding:6px 14px;font-size:12px;color:#4a6fa5;text-align:center;border-bottom:2px solid #d0e0ff;font-family:system-ui,sans-serif;position:sticky;top:0;z-index:999;">
+  🤖 本页面由 AI 生成 · 内容仅供参考
+</div>`;
+
+    let codeWithLabel = result.code;
+    if (codeWithLabel.includes('<body>')) {
+      codeWithLabel = codeWithLabel.replace('<body>', `<body>${aiLabel}`);
+    } else {
+      codeWithLabel = aiLabel + codeWithLabel;
+    }
+
     const appId = `app_${Date.now()}`;
 
     await query(
@@ -199,52 +223,4 @@ ${prompt ? `补充要求：${prompt}` : ''}
 
   console.log('📸 图片生成任务完成');
   return { success: true, code: generatedCode };
-}
-
-// ========== ✅ 添加 AI 标识 ==========
-function addAILabel(code: string, title: string): string {
-  // 检查是否已经包含 AI 标识，避免重复添加
-  if (code.includes('AI生成') || code.includes('AI 生成') || code.includes('由 AI 生成')) {
-    return code;
-  }
-
-  // 提取标题
-  const titleMatch = code.match(/<title>(.*?)<\/title>/);
-  const pageTitle = titleMatch ? titleMatch[1] : title;
-
-  // AI 标识 HTML
-  const labelHTML = `
-<!-- AI 生成标识 -->
-<div style="background:#f0f7ff;padding:6px 14px;font-size:12px;color:#4a6fa5;text-align:center;border-bottom:2px solid #d0e0ff;font-family:system-ui,sans-serif;">
-  🤖 本页面由 AI 生成 · 内容仅供参考
-</div>
-`;
-
-  // 检查是否有 <body> 标签
-  if (code.includes('<body>')) {
-    return code.replace('<body>', `<body>${labelHTML}`);
-  }
-
-  // 如果有 <html> 但没有 <body>
-  if (code.includes('<html>')) {
-    return code.replace('<html>', `<html><body>${labelHTML}`);
-  }
-
-  // 兜底：包装整个代码
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${pageTitle}</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
-    .ai-label { background: #f0f7ff; padding: 8px 16px; font-size: 13px; color: #4a6fa5; text-align: center; border-bottom: 2px solid #d0e0ff; margin-bottom: 20px; }
-  </style>
-</head>
-<body>
-  <div class="ai-label">🤖 本页面由 AI 生成 · 内容仅供参考</div>
-  <div>${code}</div>
-</body>
-</html>`;
 }
