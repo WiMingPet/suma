@@ -216,8 +216,10 @@ export default function Home() {
 
         if (data.success) {
           setGeneratedCode(data.code)
+          // ✅ 从服务器刷新最新余额
           refreshUser()
 
+          // ✅ 仅更新本地缓存，不重复插入数据库
           const newApp = {
             id: Date.now().toString(),
             name: `图片应用-${Date.now()}`,
@@ -231,6 +233,14 @@ export default function Home() {
         } else {
           console.log(data.error || '生成失败')
         }
+        setIsGeneratingImage(false)
+      }
+      reader.readAsDataURL(imageFile)
+    } catch (err) {
+      console.log('生成失败，请稍后重试')
+      setIsGeneratingImage(false)
+    }
+  }
 
   // 后台生成 - 文字
   const handleBackgroundText = async () => {
