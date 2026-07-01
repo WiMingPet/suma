@@ -136,6 +136,12 @@ export default function Home() {
         const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
         apps.unshift(newApp)
         localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
+        // ✅ 同步到服务器
+        fetch('https://sumaai.cn/api/saved-apps', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
+          body: JSON.stringify(newApp)
+        }).catch(err => console.warn('服务器同步失败', err));
       } else {
         console.log(data.error || '生成失败')
       }
@@ -230,6 +236,12 @@ export default function Home() {
           const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
           apps.unshift(newApp)
           localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
+          // ✅ 同步到服务器
+          fetch('https://sumaai.cn/api/saved-apps', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
+            body: JSON.stringify(newApp)
+          }).catch(err => console.warn('服务器同步失败', err));
         } else {
           console.log(data.error || '生成失败')
         }
@@ -564,6 +576,31 @@ export default function Home() {
                 <div className="flex gap-2">
                   <button onClick={() => setPreviewCode(generatedCode)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">预览</button>
                   <button onClick={handleDownload} className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm">下载 HTML</button>
+                 
+                  {/* ✅ 添加保存按钮 */}
+                  <button onClick={() => {
+                    if (!user) {
+                      setShowLogin(true);
+                      return;
+                    }
+                    const newApp = {
+                      id: Date.now().toString(),
+                      name: activeTab === 'image' ? `图片应用-${Date.now()}` : textPrompt.slice(0, 30) + '...',
+                      code: generatedCode,
+                      type: activeTab === 'image' ? 'image' : 'text',
+                      created_at: new Date().toISOString()
+                    };
+                    const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]');
+                    apps.unshift(newApp);
+                    localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps));
+                    fetch('https://sumaai.cn/api/saved-apps', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
+                      body: JSON.stringify(newApp)
+                    }).then(() => alert('✅ 已保存到我的应用')).catch(() => alert('保存失败'));
+                  }} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm">
+                    💾 保存
+                  </button>
                   <button
                     onClick={async () => {
                       try {
