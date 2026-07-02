@@ -136,12 +136,7 @@ export default function Home() {
         const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
         apps.unshift(newApp)
         localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
-        // ✅ 同步到服务器
-        fetch('https://sumaai.cn/api/saved-apps', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
-          body: JSON.stringify(newApp)
-        }).catch(err => console.warn('服务器同步失败', err));
+
       } else {
         console.log(data.error || '生成失败')
       }
@@ -236,12 +231,7 @@ export default function Home() {
           const apps = JSON.parse(localStorage.getItem(`suma_apps_${user.id}`) || '[]')
           apps.unshift(newApp)
           localStorage.setItem(`suma_apps_${user.id}`, JSON.stringify(apps))
-          // ✅ 同步到服务器
-          fetch('https://sumaai.cn/api/saved-apps', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
-            body: JSON.stringify(newApp)
-          }).catch(err => console.warn('服务器同步失败', err));
+
         } else {
           console.log(data.error || '生成失败')
         }
