@@ -66,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   const outTradeNo = `ORDER_${Date.now()}_${userId}`;
   const notifyUrl = `${baseUrl}/api/alipay-notify`;
-  const returnUrl = `${baseUrl}/member-center?from=alipay`;
+  const returnUrl = `${baseUrl}/payment-result`;
 
   // 套餐名称映射
   const planNames: Record<string, string> = { month: '月卡', season: '季卡', year: '年卡' };

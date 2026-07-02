@@ -107,18 +107,18 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
       });
       if (result.success) {
         if (isIAP) {
-          console.log(`支付成功！获得 ${planPoints[plan]} 点币`);
+          alert(`支付成功！获得 ${planPoints[plan]} 点币`);
           onSuccess();
           onClose();
         } else {
           setOutTradeNo(result.orderId || '');
         }
       } else {
-        console.log(result.message || '购买失败，请重试');
+        alert(result.message || '购买失败，请重试');
       }
     } catch (error: any) {
       console.error('创建订单失败:', error);
-      console.log('支付失败，请重试');
+      alert('支付失败，请重试');
     } finally {
       setLoading(false);
     }
@@ -140,18 +140,18 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
           setQrCode(data.qrCode);
           setOutTradeNo(data.outTradeNo);
         } else {
-          console.log(data.error || '创建订单失败');
+          alert(data.error || '创建订单失败');
         }
       } else {
         if (data.success && data.payUrl) {
           window.location.href = data.payUrl;
         } else {
-          console.log(data.error || '创建订单失败');
+          alert(data.error || '创建订单失败');
         }
       }
     } catch (error) {
       console.error('创建订单失败:', error);
-      console.log('创建订单失败，请稍后重试');
+      alert('创建订单失败，请稍后重试');
     } finally {
       setLoading(false);
     }
@@ -182,7 +182,7 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
         const data = await res.json();
         if (data.isPaid) {
           clearInterval(interval);
-          console.log(`✅ 支付成功！获得 ${planPoints[plan]} 点币`);
+          alert(`✅ 支付成功！获得 ${planPoints[plan]} 点币`);
           onSuccess();
           onClose();
         }
@@ -199,14 +199,14 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
       const res = await fetch(`https://sumaai.cn/api/order-status?outTradeNo=${outTradeNo}&force=paid`);
       const data = await res.json();
       if (data.success) {
-        console.log(`✅ 支付确认成功！获得 ${planPoints[plan]} 点币`);
+        alert(`✅ 支付确认成功！获得 ${planPoints[plan]} 点币`);
         onSuccess();
         onClose();
       } else {
-        console.log(data.message || '未检测到支付');
+        alert(data.message || '未检测到支付');
       }
     } catch (err) {
-      console.log('确认失败，请稍后重试');
+      alert('确认失败，请稍后重试');
     } finally {
       setLoading(false);
     }
