@@ -77,8 +77,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: '生成失败' });
   }
 
-  // ✅ 只添加标识，不保存到数据库（后端不做保存，前端只存本地缓存）
+  // ✅ 前台模式也保存到数据库
   const codeWithLabel = addAILabel(result.code);
+  const appId = `app_${Date.now()}`;
+  await query(
+    `INSERT INTO saved_apps (app_id, user_id, name, code, type) VALUES ($1, $2, $3, $4, $5)`,
+    [appId, userId, prompt.slice(0, 30) + '...', codeWithLabel, 'text']
+  );
 
   const newFreeUsed = await getFreeUsed(userId);
   const finalPoints = await getUserPoints(userId);
@@ -89,7 +94,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     free_used: newFreeUsed,
     points: finalPoints
   });
-}
 
 // ========== 后台异步执行 ==========
 async function executeTextTask(taskId: string, userId: string, prompt: string, isPro: boolean) {

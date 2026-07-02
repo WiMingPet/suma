@@ -62,11 +62,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return;
   }
 
-  // ========== 前台模式：只返回代码，不保存数据库 ==========
+  // ========== 前台模式：保存到数据库 ==========
   const result = await executeImageGeneration(userId, imageBase64, prompt, isPro);
   if (!result.success) return res.status(500).json({ error: '生成失败' });
 
   const codeWithLabel = addAILabel(result.code);
+  const appId = `app_${Date.now()}`;
+  await query(
+    `INSERT INTO saved_apps (app_id, user_id, name, code, type) VALUES ($1, $2, $3, $4, $5)`,
+    [appId, userId, `图片应用-${Date.now()}`, codeWithLabel, 'image']
+  );
+
   const newFreeUsed = await getFreeUsed(userId);
   const finalPoints = await getUserPoints(userId);
   return res.status(200).json({ success: true, code: codeWithLabel, free_used: newFreeUsed, points: finalPoints });
