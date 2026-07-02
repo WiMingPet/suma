@@ -1,5 +1,5 @@
 // pages/member-center.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useUser } from '../contexts/UserContext';
 import PaymentModal from '../components/PaymentModal';
@@ -11,6 +11,15 @@ export default function MemberCenter() {
   const [selectedPlan, setSelectedPlan] = useState<'month' | 'season' | 'year'>('month');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // ✅ 支付宝支付完成后自动恢复登录状态
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('from') === 'alipay') {
+      refreshUser();
+      window.history.replaceState({}, '', '/member-center');
+    }
+  }, []);
 
   const plans = {
     month: { name: '500点币', price: 29, points: 500 },
