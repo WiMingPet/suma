@@ -147,7 +147,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
         version: '1.0',
         notify_url: notifyUrl,
-        return_url: returnUrl,
         biz_content: JSON.stringify(bizContent),
       };
       
