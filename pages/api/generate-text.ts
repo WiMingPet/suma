@@ -94,6 +94,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     free_used: newFreeUsed,
     points: finalPoints
   });
+}
 
 // ========== 后台异步执行 ==========
 async function executeTextTask(taskId: string, userId: string, prompt: string, isPro: boolean) {
