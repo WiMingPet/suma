@@ -144,7 +144,10 @@ export default function PaymentModal({ isOpen, onClose, userId, onSuccess, plan:
         }
       } else {
         if (data.success && data.payUrl) {
-          window.location.href = data.payUrl;
+          const a = document.createElement('a');
+          a.href = data.payUrl;
+          a.target = '_blank';
+          a.click();
         } else {
           console.log(data.error || '创建订单失败');
         }
